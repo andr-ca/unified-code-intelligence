@@ -17,7 +17,7 @@
     "completeness": [
       {"symbol": "COMEN01C", "expect_exact": false, "why": "reached only via dynamic XCTL PROGRAM(CDEMO-TO-PROGRAM); its own dispatch is dynamic too (menu router)"},
       {"symbol": "COACTUPC", "expect_exact": false, "why": "invoked via CSD transaction CAUP and dynamic XCTL — no literal caller exists in source"},
-      {"symbol": "COSGN00C", "expect_exact": false, "why": "dynamic XCTL at line ~ (CDEMO-TO-PROGRAM); entry via CSD tran CC00"},
+      {"symbol": "COSGN00C", "expect_exact": true, "why": "its own dispatch is LITERAL (XCTL PROGRAM('COADM01C'/'COMEN01C'), cbl lines ~231/236); callers arrive via CSD transaction (INVOKES edge) — under the documented completeness contract (candidate edges + named unresolved sites + own dynamic sites) this is exact. See scoring.md §6.5 for the anonymous-dynamic-dispatch caveat."},
       {"symbol": "CBSTM03B", "expect_exact": true, "why": "called only via literal CALL 'CBSTM03B' from CBSTM03A (batch, fully static)"},
       {"symbol": "CSUTLDTC", "expect_exact": true, "why": "called only via literal CALL 'CSUTLDTC' (CORPT00C, COTRN02C)"}
     ],

@@ -21,8 +21,26 @@ from ..parser.base import ParseResult
 _DEFINER_KINDS = frozenset(
     {EntityType.MODULE, EntityType.CLASS, EntityType.PACKAGE, EntityType.FILE}
 )
-_CALLABLE = frozenset({EntityType.FUNCTION, EntityType.METHOD, EntityType.TEST})
+_CALLABLE = frozenset({EntityType.FUNCTION, EntityType.METHOD, EntityType.TEST,
+                       EntityType.LEGACY_PROGRAM, EntityType.PARAGRAPH})
 _CLASSISH = frozenset({EntityType.CLASS, EntityType.INTERFACE})
+
+#: Languages using the flat member-library convention (name == origin; a literal reference
+#: that doesn't resolve is a missing artifact, never a global name-match fallback).
+_MAINFRAME_LANGS = frozenset({"cobol", "jcl", "csd"})
+
+#: z/OS system utilities commonly executed from JCL — external by convention, never gaps.
+_SYSTEM_UTILITIES = frozenset({
+    "IDCAMS", "IEBGENER", "IEBCOPY", "IEFBR14", "SORT", "ICETOOL", "ICEMAN",
+    "IKJEFT01", "IKJEFT1A", "IKJEFT1B", "SDSF", "FTP", "ADRDSSU", "GIMSMP",
+})
+
+_LINK_RELATIONS = {
+    "runs": RelationType.RUNS,
+    "invokes": RelationType.INVOKES,
+    "reads": RelationType.READS,
+    "writes": RelationType.WRITES,
+}
 
 #: If a bare name matches more than this many symbols, emit no edge (record it as unresolved).
 _FANOUT_CAP = 5
@@ -124,7 +142,13 @@ class GraphBuilder:
         self._resolve_imports(files)
         self._resolve_inheritance(files)
         self._resolve_calls(files)
+        self._resolve_links(files)
         return list(self.entities.values()), self.relationships
+
+    def _is_external_name(self, name: str) -> bool:
+        """System/vendor artifact by naming convention (DFH*, MQ*, CEE*, utilities, …)."""
+        up = name.upper()
+        return up in _SYSTEM_UTILITIES or any(up.startswith(p) for p in self.external_prefixes)
 
     def _compute_import_tables(self, files: list[FileParse]) -> None:
         """Per-module imported-module set + local-name binding table, shared by all resolvers."""
@@ -271,6 +295,14 @@ class GraphBuilder:
             src = self.module_by_path[fp.path]
             for imp in fp.result.imports:
                 target = self.modules_by_qname.get(imp.module)
+                if fp.language in _MAINFRAME_LANGS:
+                    # COPY MEMBER: land the edge on the COPYBOOK/program symbol so impact
+                    # queries on the copybook see its dependents directly
+                    member = self._resolve_member(
+                        imp.module, kinds=(EntityType.COPYBOOK, EntityType.LEGACY_PROGRAM)
+                    )
+                    if member is not None:
+                        target = member
                 prov = self._prov(fp.path, imp.start_line, imp.start_line)
                 if target is not None:
                     self._add_rel(RelationType.IMPORTS, src.id, target.id, prov,
@@ -278,7 +310,22 @@ class GraphBuilder:
                     continue
                 if not imp.module:
                     continue
-                if self._is_external_module(imp.module, imp.external, tops):
+                mainframe = fp.language in _MAINFRAME_LANGS
+                if mainframe:
+                    # flat member namespace: a COPY that doesn't resolve is either a platform
+                    # copybook (DFH*/SQLCA -> external stub) or a missing member (gap)
+                    if imp.external or self._is_external_name(imp.module):
+                        stub = self.report_gap("copybook", imp.module, EntityType.COPYBOOK, prov,
+                                               "external-copybook", "", external=True)
+                        self._add_rel(RelationType.IMPORTS, src.id, stub.id, prov,
+                                      {"names": imp.names, "resolution": "external"})
+                    else:
+                        stub = self.report_gap("copybook", imp.module, EntityType.COPYBOOK, prov,
+                                               "copy-member-not-found",
+                                               f"{imp.module}.cpy (copybook library)", external=False)
+                        self._add_rel(RelationType.IMPORTS, src.id, stub.id, prov,
+                                      {"names": imp.names, "resolution": "missing"})
+                elif self._is_external_module(imp.module, imp.external, tops):
                     pkg = self._ensure_package(imp.module)
                     self._add_rel(RelationType.IMPORTS, src.id, pkg.id, prov, {"names": imp.names})
                     self._add_rel(RelationType.DEPENDS_ON, repo_id_ent, pkg.id, prov)
@@ -379,7 +426,31 @@ class GraphBuilder:
                 callers = self.by_qname.get(call.caller_qname, [])
                 if not callers:
                     continue
-                caller = callers[0]
+                # prefer the callable symbol over a same-named module/file (mainframe: the
+                # LEGACY_PROGRAM and its MODULE share one qualified name)
+                caller = next((c for c in callers if c.kind in _CALLABLE), callers[0])
+                # dynamic targets (COBOL CALL WS-PGM, CICS XCTL(var), JCL PGM=&VAR) are never
+                # resolvable from source — record the site, never guess an edge
+                if call.dynamic:
+                    self.unresolved_calls.append({
+                        "caller": caller.qualified_name, "name": call.callee_name,
+                        "receiver": call.receiver, "reason": "dynamic-target",
+                        "path": fp.path, "line": call.start_line, "fan_out": 0,
+                    })
+                    continue
+                if fp.language in _MAINFRAME_LANGS:
+                    # a literal CALL/XCTL/LINK names its member exactly (flat namespace):
+                    # unique member -> provable edge; external API -> external stub; else gap
+                    target = self._resolve_member(call.callee_name)
+                    if target is not None:
+                        prov = Provenance(self.repo_id, fp.path, call.start_line, call.start_line,
+                                          f"{fp.language}_parser", 1.0)
+                        self._add_rel(RelationType.CALLS, caller.id, target.id, prov,
+                                      {"callee": call.callee_name, "resolution": "syntactic",
+                                       "fan_out": 1})
+                    else:
+                        self._emit_mainframe_call(caller, call, fp)
+                    continue
                 # binds-first: an explicit import is the strongest evidence and overrides the global
                 # ladder — a binds miss becomes a gap, never a same-named unrelated symbol (§13.2)
                 bound = self._resolve_via_binds(call, binds)
@@ -450,6 +521,94 @@ class GraphBuilder:
         self._add_rel(RelationType.CALLS, caller.id, stub.id, prov,
                       {"receiver": call.receiver, "callee": call.callee_name,
                        "resolution": "external" if external else "missing", "fan_out": -1})
+
+    def _emit_mainframe_call(self, caller: Entity, call, fp: FileParse) -> None:
+        """A literal mainframe CALL/XCTL/LINK to an unindexed member: external API or program gap."""
+        name = call.callee_name.upper()
+        external = self._is_external_name(name)
+        prov = Provenance(self.repo_id, fp.path, call.start_line, call.start_line, "normalizer", 0.0)
+        reason = "external-call" if external else "call-target-not-indexed"
+        stub = self.report_gap("program", name, EntityType.LEGACY_PROGRAM, prov, reason,
+                               "" if external else f"{name} (load library / source member)",
+                               external=external)
+        self._add_rel(RelationType.CALLS, caller.id, stub.id, prov,
+                      {"callee": name, "resolution": "external" if external else "missing",
+                       "fan_out": -1})
+
+    #: Which entity kind a link's source must be — member names collide across artifact types
+    #: (CBEXPORT is both a program and the job that runs it), so "runs" must anchor on the job.
+    _LINK_SRC_KINDS = {
+        "runs": (EntityType.JCL_JOB,),
+        "invokes": (EntityType.TRANSACTION_CODE,),
+        "reads": (EntityType.LEGACY_PROGRAM, EntityType.FUNCTION, EntityType.METHOD),
+        "writes": (EntityType.LEGACY_PROGRAM, EntityType.FUNCTION, EntityType.METHOD),
+    }
+
+    def _resolve_links(self, files: list[FileParse]) -> None:
+        """Materialize parser-emitted structural links: JCL RUNS, CSD INVOKES, SQL READS/WRITES."""
+        for fp in files:
+            for link in fp.result.links:
+                rtype = _LINK_RELATIONS.get(link.relation)
+                sources = self.by_qname.get(link.src_qname, [])
+                preferred = self._LINK_SRC_KINDS.get(link.relation, ())
+                src = next((s for s in sources if s.kind in preferred),
+                           next((s for s in sources if s.kind in SYMBOL_KINDS),
+                                sources[0] if sources else None))
+                if rtype is None or src is None:
+                    continue
+                prov = Provenance(self.repo_id, fp.path, link.start_line, link.start_line,
+                                  f"{fp.language}_parser", 1.0)
+                if rtype in (RelationType.READS, RelationType.WRITES):
+                    table = self._ensure_table(link.target_name, prov)
+                    self._add_rel(rtype, src.id, table.id, prov, {"resolution": "syntactic"})
+                    continue
+                target = self._resolve_member(link.target_name)
+                if target is not None:
+                    self._add_rel(rtype, src.id, target.id, prov,
+                                  {"resolution": "syntactic", **link.attributes})
+                elif self._is_external_name(link.target_name):
+                    stub = self.report_gap("program", link.target_name.upper(),
+                                           EntityType.LEGACY_PROGRAM, prov, "external-program",
+                                           "", external=True)
+                    self._add_rel(rtype, src.id, stub.id, prov,
+                                  {"resolution": "external", **link.attributes})
+                else:
+                    kind = "proc" if link.target_kind == EntityType.JCL_JOB.value else "program"
+                    stub = self.report_gap(kind, link.target_name.upper(),
+                                           EntityType(link.target_kind), prov,
+                                           f"{kind}-not-indexed",
+                                           f"{link.target_name} (library member)", external=False)
+                    self._add_rel(rtype, src.id, stub.id, prov,
+                                  {"resolution": "missing", **link.attributes})
+
+    def _resolve_member(
+        self, name: str,
+        kinds: tuple[EntityType, ...] = (EntityType.LEGACY_PROGRAM, EntityType.JCL_JOB),
+    ) -> Entity | None:
+        """Resolve a mainframe member name to its symbol entity (flat namespace), falling back
+        to the member's MODULE entity when no symbol of the preferred kinds exists.
+
+        ``kinds`` is a **priority order**, not a set: member names collide across artifact
+        types (CREACC is a program *and* its COMMAREA copybook; CBEXPORT is a program *and*
+        the job that runs it), so COPY must prefer the copybook while CALL/PGM= must prefer
+        the program.
+        """
+        candidates = self.by_name.get(name.lower(), [])
+        for kind in kinds:
+            for entity in candidates:
+                if entity.kind == kind and not entity.attributes.get("missing"):
+                    return entity
+        for entity in candidates:
+            if entity.kind == EntityType.MODULE and not entity.attributes.get("missing"):
+                return entity
+        return None
+
+    def _ensure_table(self, table: str, prov: Provenance) -> Entity:
+        qname = table.upper()
+        return self._add_entity(
+            EntityType.DATABASE_TABLE, "", qname, qname.split(".")[-1], prov,
+            {"table": True},
+        )
 
     def _unresolved_reason(self, call, fan_out: int, binds: dict[str, str]) -> str | None:
         """Classify an unattributed call so completeness never silently reports 'exact' for a symbol

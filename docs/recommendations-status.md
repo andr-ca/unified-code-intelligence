@@ -24,11 +24,15 @@ Maps each item in [`recommendations.md`](recommendations.md) (and the concept ga
 | 2.3 | Index generations + HEAD SHA; readers use last completed generation | ✅ | `indexer` stamps `state["index"] = {generation, head_sha, indexed_at}` |
 | 2.4 | `--full` escape hatch + auto full-reindex on model change | ✅ | `uci index --full`; embedding-model change clears vectors and re-embeds (`indexer` §6.2 guard) |
 
-## 3. Evaluation harness (P1/P2/P7)
+## 3. Evaluation harness (P1/P2/P7)  ✅
 
 | Status | Notes |
 | --- | --- |
-| ⏳ next | Golden call-graph + retrieval + impact fixtures with precision/recall **per resolution level** and MRR@k. This is the agreed next task; the substrate (resolution labels, `unresolved_calls`, completeness) is now in place to measure it. |
+| ✅ done | Two-track suite under `evals/` (contract: `evals/docs/scoring.md`, runner: `evals/run_eval.py`). **supported** track (Python/JS) is the regression gate — `shop` + `resolve_cases` fixtures scored on `symbol_lookup / calls / impact / queries / completeness / gaps`, per-caller F1 checked against the resolution ladder (`expect_resolved`). **mainframe** track (COBOL/JCL/CICS/DB2 demo repos + mined ground truth) is the Phase-5 progress meter, `0` by construction until extractors land. `evals/reports/baseline.json` gates CI (`--baseline`); supported fails on a >1.0-pt track drop or >0.05 category drop. |
+| ✅ first defect fixed | The suite's first find: same-module constructor calls (`DiscountRule()`) were recorded as `not-found` unresolved sites, over-hedging `PricingCalculator.calculate` completeness. `_unresolved_reason` now treats a bare Capitalized callee as the instantiation the REFERENCES path already owns (mirrors the parser's `func.id[0].isupper()` rule) — no new edge, `calls` stays 1.00. **shop 90.0 → 100.0, supported track 93.6 → 98.6**; baseline re-committed. |
+
+> Note: the earlier reviewer-generated harness stub (`src/uci/eval/`, a `uci eval` command) was removed in favor of the canonical `evals/run_eval.py` — one harness, one scoring contract.
+
 
 ## 4. Explainability of UCI's own outputs (P5)
 
@@ -153,4 +157,9 @@ find_symbol, env weights), `tests/test_impact.py` (stratification, completeness,
 staleness), `tests/test_mcp.py` (dynamic availability), `tests/test_gaps.py` (gap registry, **Phase-4**: internal
 base-class gaps, stub labeling/exclusion), plus **Phase-5** resolution tests (impact/get_callees parity,
 binds-miss gapping, external-stub labeling).
-**129 tests pass, no Docker/network.**
+**145 tests pass (incl. the full-suite eval baseline gate, `tests/test_evals_gate.py`), no Docker/network.**
+
+Beyond the unit suite, the **eval suite** (`evals/run_eval.py`, contract `evals/docs/scoring.md`) is the
+measurement gate for every retrieval/extraction change: `supported` **98.6/100** (regression gate,
+`evals/reports/baseline.json`), `mainframe` **0.0/100** (progress meter until COBOL/JCL/CICS/DB2 extractors land).
+`tests/test_evals_gate.py` drives the runner unmodified and fails CI if the supported track regresses.

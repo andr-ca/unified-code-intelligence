@@ -49,6 +49,15 @@ _PROFILES: dict[str, dict[str, str]] = {
 
 _TRUE = {"1", "true", "yes", "on"}
 
+#: Name prefixes classified as external platform artifacts (never "missing" gaps).
+_DEFAULT_GAP_PREFIXES = (
+    # CICS, DB2, LE, IMS, COBOL runtime, IDMS, DB2 catalog
+    "DFH", "DSN", "CEE", "DFS", "IGZ", "IDMS", "SYSIBM",
+    # MQ APIs + MQ copybooks (CMQ*), MQ subsystem, SQL artifacts (SQLCA/SQLDA),
+    # IMS DL/I (CBLTDLI), PL/I library
+    "MQ", "CMQ", "CSQ", "SQL", "CBLTDLI", "ILBO",
+)
+
 
 def _parse_env_file(path: Path) -> dict[str, str]:
     data: dict[str, str] = {}
@@ -95,7 +104,7 @@ class Config:
     window_overlap: int = 10
 
     # gap registry: name prefixes treated as external (not "missing") — e.g. mainframe system modules
-    gap_external_prefixes: tuple[str, ...] = ("DFH", "DSN", "CEE", "DFS", "IGZ", "IDMS", "SYSIBM")
+    gap_external_prefixes: tuple[str, ...] = _DEFAULT_GAP_PREFIXES
 
     # retrieval fusion weights (graph-first defaults)
     weight_symbol: float = 1.4
@@ -210,9 +219,6 @@ def _default_model_for(provider: str, env: dict[str, str]) -> tuple[str, int]:
     if provider == "openai":
         return env.get("UCI_OPENAI_EMBED_MODEL", "text-embedding-3-small"), 1536
     return "hash-64", 64
-
-
-_DEFAULT_GAP_PREFIXES = ("DFH", "DSN", "CEE", "DFS", "IGZ", "IDMS", "SYSIBM")
 
 
 def _gap_prefixes(env: dict[str, str]) -> tuple[str, ...]:

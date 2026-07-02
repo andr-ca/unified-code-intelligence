@@ -528,42 +528,48 @@
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "DB2-CREATE": {
       "path": ".setup/jcl/ims/Db2-create.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "DB2-DROP": {
       "path": ".setup/jcl/ims/Db2-drop.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "DB2-GRANT": {
       "path": ".setup/jcl/cics/Db2-grant.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "DB2-INSERT": {
       "path": ".setup/jcl/cics/Db2-insert.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "BNKSTMT": {
       "path": "src/base/batch/jcl/BNKSTMT.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     }
   },
   "transactions": [],

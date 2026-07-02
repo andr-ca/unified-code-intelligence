@@ -30,7 +30,12 @@ def resolve_symbol(
         if kind is not None and entity.kind != kind:
             return
         seen.add(entity.id)
-        kind_rank = 0 if entity.kind in SYMBOL_KINDS else 1
+        if entity.kind in SYMBOL_KINDS:
+            # programs outrank their same-named COMMAREA copybooks (mainframe convention:
+            # CREACC.cbl + CREACC.cpy) — "CREACC" almost always means the program
+            kind_rank = 1 if entity.kind == EntityType.COPYBOOK else 0
+        else:
+            kind_rank = 2
         ranked.append((priority, kind_rank * 1000 + len(entity.qualified_name), entity))
 
     # 1. exact name / qualified name

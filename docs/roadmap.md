@@ -64,12 +64,22 @@ keeps vendor imports out of the report. Spec: [`next-iteration-gap-registry.md`]
 - Ownership/evolution: git blame → `AUTHOR`/`TEAM` `OWNS`; churn → `increases_risk_for`; ticket linking.
 - Business/domain: `BUSINESS_CAPABILITY`, `USER_FLOW`, `REPORT` inference (heuristic + optional LLM).
 
-## Phase 5 — Legacy modernization  ⏳ (schema-ready, sample fixtures included)
-- COBOL parser: `LEGACY_PROGRAM`, `PARAGRAPH`, `COPYBOOK`, `COPYBOOK Field` → `MAPS_TO` DB/API.
-- JCL parser: `JCL_JOB` `RUNS` program; step/DD dataset `READS`/`WRITES`.
-- CICS/IMS: `TRANSACTION_CODE` `INVOKES` `LEGACY_PROGRAM`/`SCREEN`.
-- Modernization: `LEGACY_MODULE → CANDIDATE_FOR_MIGRATION → TargetService` with mapping reports.
-- Sample COBOL/JCL/copybook fixtures ship now (`examples/legacy/`) to validate the schema end-to-end.
+## Phase 5 — Legacy modernization  🚧 (parsers delivered & eval-scored; deeper extraction ⏳)
+- ✅ COBOL parser (`parser/cobol_parser.py`): `LEGACY_PROGRAM` + `COPYBOOK` symbols; literal
+  `CALL`/`EXEC CICS XCTL|LINK` → resolved calls; **dynamic** targets (`CALL WS-PGM`,
+  `XCTL PROGRAM(var)`) → unresolved sites (honest completeness); `COPY`/`EXEC SQL INCLUDE` →
+  copybook dependency edges with external-vs-missing gap classification; `EXEC SQL` →
+  `READS`/`WRITES` `DATABASE_TABLE` edges.
+- ✅ JCL parser (`parser/jcl_parser.py`): `JCL_JOB` `RUNS` program (`EXEC PGM=`); PROC refs
+  gap-tracked; symbolic (`PGM=&VAR`) → dynamic sites.
+- ✅ CSD parser (`parser/csd_parser.py`): `TRANSACTION_CODE` `INVOKES` `LEGACY_PROGRAM`.
+- ✅ Scored against real repos (`evals/`): **mainframe track 91/100** (CardDemo, Bank-of-Z,
+  cash-account) — calls/copybook-impact/jobs/transactions/data-access at or near 1.0;
+  retrieval (`queries`) is the known remaining gap (FTS5 work).
+- ⏳ `PARAGRAPH` structure, BMS `SCREEN` maps, DCLGEN `MAPS_TO`, DB2 catalog ingester
+  (SYSPACKDEP), IMS PSB/gen, HLASM linkage (CSECT/EXTRN/V-cons), dataflow for
+  `MOVE 'X' TO var` dynamic-call resolution.
+- ⏳ Modernization: `LEGACY_MODULE → CANDIDATE_FOR_MIGRATION → TargetService` with mapping reports.
 
 ## Cross-cutting adapter roadmap (behind interfaces, config-selectable)
 | Category | local-lite (now) | First upgrade | Later |
@@ -89,3 +99,4 @@ Deliverables per profile: `docker-compose.local-pro.yml` (Memgraph + Qdrant + Ol
 - Optional-backend tests are marked and skipped when the backend is absent.
 - Docs updated (schema, retrieval, mcp-tools as relevant).
 - All extracted facts remain traceable to file + line range.
+- **No retrieval/extraction change ships without an eval delta**: run `evals/run_eval.py --baseline evals/reports/baseline.json`; the `supported` track must not regress (>1.0-pt track or >0.05 category), and any movement re-commits `baseline.json` with an explanation (`evals/docs/scoring.md` §5). `mainframe` extractor work is expected to *raise* its track.

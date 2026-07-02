@@ -19,6 +19,9 @@ venv/
 .coverage
 htmlcov/
 
+# Eval run reports (generated artifacts, not tracked)
+evals/reports/run-*
+
 # Editors / OS
 .idea/
 .vscode/

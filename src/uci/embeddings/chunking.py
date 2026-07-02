@@ -23,6 +23,9 @@ _CHUNKABLE = frozenset(
         EntityType.CLASS,
         EntityType.INTERFACE,
         EntityType.TEST,
+        EntityType.LEGACY_PROGRAM,
+        EntityType.COPYBOOK,
+        EntityType.JCL_JOB,
     }
 )
 

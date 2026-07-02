@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from .base import LanguageParser, ParseResult
+from .cobol_parser import CobolParser
 from .config_parser import ConfigParser
+from .csd_parser import CsdParser
 from .javascript_parser import JavaScriptParser
+from .jcl_parser import JclParser
 from .python_parser import PythonParser
 
 _PARSERS: dict[str, LanguageParser] = {}
@@ -26,6 +29,9 @@ def supported_languages() -> list[str]:
 register(PythonParser())
 register(JavaScriptParser())
 register(ConfigParser())
+register(CobolParser())
+register(JclParser())
+register(CsdParser())
 
 
 __all__ = ["register", "get_parser", "supported_languages", "ParseResult", "LanguageParser"]

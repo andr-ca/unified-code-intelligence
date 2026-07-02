@@ -6,11 +6,20 @@ _EXT_LANGUAGE: dict[str, str] = {
     ".py": "python", ".pyi": "python",
     ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
     ".ts": "javascript", ".tsx": "javascript",
+    ".cbl": "cobol", ".cob": "cobol", ".cpy": "cobol",
+    ".jcl": "jcl",
+    ".csd": "csd",
     ".env": "config", ".ini": "config", ".cfg": "config", ".toml": "config",
     ".yaml": "config", ".yml": "config", ".json": "config", ".properties": "config",
 }
 
-_CODE_EXTS = frozenset({".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"})
+_CODE_EXTS = frozenset({
+    ".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+    ".cbl", ".cob", ".cpy", ".jcl",
+})
+
+# mainframe members live in flat libraries: the member name IS the module name
+_MAINFRAME_EXTS = (".cbl", ".cob", ".cpy", ".jcl", ".csd")
 
 # extensions we treat as plain text when index_all_text is enabled
 _TEXT_EXTS = frozenset({".md", ".rst", ".txt", ".sql", ".sh", ".html", ".css"})
@@ -37,11 +46,20 @@ def is_text(path: str) -> bool:
 
 
 def module_qname(rel_path: str) -> str:
-    """Derive a dotted module name from a repo-relative path."""
+    """Derive a module name from a repo-relative path.
+
+    Mainframe members (COBOL/JCL/CSD) use the flat library convention — the uppercase member
+    stem is the module name, so `COPY MEMBER` / `EXEC PGM=NAME` resolve by name regardless of
+    which directory the member sits in.
+    """
     p = rel_path.replace("\\", "/").lstrip("/")
+    lower = p.lower()
+    for ext in _MAINFRAME_EXTS:
+        if lower.endswith(ext):
+            return p.rsplit("/", 1)[-1][: -len(ext)].upper()
     for ext in (".pyi", ".py", ".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs",
                 ".yaml", ".yml", ".toml", ".json", ".ini", ".cfg", ".env", ".properties"):
-        if p.lower().endswith(ext):
+        if lower.endswith(ext):
             p = p[: -len(ext)]
             break
     parts = [seg for seg in p.split("/") if seg]

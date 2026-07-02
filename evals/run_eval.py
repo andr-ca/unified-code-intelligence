@@ -166,6 +166,20 @@ def run_calls(engine, entries, details):
     return mean(scores)
 
 
+def copybook_entity_id(engine, name: str) -> str | None:
+    """The copybook question is about the .cpy artifact — prefer the COPYBOOK entity even when a
+    same-named program exists (Bank-of-Z convention: CREACC.cbl + CREACC.cpy)."""
+    try:
+        results = engine.find_symbol(name)["results"] or \
+                  engine.find_symbol(simple(name).upper())["results"]
+    except Exception:
+        return None
+    for r in results:
+        if r.get("kind") == "copybook":
+            return r["entity_id"]
+    return results[0]["entity_id"] if results else None
+
+
 def run_copybook_impact(engine, entries, details):
     scores = []
     for e in entries:
@@ -178,8 +192,13 @@ def run_copybook_impact(engine, entries, details):
                     answered |= {simple(h["name"]) for h in imp["callers"].get(sec, [])}
         except Exception:
             pass
-        nodes, edges = neighborhood(engine, e["copybook"])
-        me = entity_id_of(engine, e["copybook"])
+        me = copybook_entity_id(engine, e["copybook"])
+        nodes, edges = ({}, [])
+        if me:
+            data = engine.graph_neighborhood(me, depth=1, limit=500)
+            if data.get("ok"):
+                nodes = {n["id"]: n for n in data["nodes"]}
+                edges = data["edges"]
         for edge in edges:
             if edge["target"] == me and edge["source"] in nodes:
                 answered.add(simple(nodes[edge["source"]]["name"]))
@@ -196,7 +215,9 @@ def run_jobs(engine, entries, details):
     scores = []
     for e in entries:
         golden = {simple(p) for p in e["programs_internal"]}
-        neutral = {simple(p) for p in e.get("programs_external", [])}
+        # external utilities AND PROC invocations are neutral (the golden enumerates programs;
+        # a RUNS edge to a PROC member is a correct answer the golden doesn't model)
+        neutral = {simple(p) for p in e.get("programs_external", []) + e.get("procs", [])}
         nodes, edges = neighborhood(engine, e["job"])
         me = entity_id_of(engine, e["job"])
         answered = {

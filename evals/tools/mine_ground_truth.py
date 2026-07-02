@@ -145,17 +145,24 @@ def mine(repo: Path) -> dict:
     jobs: dict[str, dict] = {}
     for jcl in jcl_files:
         job = jcl.stem.upper()
-        internal, external = set(), set()
+        internal, external, procs = set(), set(), set()
         for _lineno, line in jcl_lines(jcl):
+            matched_pgm = False
             for m in RE_EXEC_PGM.finditer(line):
+                matched_pgm = True
                 name = m.group(1).upper().rstrip(".")
                 if name.startswith("&"):
                     continue  # symbolic — unresolved by construction
                 (internal if name in program_names else external).add(name)
-        if internal or external:
+            if not matched_pgm and line.startswith("//") and "PGM=" not in line.upper():
+                pm = re.match(r"^//([A-Z0-9$#@]*)\s+EXEC\s+(?:PROC=)?([A-Z0-9$#@]+)", line)
+                if pm and pm.group(2).upper() not in ("PGM",):
+                    procs.add(pm.group(2).upper())
+        if internal or external or procs:
             jobs[job] = {"path": str(jcl.relative_to(repo)),
                          "programs_internal": sorted(internal),
-                         "programs_external": sorted(e for e in external)}
+                         "programs_external": sorted(external),
+                         "procs": sorted(procs)}
 
     transactions = []
     for csd in csd_files:

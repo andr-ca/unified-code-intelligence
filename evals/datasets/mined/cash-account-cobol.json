@@ -36,21 +36,24 @@
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "DB2DDL": {
       "path": "DB2-DDL/DB2DDL.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "DEFKSDS": {
       "path": "VSAM/DEFKSDS.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     }
   },
   "transactions": [],

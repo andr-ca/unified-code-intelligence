@@ -89,12 +89,20 @@ SYMBOL_KINDS: frozenset[EntityType] = frozenset(
         EntityType.VARIABLE,
         EntityType.TYPE,
         EntityType.TEST,
+        # mainframe: programs/copybooks/jobs/transactions are first-class symbols so
+        # resolve_symbol prefers them over same-named FILE/MODULE entities
+        EntityType.LEGACY_PROGRAM,
+        EntityType.COPYBOOK,
+        EntityType.PARAGRAPH,
+        EntityType.JCL_JOB,
+        EntityType.TRANSACTION_CODE,
     }
 )
 
 #: Entity kinds that are callable (can appear on either side of a CALLS edge).
 CALLABLE_KINDS: frozenset[EntityType] = frozenset(
-    {EntityType.FUNCTION, EntityType.METHOD, EntityType.TEST}
+    {EntityType.FUNCTION, EntityType.METHOD, EntityType.TEST,
+     EntityType.LEGACY_PROGRAM, EntityType.PARAGRAPH}
 )
 
 #: Entity kinds that behave like containers (files, dirs, modules).

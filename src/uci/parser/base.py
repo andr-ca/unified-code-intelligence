@@ -50,6 +50,25 @@ class ParsedCall:
     start_line: int = 0
     receiver: str | None = None       # text of the object before the dot, if any
     receiver_type: str | None = None  # inferred class of the receiver (local var type inference)
+    dynamic: bool = False             # target is a variable (COBOL CALL WS-PGM, CICS XCTL(var)):
+                                      # never resolvable from source — recorded as an unresolved
+                                      # site so completeness stays honest, not as an edge
+
+
+@dataclass
+class ParsedLink:
+    """A non-call structural edge extracted by a parser (JCL RUNS, CSD INVOKES, SQL READS/WRITES).
+
+    The graph builder resolves ``target_name`` against the symbol index using ``target_kind`` as
+    the creation hint when the target must be materialized (tables) or stubbed (missing programs).
+    """
+
+    relation: str                     # "runs" | "invokes" | "reads" | "writes"
+    src_qname: str                    # qualified name of the source symbol (job, transaction, program)
+    target_name: str                  # referenced artifact name (program, table)
+    target_kind: str = "legacy_program"  # EntityType value hint for stub/materialization
+    start_line: int = 0
+    attributes: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -68,6 +87,7 @@ class ParseResult:
     imports: list[ParsedImport] = field(default_factory=list)
     calls: list[ParsedCall] = field(default_factory=list)
     references: list[ParsedReference] = field(default_factory=list)
+    links: list[ParsedLink] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -123,6 +143,7 @@ __all__ = [
     "ParsedSymbol",
     "ParsedImport",
     "ParsedCall",
+    "ParsedLink",
     "ParsedReference",
     "ParseResult",
     "LanguageParser",

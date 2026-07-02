@@ -1023,7 +1023,8 @@
       "programs_internal": [],
       "programs_external": [
         "DFSRRC00"
-      ]
+      ],
+      "procs": []
     },
     "DBPAUTP0": {
       "path": "app/app-authorization-ims-db2-mq/jcl/DBPAUTP0.jcl",
@@ -1031,7 +1032,8 @@
       "programs_external": [
         "DFSRRC00",
         "IEFBR14"
-      ]
+      ],
+      "procs": []
     },
     "CREADB21": {
       "path": "app/app-transaction-type-db2/jcl/CREADB21.jcl",
@@ -1039,14 +1041,16 @@
       "programs_external": [
         "IEFBR14",
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "MNTTRDB2": {
       "path": "app/app-transaction-type-db2/jcl/MNTTRDB2.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "TRANEXTR": {
       "path": "app/app-transaction-type-db2/jcl/TRANEXTR.jcl",
@@ -1055,14 +1059,16 @@
         "IEBGENER",
         "IEFBR14",
         "IKJEFT01"
-      ]
+      ],
+      "procs": []
     },
     "ACCTFILE": {
       "path": "app/jcl/ACCTFILE.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "CARDFILE": {
       "path": "app/jcl/CARDFILE.jcl",
@@ -1070,14 +1076,16 @@
       "programs_external": [
         "IDCAMS",
         "SDSF"
-      ]
+      ],
+      "procs": []
     },
     "CBADMCDJ": {
       "path": "app/jcl/CBADMCDJ.jcl",
       "programs_internal": [],
       "programs_external": [
         "DFHCSDUP"
-      ]
+      ],
+      "procs": []
     },
     "CBEXPORT": {
       "path": "app/jcl/CBEXPORT.jcl",
@@ -1086,21 +1094,24 @@
       ],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "CBIMPORT": {
       "path": "app/jcl/CBIMPORT.jcl",
       "programs_internal": [
         "CBIMPORT"
       ],
-      "programs_external": []
+      "programs_external": [],
+      "procs": []
     },
     "CLOSEFIL": {
       "path": "app/jcl/CLOSEFIL.jcl",
       "programs_internal": [],
       "programs_external": [
         "SDSF"
-      ]
+      ],
+      "procs": []
     },
     "COMBTRAN": {
       "path": "app/jcl/COMBTRAN.jcl",
@@ -1108,7 +1119,8 @@
       "programs_external": [
         "IDCAMS",
         "SORT"
-      ]
+      ],
+      "procs": []
     },
     "CUSTFILE": {
       "path": "app/jcl/CUSTFILE.jcl",
@@ -1116,28 +1128,32 @@
       "programs_external": [
         "IDCAMS",
         "SDSF"
-      ]
+      ],
+      "procs": []
     },
     "DALYREJS": {
       "path": "app/jcl/DALYREJS.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "DEFCUST": {
       "path": "app/jcl/DEFCUST.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "DEFGDGB": {
       "path": "app/jcl/DEFGDGB.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "DEFGDGD": {
       "path": "app/jcl/DEFGDGD.jcl",
@@ -1145,14 +1161,16 @@
       "programs_external": [
         "IDCAMS",
         "IEBGENER"
-      ]
+      ],
+      "procs": []
     },
     "DISCGRP": {
       "path": "app/jcl/DISCGRP.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "DUSRSECJ": {
       "path": "app/jcl/DUSRSECJ.jcl",
@@ -1161,7 +1179,8 @@
         "IDCAMS",
         "IEBGENER",
         "IEFBR14"
-      ]
+      ],
+      "procs": []
     },
     "ESDSRRDS": {
       "path": "app/jcl/ESDSRRDS.jcl",
@@ -1170,28 +1189,32 @@
         "IDCAMS",
         "IEBGENER",
         "IEFBR14"
-      ]
+      ],
+      "procs": []
     },
     "INTCALC": {
       "path": "app/jcl/INTCALC.jcl",
       "programs_internal": [
         "CBACT04C"
       ],
-      "programs_external": []
+      "programs_external": [],
+      "procs": []
     },
     "OPENFIL": {
       "path": "app/jcl/OPENFIL.jcl",
       "programs_internal": [],
       "programs_external": [
         "SDSF"
-      ]
+      ],
+      "procs": []
     },
     "POSTTRAN": {
       "path": "app/jcl/POSTTRAN.jcl",
       "programs_internal": [
         "CBTRN02C"
       ],
-      "programs_external": []
+      "programs_external": [],
+      "procs": []
     },
     "PRTCATBL": {
       "path": "app/jcl/PRTCATBL.jcl",
@@ -1199,6 +1222,9 @@
       "programs_external": [
         "IEFBR14",
         "SORT"
+      ],
+      "procs": [
+        "REPROC"
       ]
     },
     "READACCT": {
@@ -1208,48 +1234,57 @@
       ],
       "programs_external": [
         "IEFBR14"
-      ]
+      ],
+      "procs": []
     },
     "READCARD": {
       "path": "app/jcl/READCARD.jcl",
       "programs_internal": [
         "CBACT02C"
       ],
-      "programs_external": []
+      "programs_external": [],
+      "procs": []
     },
     "READCUST": {
       "path": "app/jcl/READCUST.jcl",
       "programs_internal": [
         "CBCUS01C"
       ],
-      "programs_external": []
+      "programs_external": [],
+      "procs": []
     },
     "READXREF": {
       "path": "app/jcl/READXREF.jcl",
       "programs_internal": [
         "CBACT03C"
       ],
-      "programs_external": []
+      "programs_external": [],
+      "procs": []
     },
     "REPTFILE": {
       "path": "app/jcl/REPTFILE.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "TCATBALF": {
       "path": "app/jcl/TCATBALF.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "TRANBKP": {
       "path": "app/jcl/TRANBKP.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
+      ],
+      "procs": [
+        "REPROC"
       ]
     },
     "TRANCATG": {
@@ -1257,7 +1292,8 @@
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "TRANFILE": {
       "path": "app/jcl/TRANFILE.jcl",
@@ -1265,14 +1301,16 @@
       "programs_external": [
         "IDCAMS",
         "SDSF"
-      ]
+      ],
+      "procs": []
     },
     "TRANIDX": {
       "path": "app/jcl/TRANIDX.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "TRANREPT": {
       "path": "app/jcl/TRANREPT.jcl",
@@ -1281,6 +1319,9 @@
       ],
       "programs_external": [
         "SORT"
+      ],
+      "procs": [
+        "REPROC"
       ]
     },
     "TRANTYPE": {
@@ -1288,20 +1329,31 @@
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
-      ]
+      ],
+      "procs": []
     },
     "WAITSTEP": {
       "path": "app/jcl/WAITSTEP.jcl",
       "programs_internal": [
         "COBSWAIT"
       ],
-      "programs_external": []
+      "programs_external": [],
+      "procs": []
     },
     "XREFFILE": {
       "path": "app/jcl/XREFFILE.jcl",
       "programs_internal": [],
       "programs_external": [
         "IDCAMS"
+      ],
+      "procs": []
+    },
+    "BATCMP": {
+      "path": "samples/jcl/BATCMP.jcl",
+      "programs_internal": [],
+      "programs_external": [],
+      "procs": [
+        "BUILDBAT"
       ]
     },
     "BMSCMP": {
@@ -1309,6 +1361,9 @@
       "programs_internal": [],
       "programs_external": [
         "SDSF"
+      ],
+      "procs": [
+        "BUILDBMS"
       ]
     },
     "CICCMP": {
@@ -1316,6 +1371,17 @@
       "programs_internal": [],
       "programs_external": [
         "SDSF"
+      ],
+      "procs": [
+        "BUILDONL"
+      ]
+    },
+    "CICDBCMP": {
+      "path": "samples/jcl/CICDBCMP.jcl",
+      "programs_internal": [],
+      "programs_external": [],
+      "procs": [
+        "BLDCIDB2"
       ]
     },
     "IMSMQCMP": {
@@ -1326,7 +1392,8 @@
         "IEBGENER",
         "IEWL",
         "IGYCRCTL"
-      ]
+      ],
+      "procs": []
     },
     "LISTCAT": {
       "path": "samples/jcl/LISTCAT.jcl",
@@ -1334,13 +1401,23 @@
       "programs_external": [
         "IDCAMS",
         "IEFBR14"
-      ]
+      ],
+      "procs": []
     },
     "RACFCMDS": {
       "path": "samples/jcl/RACFCMDS.jcl",
       "programs_internal": [],
       "programs_external": [
         "IKJEFT01"
+      ],
+      "procs": []
+    },
+    "REPRTEST": {
+      "path": "samples/jcl/REPRTEST.jcl",
+      "programs_internal": [],
+      "programs_external": [],
+      "procs": [
+        "REPROC"
       ]
     },
     "SORTTEST": {
@@ -1348,7 +1425,8 @@
       "programs_internal": [],
       "programs_external": [
         "SORT"
-      ]
+      ],
+      "procs": []
     }
   },
   "transactions": [
