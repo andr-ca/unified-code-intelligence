@@ -52,6 +52,9 @@ For each `{program, reads, writes}` (golden complete, mined from `EXEC SQL`):
 - `F1_reads`, `F1_writes` computed separately (skip a mode whose golden set is empty); `program_score = mean(present modes)`.
 `score = mean(program scores)`
 
+### 2.10 `maps_to` — DCLGEN lineage recall
+For each `{copybook, tables}` (golden complete, mined from `EXEC SQL DECLARE <table> TABLE` in `.cpy` members): the copybook's entity must carry an outgoing `MAPS_TO` edge to each declared table (matched on qualified name, or last segment). `entry_score = matched / |tables|`; `score = mean(entries)`. Weight 1.5 (data family).
+
 ### 2.7 `queries` — retrieval quality
 For each `{q, expected, k=5}` (any expected entity counts as relevant):
 - `hit_rank` = rank (1-based) of the first result matching any expected name; ∞ if none in top `k`.

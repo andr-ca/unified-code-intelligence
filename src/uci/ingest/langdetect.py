@@ -7,19 +7,20 @@ _EXT_LANGUAGE: dict[str, str] = {
     ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
     ".ts": "javascript", ".tsx": "javascript",
     ".cbl": "cobol", ".cob": "cobol", ".cpy": "cobol",
-    ".jcl": "jcl",
-    ".csd": "csd",
+    ".jcl": "jcl", ".prc": "jcl", ".proc": "jcl",
+    ".csd": "csd", ".bms": "bms",
+    ".asm": "hlasm", ".hlasm": "hlasm",
     ".env": "config", ".ini": "config", ".cfg": "config", ".toml": "config",
     ".yaml": "config", ".yml": "config", ".json": "config", ".properties": "config",
 }
 
 _CODE_EXTS = frozenset({
     ".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
-    ".cbl", ".cob", ".cpy", ".jcl",
+    ".cbl", ".cob", ".cpy", ".jcl", ".prc", ".proc", ".asm", ".hlasm",
 })
 
 # mainframe members live in flat libraries: the member name IS the module name
-_MAINFRAME_EXTS = (".cbl", ".cob", ".cpy", ".jcl", ".csd")
+_MAINFRAME_EXTS = (".cbl", ".cob", ".cpy", ".jcl", ".prc", ".proc", ".csd", ".asm", ".hlasm")
 
 # extensions we treat as plain text when index_all_text is enabled
 _TEXT_EXTS = frozenset({".md", ".rst", ".txt", ".sql", ".sh", ".html", ".css"})

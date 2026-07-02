@@ -9,7 +9,7 @@ degrades gracefully when embeddings are unavailable.
 | Signal | Source | Works without embeddings? |
 | --- | --- | --- |
 | **Symbol lookup** | exact/qualified-name match in metadata store | ✅ |
-| **Keyword / lexical** | tokenized match over names, docstrings, chunk text (SQLite FTS or fallback) | ✅ |
+| **Keyword / lexical** | entity names/docstrings + **FTS5 BM25 over chunk text** (token-overlap fallback) | ✅ |
 | **Semantic** | vector similarity over symbol-aware chunks | ❌ (optional) |
 | **Graph expansion** | 1..N-hop neighborhood over CALLS/IMPORTS/DEFINES/... | ✅ |
 | **File proximity** | same file / same directory / same module | ✅ |
@@ -28,8 +28,9 @@ churn=0.3`. **Adaptive routing** (from CodeRAG) detects whether the query names 
 for prose it leans semantic. Weights and `rrf_k` are configurable via `UCI_WEIGHT_*` / `UCI_RRF_K`
 (see `.env.example`).
 
-> **Scaling note:** the MVP keyword signal scores entities/chunks in Python (O(n) per query) — fine at
-> repo scale, but a SQLite FTS5 lexical index is planned before any large-scale benchmark.
+> **Scaling note:** chunk text is served by a **SQLite FTS5 (BM25) index** when the SQLite build
+> supports it (entity-name matching remains an in-process scan); builds without fts5 fall back to the
+> token-overlap scan automatically.
 
 ## 3. Query pipeline
 

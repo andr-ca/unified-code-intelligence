@@ -83,6 +83,8 @@ class _PyVisitor:
     def visit_module(self, tree: ast.Module) -> None:
         for node in tree.body:
             self._visit_node(node, scope_qname=self.module_qname, class_scope=None)
+        # module-level calls (registrations, app = Flask(__name__), ...) belong to the module
+        self._collect_calls(tree, caller_qname=self.module_qname)
 
     # -- dispatch -----------------------------------------------------------
     def _visit_node(self, node: ast.AST, scope_qname: str, class_scope: str | None) -> None:
@@ -94,6 +96,21 @@ class _PyVisitor:
             self._handle_class(node, scope_qname)
         elif isinstance(node, ast.Assign):
             self._handle_assign(node, scope_qname, class_scope)
+        elif isinstance(node, ast.AnnAssign):
+            self._handle_ann_assign(node, scope_qname, class_scope)
+        elif isinstance(node, (ast.If, ast.Try, ast.With, ast.AsyncWith, ast.For,
+                               ast.AsyncFor, ast.While)):
+            # compound statements: `if TYPE_CHECKING:` imports, try/except fallback imports,
+            # and conditionally defined symbols must not be invisible (feedback.md §4.3)
+            self._visit_compound(node, scope_qname, class_scope)
+
+    def _visit_compound(self, node: ast.AST, scope_qname: str, class_scope: str | None) -> None:
+        for field_name in ("body", "orelse", "finalbody"):
+            for child in getattr(node, field_name, []) or []:
+                self._visit_node(child, scope_qname, class_scope)
+        for handler in getattr(node, "handlers", []) or []:
+            for child in handler.body:
+                self._visit_node(child, scope_qname, class_scope)
 
     # -- imports ------------------------------------------------------------
     def _handle_import(self, node: ast.Import | ast.ImportFrom) -> None:
@@ -209,6 +226,28 @@ class _PyVisitor:
                         attributes={"constant": target.id.isupper()},
                     )
                 )
+
+    def _handle_ann_assign(self, node: ast.AnnAssign, scope_qname: str, class_scope: str | None) -> None:
+        """``MAX_RETRIES: int = 3`` — the dominant style for typed module/class constants."""
+        if scope_qname != self.module_qname and class_scope is None:
+            return
+        if not isinstance(node.target, ast.Name):
+            return
+        name = node.target.id
+        try:
+            annotation = ast.unparse(node.annotation)
+        except Exception:  # pragma: no cover
+            annotation = ""
+        self.symbols.append(
+            ParsedSymbol(
+                name=name, qualified_name=qualify(scope_qname, name), kind=EntityType.VARIABLE,
+                start_line=node.lineno,
+                end_line=getattr(node, "end_lineno", node.lineno) or node.lineno,
+                parent_qname=scope_qname,
+                is_exported=not name.startswith("_"),
+                attributes={"constant": name.isupper(), "annotation": annotation},
+            )
+        )
 
     # -- calls --------------------------------------------------------------
     def _iter_calls_shallow(self, node: ast.AST):

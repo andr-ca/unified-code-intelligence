@@ -129,13 +129,13 @@ These are parsers over declarative artifacts — recommend building them as ordi
 
 ### 3.7 Phasing recommendation for the mainframe roadmap
 
-Re-sequence Phase 5 by determinism-per-effort, not by language:
+Re-sequence Phase 5 by determinism-per-effort, not by language. **Status (see `docs/roadmap.md` Phase 5 for detail; scored by `evals/`, mainframe track ~94/100):**
 
-1. **JCL + CSD + IMS-gen extractors** (days each, all R0 edges) → the inter-program skeleton: jobs→programs→transactions. Demo: "what runs PGMB and when?"
-2. **COBOL `CALL`/`EXEC CICS`/`EXEC SQL` + copybook `COPY` extractor** with the ladder → the intra-estate call and data graph. Demo: copybook-change impact analysis (§3.3).
-3. **DB2 catalog ingester + DCLGEN `MAPS_TO`** → data lineage. Demo: "every program that writes TABLE_X, with line numbers."
-4. **Che4z LSP bridge (COBOL, then HLASM)** → paragraph-level precision, copybook line mapping, macro expansion.
-5. **HLASM linkage extractor** (`CSECT`/`EXTRN`/`V`-cons) → assembler modules join the graph.
+1. ✅ **JCL (+`.prc` PROCs) + CSD extractors** — jobs→procs→programs (`RUNS`), transactions→programs (`INVOKES`), `DD DSN=`→`DATASET` edges, CSD FILE/MAPSET. IMS-gen still ⏳.
+2. ✅ **COBOL `CALL`/`EXEC CICS`/`EXEC SQL` + copybook `COPY` extractor** with the ladder — incl. VSAM `SELECT/OPEN` + CICS `FILE(...)` data edges, `PERFORM`/`PARAGRAPH` structure, literal-dataflow (`MOVE 'X' TO var`) recovery with taint tracking, and BMS `SCREEN` maps + `SEND/RECEIVE MAP` edges.
+3. 🚧 **DCLGEN `MAPS_TO`** ✅ (table-level); DB2 catalog ingester (SYSPACKDEP) and DDL parsing ⏳.
+4. ⏳ **Che4z LSP bridge (COBOL, then HLASM)** — macro expansion, copybook line mapping, paragraph precision.
+5. ✅ **HLASM linkage extractor** (`CSECT`/`ENTRY`/`EXTRN`/`V`-cons + `CALL` macro) — assembler modules joined the graph; COBOL→assembler calls resolve.
 
 Note items 1–3 need **no LSP at all** and deliver most of the modernization value; the LSP bridge is a precision upgrade, not the foundation. This ordering also means each step ships user-visible impact queries, honoring the roadmap's "each phase ends with working software" principle.
 

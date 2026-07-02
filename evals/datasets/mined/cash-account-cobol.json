@@ -68,5 +68,19 @@
       ]
     }
   },
+  "dclgens": {
+    "DCLCASH": {
+      "path": "COBOL/DCLCASH.cpy",
+      "tables": [
+        "STOCKTRD.CASHACCOUNTY"
+      ]
+    },
+    "DCLFRANK": {
+      "path": "COBOL/DCLFRANK.cpy",
+      "tables": [
+        "STOCKTRD.FRANKFURT1"
+      ]
+    }
+  },
   "dynamic_dispatch": {}
 }

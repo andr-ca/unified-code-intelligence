@@ -140,11 +140,17 @@ def test_missing_program_becomes_gap_with_stub_edge(mf_engine):
 
 
 def test_dynamic_call_and_xctl_are_unresolved_not_edges(mf_engine):
-    callees = _names(mf_engine.callees("MAINPGM")["results"])
-    assert "WS-TARGET" not in callees and "WS-NEXT-PGM" not in callees
+    callees = mf_engine.callees("MAINPGM")["results"]
+    names = _names(callees)
+    assert "WS-TARGET" not in names and "WS-NEXT-PGM" not in names
+    # CALL WS-TARGET is recovered by VALUE-clause dataflow (VALUE 'SUBPGM') at the R2 rung
+    sub = next(r for r in callees if r["name"].upper() == "SUBPGM")
+    assert sub["resolution"] in ("syntactic", "inferred")
     imp = mf_engine.impact("MAINPGM")
+    # XCTL PROGRAM(WS-NEXT-PGM) has no literal reaching it -> still honest-unresolved
     assert imp["completeness"]["level"] != "exact"
-    assert imp["callees"]["unresolved"]["count"] >= 2
+    assert imp["callees"]["unresolved"]["count"] >= 1
+    assert "WS-NEXT-PGM" in imp["callees"]["unresolved"]["names"]
 
 
 def test_static_program_completeness_exact(mf_engine):
@@ -218,7 +224,216 @@ def test_csd_transaction_invokes_program(mf_engine):
     assert "MAINPGM" in invoked
 
 
-def test_csd_missing_program_gap_and_file_defs_ignored(mf_engine):
+def test_csd_missing_program_gap_and_file_becomes_dataset(mf_engine):
     gaps = {g["name"] for g in mf_engine.gaps()["gaps"]}
     assert "GONEPGM" in gaps
-    assert not mf_engine.find_symbol("ACCT")["results"]  # DEFINE FILE not a transaction
+    res = mf_engine.find_symbol("ACCT")["results"]  # DEFINE FILE -> logical DATASET entity
+    assert res and res[0]["kind"] == "dataset"
+
+
+# ---------------------------------------------------------------- HLASM + DCLGEN
+DATE_ASM = """\
+*  DATE FORMATTER (LINKAGE FIXTURE)
+DATEFMT  CSECT
+         ENTRY DATEFMT2
+         EXTRN LOGSVC
+         CALL  TIMESVC
+         L     R15,=V(CLOCKMOD)
+         BALR  R14,R15
+         COPY  ASMMACS
+         END   DATEFMT
+"""
+
+CALLER_CBL = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. ASMCALLR.
+       PROCEDURE DIVISION.
+           CALL 'DATEFMT' USING WS-DATE.
+           GOBACK.
+"""
+
+DCL_CPY = """\
+           EXEC SQL DECLARE STOCKTRD.CASHACCT TABLE
+           ( ACCT_ID        CHAR(8) NOT NULL,
+             BALANCE        DECIMAL(11,2)
+           ) END-EXEC.
+       01  DCLCASHACCT.
+           10 ACCT-ID       PIC X(8).
+           10 BALANCE       PIC S9(9)V99 COMP-3.
+"""
+
+
+@pytest.fixture
+def asm_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "asmrepo"
+    (repo / "asm").mkdir(parents=True)
+    (repo / "cbl").mkdir()
+    (repo / "cpy").mkdir()
+    (repo / "asm" / "DATEFMT.asm").write_text(DATE_ASM, encoding="utf-8")
+    (repo / "cbl" / "ASMCALLR.cbl").write_text(CALLER_CBL, encoding="utf-8")
+    (repo / "cpy" / "DCLCASH2.cpy").write_text(DCL_CPY, encoding="utf-8")
+    return repo
+
+
+@pytest.fixture
+def asm_engine(asm_repo: Path) -> Engine:
+    eng = Engine(Config.from_env(asm_repo, {"embedding_provider": "noop"}))
+    eng.index(full=True)
+    yield eng
+    eng.close()
+
+
+def test_hlasm_program_symbol_from_member(asm_engine):
+    res = asm_engine.find_symbol("DATEFMT")["results"]
+    assert res and res[0]["kind"] == "legacy_program"
+    assert res[0]["path"] == "asm/DATEFMT.asm"
+
+
+def test_cobol_call_to_asm_program_resolves_no_gap(asm_engine):
+    callees = asm_engine.callees("ASMCALLR")["results"]
+    date = next(r for r in callees if r["name"].upper() == "DATEFMT")
+    assert date["resolution"] == "syntactic"
+    assert "DATEFMT" not in {g["name"] for g in asm_engine.gaps()["gaps"]}
+
+
+def test_hlasm_call_macro_and_vcon_produce_call_gaps(asm_engine):
+    gaps = {g["name"]: g for g in asm_engine.gaps()["gaps"]}
+    assert "TIMESVC" in gaps and "CLOCKMOD" in gaps  # named, not indexed -> acquisition list
+    callees = {r["name"].upper() for r in asm_engine.callees("DATEFMT")["results"]}
+    assert {"TIMESVC", "CLOCKMOD"} <= callees
+
+
+def test_hlasm_extrn_becomes_depends_on(asm_engine):
+    res = asm_engine.find_symbol("DATEFMT")["results"][0]
+    nb = asm_engine.graph_neighborhood(res["entity_id"], depth=1, limit=100)
+    dep_targets = {n["name"].upper() for n in nb["nodes"]
+                   if any(e["type"] == "depends_on" and e["target"] == n["id"] for e in nb["edges"])}
+    assert "LOGSVC" in dep_targets
+
+
+def test_hlasm_copy_member_gap(asm_engine):
+    gaps = {g["name"]: g for g in asm_engine.gaps()["gaps"]}
+    assert "ASMMACS" in gaps and gaps["ASMMACS"]["artifact_kind"] == "copybook"
+
+
+def test_dclgen_maps_to_table(asm_engine):
+    res = asm_engine.find_symbol("DCLCASH2")["results"]
+    assert res and res[0]["kind"] == "copybook"
+    nb = asm_engine.graph_neighborhood(res[0]["entity_id"], depth=1, limit=50)
+    mapped = {n["name"].upper() for n in nb["nodes"]
+              if any(e["type"] == "maps_to" and e["target"] == n["id"] for e in nb["edges"])}
+    assert "CASHACCT" in mapped
+    lineage = asm_engine.find_data_lineage("DCLCASH2")
+    assert any("CASHACCT" in (r.get("qualified_name") or "").upper()
+               for r in lineage.get("results", []))
+
+
+# ---------------------------------------------------------------- sprint: dataflow, VSAM, PROC, BMS
+FLOW_CBL = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. FLOWPGM.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT ACCT-FILE ASSIGN TO ACCTDD
+               ORGANIZATION IS INDEXED.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-NEXT     PIC X(8).
+       PROCEDURE DIVISION.
+       MAIN-PARA.
+           OPEN INPUT ACCT-FILE.
+           MOVE 'SUBPGM' TO WS-NEXT.
+           PERFORM SEND-SCREEN.
+           EXEC CICS XCTL PROGRAM(WS-NEXT) END-EXEC.
+       SEND-SCREEN.
+           EXEC CICS SEND MAP('ACCTMAP') MAPSET('ACCTSET') END-EXEC.
+           EXEC CICS READ FILE('ACCTDAT') INTO(WS-REC) END-EXEC.
+           EXEC CICS
+                CALL
+           END-EXEC.
+"""
+
+ACCT_BMS = """\
+ACCTSET  DFHMSD TYPE=&SYSPARM,MODE=INOUT,LANG=COBOL
+ACCTMAP  DFHMDI SIZE=(24,80),LINE=1,COLUMN=1
+         DFHMSD TYPE=FINAL
+         END
+"""
+
+FLOW_PRC = """\
+//DAILYPRC PROC
+//PSTEP1   EXEC PGM=FLOWPGM
+//INDD     DD DSN=PROD.ACCT.MASTER,DISP=SHR
+//OUTDD    DD DSN=PROD.ACCT.REPORT,DISP=(NEW,CATLG)
+"""
+
+FLOW_JCL = """\
+//DAILYJOB JOB (ACCT),'DAILY'
+//RUNPROC  EXEC PROC=DAILYPRC
+"""
+
+
+@pytest.fixture
+def flow_engine(tmp_path: Path) -> Engine:
+    repo = tmp_path / "flowrepo"
+    for d in ("cbl", "bms", "proc", "jcl"):
+        (repo / d).mkdir(parents=True)
+    (repo / "cbl" / "FLOWPGM.cbl").write_text(FLOW_CBL, encoding="utf-8")
+    (repo / "cbl" / "SUBPGM.cbl").write_text(SUB_CBL, encoding="utf-8")
+    (repo / "bms" / "ACCTSET.bms").write_text(ACCT_BMS, encoding="utf-8")
+    (repo / "proc" / "DAILYPRC.prc").write_text(FLOW_PRC, encoding="utf-8")
+    (repo / "jcl" / "DAILYJOB.jcl").write_text(FLOW_JCL, encoding="utf-8")
+    eng = Engine(Config.from_env(repo, {"embedding_provider": "noop"}))
+    eng.index(full=True)
+    yield eng
+    eng.close()
+
+
+def test_move_dataflow_resolves_dynamic_xctl_as_inferred(flow_engine):
+    callees = flow_engine.callees("FLOWPGM")["results"]
+    sub = next((r for r in callees if r["name"].upper() == "SUBPGM"), None)
+    assert sub is not None and sub["resolution"] == "inferred"
+
+
+def test_vsam_open_and_cics_file_reads(flow_engine):
+    data = flow_engine.find_data_lineage("FLOWPGM")["results"]
+    names = {(r["name"].upper(), r["reason"].split()[0]) for r in data}
+    assert ("ACCTDD", "reads") in names    # SELECT/ASSIGN + OPEN INPUT
+    assert ("ACCTDAT", "reads") in names   # EXEC CICS READ FILE
+
+
+def test_bms_screen_entity_and_uses_edge(flow_engine):
+    res = flow_engine.find_symbol("ACCTMAP")["results"]
+    assert res and res[0]["kind"] == "screen"
+    nb = flow_engine.graph_neighborhood(res[0]["entity_id"], depth=1, limit=50)
+    users = {n["name"].upper() for n in nb["nodes"]
+             if any(e["type"] == "uses" and e["source"] == n["id"] for e in nb["edges"])}
+    # the program's uses-edge must land on the BMS-defined map, not a duplicate stub
+    assert "FLOWPGM" in {u for u in users} or any(
+        e["type"] == "uses" for e in nb["edges"])
+
+
+def test_paragraph_symbols_and_perform_edge(flow_engine):
+    res = flow_engine.find_symbol("SEND-SCREEN")["results"]
+    assert res and res[0]["kind"] == "paragraph"
+    callers = flow_engine.callers("FLOWPGM.SEND-SCREEN")["results"]
+    assert any(r["name"].upper() == "MAIN-PARA" for r in callers)
+
+
+def test_prc_member_resolves_proc_gap_and_chains_to_program(flow_engine):
+    gaps = {g["name"] for g in flow_engine.gaps()["gaps"]}
+    assert "DAILYPRC" not in gaps  # the .prc member is indexed now
+    res = flow_engine.find_symbol("DAILYPRC")["results"]
+    assert res and res[0]["kind"] == "jcl_job"
+    nb = flow_engine.graph_neighborhood(res[0]["entity_id"], depth=1, limit=100)
+    runs_out = {n["name"].upper() for n in nb["nodes"]
+                if any(e["type"] == "runs" and e["target"] == n["id"] for e in nb["edges"])}
+    assert "FLOWPGM" in runs_out
+
+
+def test_jcl_dd_dataset_edges_with_disp_heuristic(flow_engine):
+    data = flow_engine.find_data_lineage("DAILYPRC")["results"]
+    by = {(r["qualified_name"].upper(), r["reason"].split()[0]) for r in data}
+    assert ("PROD.ACCT.MASTER", "reads") in by
+    assert ("PROD.ACCT.REPORT", "writes") in by

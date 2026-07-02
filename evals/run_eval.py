@@ -33,7 +33,7 @@ from uci.core.relationships import RESOLVED_LEVELS  # noqa: E402
 
 WEIGHTS = {
     "calls": 2.0, "copybook_impact": 2.0, "impact": 2.0,
-    "jobs": 1.5, "transactions": 1.5, "data_access": 1.5,
+    "jobs": 1.5, "transactions": 1.5, "data_access": 1.5, "maps_to": 1.5,
     "completeness": 1.5, "gaps": 1.5,
     "symbol_lookup": 1.0, "queries": 1.0,
 }
@@ -194,21 +194,45 @@ def run_copybook_impact(engine, entries, details):
             pass
         me = copybook_entity_id(engine, e["copybook"])
         nodes, edges = ({}, [])
+        my_path = ""
         if me:
             data = engine.graph_neighborhood(me, depth=1, limit=500)
             if data.get("ok"):
                 nodes = {n["id"]: n for n in data["nodes"]}
                 edges = data["edges"]
+                my_path = nodes.get(me, {}).get("path", "")
         for edge in edges:
             if edge["target"] == me and edge["source"] in nodes:
-                answered.add(simple(nodes[edge["source"]]["name"]))
-        answered.discard(simple(e["copybook"]))
+                src_node = nodes[edge["source"]]
+                # exclude the copybook's own file entities (same path) — but a same-named
+                # PROGRAM copying its own COMMAREA copybook (CREACC.cbl COPY CREACC.) is a
+                # real dependent and must count, so filter by path, never by name
+                if my_path and src_node.get("path") == my_path:
+                    continue
+                answered.add(simple(src_node["name"]))
         score = set_f1(golden, answered)
         scores.append(score)
         if score < 1.0:
             details.append(f"copybook_impact {e['copybook']}: expected {len(golden)} dependents, "
                            f"matched {len(answered & golden)}, extra {len(answered - golden)}")
     return mean(scores)
+
+
+def job_entity_id(engine, name: str, path: str | None) -> str | None:
+    """Resolve a job by name AND path — the same member name can exist as .jcl and .prc."""
+    try:
+        results = engine.find_symbol(name)["results"] or \
+                  engine.find_symbol(simple(name).upper())["results"]
+    except Exception:
+        return None
+    if path:
+        for r in results:
+            if r.get("kind") == "jcl_job" and r.get("path") == path:
+                return r["entity_id"]
+    for r in results:
+        if r.get("kind") == "jcl_job":
+            return r["entity_id"]
+    return results[0]["entity_id"] if results else None
 
 
 def run_jobs(engine, entries, details):
@@ -218,8 +242,13 @@ def run_jobs(engine, entries, details):
         # external utilities AND PROC invocations are neutral (the golden enumerates programs;
         # a RUNS edge to a PROC member is a correct answer the golden doesn't model)
         neutral = {simple(p) for p in e.get("programs_external", []) + e.get("procs", [])}
-        nodes, edges = neighborhood(engine, e["job"])
-        me = entity_id_of(engine, e["job"])
+        me = job_entity_id(engine, e["job"], e.get("path"))
+        nodes, edges = ({}, [])
+        if me:
+            data = engine.graph_neighborhood(me, depth=1, limit=500)
+            if data.get("ok"):
+                nodes = {n["id"]: n for n in data["nodes"]}
+                edges = data["edges"]
         answered = {
             simple(nodes[edge["target"]]["name"])
             for edge in edges
@@ -229,6 +258,31 @@ def run_jobs(engine, entries, details):
         scores.append(score)
         if score < 1.0:
             details.append(f"jobs {e['job']}: golden={sorted(golden)} answered={sorted(answered)}")
+    return mean(scores)
+
+
+def run_maps_to(engine, entries, details):
+    """DCLGEN copybook -> table lineage: a MAPS_TO edge must link the copybook to each
+    declared table (scoring.md §2.10)."""
+    scores = []
+    for e in entries:
+        me = copybook_entity_id(engine, e["copybook"])
+        mapped: set[str] = set()
+        if me:
+            data = engine.graph_neighborhood(me, depth=1, limit=100)
+            if data.get("ok"):
+                nodes = {n["id"]: n for n in data["nodes"]}
+                mapped = {
+                    (nodes[edge["target"]].get("qualified_name") or nodes[edge["target"]]["name"]).upper()
+                    for edge in data["edges"]
+                    if edge["type"] == "maps_to" and edge["source"] == me and edge["target"] in nodes
+                }
+        golden = {t.upper() for t in e["tables"]}
+        hit = sum(1 for g in golden if g in mapped or g.split(".")[-1] in {m.split(".")[-1] for m in mapped})
+        score = hit / len(golden) if golden else 1.0
+        scores.append(score)
+        if score < 1.0:
+            details.append(f"maps_to {e['copybook']}: golden={sorted(golden)} mapped={sorted(mapped)}")
     return mean(scores)
 
 
@@ -258,6 +312,8 @@ def run_data_access(engine, entries, details):
             results = []
         ans = {"reads": set(), "writes": set()}
         for r in results:
+            if r.get("kind") != "database_table":
+                continue  # goldens are mined from SQL: dataset/VSAM hits are correct but unmodeled
             reason = (r.get("reason") or "").lower()
             mode = "reads" if reason.startswith("reads") else "writes" if reason.startswith("writes") else None
             if mode:
@@ -433,6 +489,11 @@ def derive_from_mined(mined: dict, categories: list[str]) -> dict:
         out["data_access"] = [
             {"program": prog, **rec} for prog, rec in sorted(mined["data_access"].items())
         ]
+    if "maps_to" in categories:
+        out["maps_to"] = [
+            {"copybook": member, "tables": rec["tables"]}
+            for member, rec in sorted(mined.get("dclgens", {}).items())
+        ]
     return {k: v for k, v in out.items() if v}
 
 
@@ -483,6 +544,7 @@ def run_dataset(ds: dict, verbose: bool) -> dict:
                     "symbol_lookup": run_symbol_lookup, "calls": run_calls,
                     "copybook_impact": run_copybook_impact, "jobs": run_jobs,
                     "transactions": run_transactions, "data_access": run_data_access,
+                    "maps_to": run_maps_to,
                     "impact": run_impact, "completeness": run_completeness,
                 }[cat]
                 score = fn(engine, entries, details)

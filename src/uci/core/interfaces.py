@@ -107,6 +107,11 @@ class MetadataStore(ABC):
     @abstractmethod
     def delete_chunks_for_file(self, repo_id: str, path: str) -> None: ...
 
+    def search_text(self, repo_id: str, query: str, limit: int = 30) -> list[tuple[str, float]] | None:
+        """Lexical full-text chunk search: ``(chunk_id, score)`` best-first. Default ``None``
+        signals "no FTS support here" so retrieval falls back to token overlap."""
+        return None
+
     @abstractmethod
     def set_state(self, repo_id: str, key: str, value: Any) -> None: ...
 

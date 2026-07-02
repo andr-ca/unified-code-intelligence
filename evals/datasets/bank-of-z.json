@@ -3,21 +3,64 @@
   "track": "mainframe",
   "repo": "demo-repos/Bank-of-Z",
   "mined": "mined/Bank-of-Z.json",
-  "mined_categories": ["symbol_lookup", "calls", "copybook_impact", "jobs", "data_access"],
+  "mined_categories": [
+    "symbol_lookup",
+    "calls",
+    "copybook_impact",
+    "jobs",
+    "data_access",
+    "maps_to"
+  ],
   "notes": "IBM banking sample carrying the CBSA program set (src/base/cics/cobol) plus IMS programs (CALL 'CBLTDLI') and batch (BANKDATA). Exercises DB2 tables (ACCOUNT, CUSTOMER, CONTROL, PROCTRAN) and cross-subsystem structure. CBLTDLI/CEE* are platform APIs (external).",
   "categories": {
     "queries": [
-      {"q": "customer inquiry program", "expected": ["INQCUST"], "evidence": "src/base/cics/cobol/INQCUST.cbl — inquire customer"},
-      {"q": "delete account", "expected": ["DELACC"], "evidence": "src/base/cics/cobol/DELACC.cbl"},
-      {"q": "which programs write the PROCTRAN table", "expected": ["CREACC"], "loose": true, "evidence": "mined data_access: CREACC writes PROCTRAN (among others — loose match accepted)"},
-      {"q": "batch program that loads bank data", "expected": ["BANKDATA"], "evidence": "src/base/cics/cobol/BANKDATA.cbl — data-load program populating ACCOUNT/CUSTOMER/CONTROL"}
+      {
+        "q": "customer inquiry program",
+        "expected": [
+          "INQCUST"
+        ],
+        "evidence": "src/base/cics/cobol/INQCUST.cbl \u2014 inquire customer"
+      },
+      {
+        "q": "delete account",
+        "expected": [
+          "DELACC"
+        ],
+        "evidence": "src/base/cics/cobol/DELACC.cbl"
+      },
+      {
+        "q": "which programs write the PROCTRAN table",
+        "expected": [
+          "CREACC"
+        ],
+        "loose": true,
+        "evidence": "mined data_access: CREACC writes PROCTRAN (among others \u2014 loose match accepted)"
+      },
+      {
+        "q": "batch program that loads bank data",
+        "expected": [
+          "BANKDATA"
+        ],
+        "evidence": "src/base/cics/cobol/BANKDATA.cbl \u2014 data-load program populating ACCOUNT/CUSTOMER/CONTROL"
+      }
     ],
     "completeness": [
-      {"symbol": "BANKDATA", "expect_exact": true, "why": "data-load program (src/base/cics/cobol/BANKDATA.cbl); only literal CALL 'CEEGMT'/'CEEDATM' (external LE APIs), no dynamic dispatch"}
+      {
+        "symbol": "BANKDATA",
+        "expect_exact": true,
+        "why": "data-load program (src/base/cics/cobol/BANKDATA.cbl); only literal CALL 'CEEGMT'/'CEEDATM' (external LE APIs), no dynamic dispatch"
+      }
     ],
     "gaps": {
       "must_report_missing": [],
-      "must_not_report_missing": ["CBLTDLI", "CEEGMT", "CEEDATM", "DFHAID", "DFHBMSCA", "SQLCA"],
+      "must_not_report_missing": [
+        "CBLTDLI",
+        "CEEGMT",
+        "CEEDATM",
+        "DFHAID",
+        "DFHBMSCA",
+        "SQLCA"
+      ],
       "evidence": "CBLTDLI is the IMS DL/I language interface (20 call sites); CEE* are LE callable services; DFH*/SQLCA are CICS/DB2-provided"
     }
   }

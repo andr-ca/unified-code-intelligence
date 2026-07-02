@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sqlite3
 import threading
 from collections.abc import Iterable, Iterator, Sequence
@@ -101,6 +102,17 @@ class SqliteDatabase:
             except sqlite3.OperationalError:  # pragma: no cover
                 pass
         self.conn.executescript(_SCHEMA)
+        # FTS5 lexical index over chunk text (the keyword signal). Optional: some SQLite builds
+        # lack the fts5 extension — retrieval falls back to the token-overlap scan.
+        self.has_fts = False
+        try:
+            self.conn.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING "
+                "fts5(text, chunk_id UNINDEXED, repo_id UNINDEXED)"
+            )
+            self.has_fts = True
+        except sqlite3.OperationalError:  # pragma: no cover - build-dependent
+            pass
         self.conn.commit()
 
     def commit(self) -> None:
@@ -426,6 +438,7 @@ class SQLiteMetadataStore(MetadataStore):
                 chunk.get("entity_id", ""), _dumps(chunk.get("tokens", [])),
             ),
         )
+        self._fts_replace([chunk])
         self.db.commit()
 
     def upsert_chunks(self, chunks: Sequence[dict[str, Any]]) -> None:
@@ -440,7 +453,40 @@ class SQLiteMetadataStore(MetadataStore):
         ]
         if rows:
             self.db.conn.executemany("INSERT OR REPLACE INTO chunks VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+            self._fts_replace(chunks)
             self.db.commit()
+
+    # -- FTS5 lexical index ---------------------------------------------------
+    def _fts_replace(self, chunks: Sequence[dict[str, Any]]) -> None:
+        if not self.db.has_fts:
+            return
+        self.db.conn.executemany(
+            "DELETE FROM chunk_fts WHERE chunk_id=?", [(c["id"],) for c in chunks]
+        )
+        self.db.conn.executemany(
+            "INSERT INTO chunk_fts (text, chunk_id, repo_id) VALUES (?,?,?)",
+            [(f"{c.get('symbol', '')} {c.get('text', '')}", c["id"], c.get("repo_id", ""))
+             for c in chunks],
+        )
+
+    def search_text(self, repo_id: str, query: str, limit: int = 30) -> list[tuple[str, float]] | None:
+        """BM25-ranked chunk search. Returns None when FTS5 is unavailable (caller falls back)."""
+        if not self.db.has_fts:
+            return None
+        tokens = [t for t in re.findall(r"[A-Za-z0-9_]+", query) if len(t) > 1][:12]
+        if not tokens:
+            return []
+        match = " OR ".join(f'"{t}"' for t in tokens)
+        try:
+            rows = self.db.conn.execute(
+                "SELECT chunk_id, bm25(chunk_fts) AS score FROM chunk_fts "
+                "WHERE chunk_fts MATCH ? AND repo_id=? ORDER BY score LIMIT ?",
+                (match, repo_id, limit),
+            ).fetchall()
+        except sqlite3.OperationalError:  # pragma: no cover - malformed query safety
+            return []
+        # bm25 returns lower-is-better; normalize to higher-is-better
+        return [(r["chunk_id"], -float(r["score"])) for r in rows]
 
     def get_chunk(self, chunk_id: str) -> dict[str, Any] | None:
         row = self.db.conn.execute("SELECT * FROM chunks WHERE id=?", (chunk_id,)).fetchone()
@@ -455,6 +501,11 @@ class SQLiteMetadataStore(MetadataStore):
             yield _chunk_row(row)
 
     def delete_chunks_for_file(self, repo_id: str, path: str) -> None:
+        if self.db.has_fts:
+            self.db.conn.execute(
+                "DELETE FROM chunk_fts WHERE chunk_id IN "
+                "(SELECT id FROM chunks WHERE repo_id=? AND path=?)", (repo_id, path)
+            )
         self.db.conn.execute("DELETE FROM chunks WHERE repo_id=? AND path=?", (repo_id, path))
         self.db.commit()
 
@@ -473,6 +524,8 @@ class SQLiteMetadataStore(MetadataStore):
 
     def clear(self, repo_id: str | None = None) -> None:
         tables = ["files", "chunks", "state", "gaps"]
+        if self.db.has_fts:
+            tables.append("chunk_fts")
         for table in tables:
             if repo_id is None:
                 self.db.conn.execute(f"DELETE FROM {table}")

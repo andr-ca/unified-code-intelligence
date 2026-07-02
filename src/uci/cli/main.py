@@ -10,6 +10,7 @@ import argparse
 import json
 import sys
 import time
+from pathlib import Path
 
 from ..config import Config
 from ..core.entities import EntityType
@@ -229,11 +230,18 @@ def cmd_gaps(args) -> int:
 
 
 def cmd_serve(args) -> int:  # pragma: no cover - I/O
+    from ..api.projects import ProjectManager
     from ..api.server import serve
 
-    with _engine(args) as engine:
+    repo_path = getattr(args, "path", None) or "."
+    with _engine(args) as engine:  # ensure the served project is indexed before opening the dashboard
         _ensure_indexed(engine)
-        serve(engine, host=args.host, port=args.port)
+    manager = ProjectManager()
+    manager.add(str(Path(repo_path).resolve()), activate=True)
+    try:
+        serve(manager, host=args.host, port=args.port)
+    finally:
+        manager.close()
     return 0
 
 

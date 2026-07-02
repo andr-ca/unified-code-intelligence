@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from .base import LanguageParser, ParseResult
+from .bms_parser import BmsParser
 from .cobol_parser import CobolParser
 from .config_parser import ConfigParser
 from .csd_parser import CsdParser
+from .hlasm_parser import HlasmParser
 from .javascript_parser import JavaScriptParser
 from .jcl_parser import JclParser
 from .python_parser import PythonParser
@@ -32,6 +34,8 @@ register(ConfigParser())
 register(CobolParser())
 register(JclParser())
 register(CsdParser())
+register(HlasmParser())
+register(BmsParser())
 
 
 __all__ = ["register", "get_parser", "supported_languages", "ParseResult", "LanguageParser"]

@@ -1,16 +1,16 @@
 {
-  "run": "2026-07-02T08:30:49Z",
-  "git_sha": "f998fa3",
+  "run": "2026-07-02T13:23:41Z",
+  "git_sha": "88d702a",
   "tracks": {
     "mainframe": {
       "datasets": {
         "bank-of-z": {
-          "score": 84.0,
+          "score": 92.7,
           "categories": {
             "queries": {
-              "score": 0.3167,
+              "score": 0.4167,
               "items": 4,
-              "mrr": 0.133,
+              "mrr": 0.333,
               "recall_at_k": 0.5
             },
             "completeness": {
@@ -23,32 +23,36 @@
             },
             "symbol_lookup": {
               "score": 1.0,
-              "items": 40
+              "items": 52
             },
             "copybook_impact": {
-              "score": 0.6676,
+              "score": 0.9253,
               "items": 25
             },
             "data_access": {
-              "score": 0.9917,
+              "score": 1.0,
               "items": 12
+            },
+            "maps_to": {
+              "score": 1.0,
+              "items": 4
             }
           },
           "index_stats": {
-            "entities": 1300,
-            "relationships": 1540,
-            "files": 266,
+            "entities": 1904,
+            "relationships": 2245,
+            "files": 293,
             "gaps": 9
           },
           "coverage": 1.0
         },
         "carddemo": {
-          "score": 94.3,
+          "score": 94.7,
           "categories": {
             "queries": {
-              "score": 0.2778,
+              "score": 0.3333,
               "items": 6,
-              "mrr": 0.222,
+              "mrr": 0.333,
               "recall_at_k": 0.333
             },
             "completeness": {
@@ -60,12 +64,12 @@
               "items": 1
             },
             "symbol_lookup": {
-              "score": 0.9545,
-              "items": 44
+              "score": 0.9565,
+              "items": 46
             },
             "calls": {
               "score": 1.0,
-              "items": 4
+              "items": 7
             },
             "copybook_impact": {
               "score": 1.0,
@@ -85,20 +89,20 @@
             }
           },
           "index_stats": {
-            "entities": 582,
-            "relationships": 1048,
-            "files": 165,
-            "gaps": 13
+            "entities": 1712,
+            "relationships": 2797,
+            "files": 194,
+            "gaps": 9
           },
           "coverage": 1.0
         },
         "cash-account": {
-          "score": 95.2,
+          "score": 96.6,
           "categories": {
             "queries": {
-              "score": 0.6667,
+              "score": 0.7083,
               "items": 2,
-              "mrr": 0.667,
+              "mrr": 0.75,
               "recall_at_k": 0.667
             },
             "completeness": {
@@ -121,18 +125,22 @@
             "data_access": {
               "score": 1.0,
               "items": 1
+            },
+            "maps_to": {
+              "score": 1.0,
+              "items": 2
             }
           },
           "index_stats": {
-            "entities": 27,
-            "relationships": 33,
+            "entities": 36,
+            "relationships": 51,
             "files": 6,
             "gaps": 0
           },
           "coverage": 1.0
         }
       },
-      "score": 91.2
+      "score": 94.7
     },
     "supported": {
       "datasets": {
@@ -198,8 +206,8 @@
             }
           },
           "index_stats": {
-            "entities": 20,
-            "relationships": 28,
+            "entities": 21,
+            "relationships": 29,
             "files": 4,
             "gaps": 0
           }

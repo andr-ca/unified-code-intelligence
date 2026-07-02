@@ -39,7 +39,7 @@ Baseline expectation: **high scores**. A regression here is a bug.
 
 `cics-banking-sample-application-cbsa` is currently a **placeholder clone (README only)** — excluded from datasets until the source is present.
 
-Baseline expectation: **near zero** (UCI has no COBOL/JCL extractors yet — `.cbl`/`.jcl` files aren't even scanned). That is intentional: this track is the **Phase 5 progress meter**. Every extractor that lands (per `docs/lsp-refactoring-recommendations.md` §3.7 phasing) should move these numbers, and nothing else should.
+Original baseline was **0.0 by construction** (no mainframe extractors existed). The COBOL/JCL+PROC/CSD/HLASM/BMS parsers have since landed and the track sits at **~94/100** — it remains the Phase 5 progress meter: every further extractor (DDL, DB2 catalog, IMS semantics) should move exactly its categories, and nothing should move `supported`.
 
 ## 3. Question categories
 
@@ -52,7 +52,8 @@ Each dataset (`evals/datasets/<name>.json`) contains some subset of these catego
 | `copybook_impact` | "Which programs break if copybook X changes?" | `impact_analysis` + `graph_neighborhood` | **complete** (mined `COPY` statements) |
 | `jobs` | "Which programs does JCL job J execute?" | `find_symbol` + `graph_neighborhood` (RUNS) | **complete** per job (mined `EXEC PGM=`) |
 | `transactions` | "Which program serves CICS transaction T?" | `graph_neighborhood` (INVOKES) | **complete** (mined CSD `DEFINE TRANSACTION`) |
-| `data_access` | "Which DB2 tables does program P read/write?" | `find_data_lineage` | **complete** per program (mined `EXEC SQL`) |
+| `data_access` | "Which DB2 tables does program P read/write?" | `find_data_lineage` (table-kind hits only — dataset/VSAM answers are correct but unmodeled by this golden) | **complete** per program (mined `EXEC SQL`) |
+| `maps_to` | "Which table does DCLGEN copybook X mirror?" | `graph_neighborhood` (MAPS_TO) | **complete** (mined `EXEC SQL DECLARE ... TABLE`) |
 | `queries` | Natural-language retrieval: "where is the account update program?" | `search` | curated |
 | `completeness` | Does the tool claim `exact` only when the truth is fully static? | `impact_analysis.completeness` | curated (from known dynamic-dispatch sites) |
 | `gaps` | Does the gap report name what's missing — and **only** what's missing? | `list_index_gaps` | curated (known-external vs known-missing artifacts) |

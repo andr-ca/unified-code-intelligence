@@ -44,7 +44,9 @@
     "COUSR01C": "app/cbl/COUSR01C.cbl",
     "COUSR02C": "app/cbl/COUSR02C.cbl",
     "COUSR03C": "app/cbl/COUSR03C.cbl",
-    "CSUTLDTC": "app/cbl/CSUTLDTC.cbl"
+    "CSUTLDTC": "app/cbl/CSUTLDTC.cbl",
+    "COBDATFT": "app/asm/COBDATFT.asm",
+    "MVSWAIT": "app/asm/MVSWAIT.asm"
   },
   "calls": {
     "COPAUA0C": {
@@ -99,13 +101,13 @@
       "unclassified": []
     },
     "CBACT01C": {
-      "internal": [],
+      "internal": [
+        "COBDATFT"
+      ],
       "external": [
         "CEE3ABD"
       ],
-      "unclassified": [
-        "COBDATFT"
-      ]
+      "unclassified": []
     },
     "CBACT02C": {
       "internal": [],
@@ -180,11 +182,11 @@
       "unclassified": []
     },
     "COBSWAIT": {
-      "internal": [],
-      "external": [],
-      "unclassified": [
+      "internal": [
         "MVSWAIT"
-      ]
+      ],
+      "external": [],
+      "unclassified": []
     },
     "CORPT00C": {
       "internal": [
@@ -1563,6 +1565,7 @@
       ]
     }
   },
+  "dclgens": {},
   "dynamic_dispatch": {
     "COADM01C": [
       {

@@ -30,17 +30,29 @@
     "UPDACC": "src/base/cics/cobol/UPDACC.cbl",
     "UPDCUST": "src/base/cics/cobol/UPDCUST.cbl",
     "XFRFUN": "src/base/cics/cobol/XFRFUN.cbl",
-    "IBACSUM": "src/base/ims/cobol/IBACSUM.cbl",
-    "IBGCUDAT": "src/base/ims/cobol/IBGCUDAT.cbl",
+    "IBACSUM": "src/base/ims/PSB/IBACSUM.asm",
+    "IBGCUDAT": "src/base/ims/PSB/IBGCUDAT.asm",
     "IBLOGIN1": "src/base/ims/cobol/IBLOGIN1.cbl",
-    "IBLOGOUT": "src/base/ims/cobol/IBLOGOUT.cbl",
-    "IBSCUDAT": "src/base/ims/cobol/IBSCUDAT.cbl",
-    "IBTRAN": "src/base/ims/cobol/IBTRAN.cbl",
+    "IBLOGOUT": "src/base/ims/PSB/IBLOGOUT.asm",
+    "IBSCUDAT": "src/base/ims/PSB/IBSCUDAT.asm",
+    "IBTRAN": "src/base/ims/PSB/IBTRAN.asm",
     "LOADACCT": "src/base/ims/cobol/LOADACCT.cbl",
     "LOADCUSA": "src/base/ims/cobol/LOADCUSA.cbl",
     "LOADCUST": "src/base/ims/cobol/LOADCUST.cbl",
     "LOADHIST": "src/base/ims/cobol/LOADHIST.cbl",
-    "LOADTSTA": "src/base/ims/cobol/LOADTSTA.cbl"
+    "LOADTSTA": "src/base/ims/cobol/LOADTSTA.cbl",
+    "ACCOUNT": "src/base/ims/DBD/ACCOUNT.asm",
+    "ACCTYPE": "src/base/ims/DBD/ACCTYPE.asm",
+    "CUSTACCS": "src/base/ims/DBD/CUSTACCS.asm",
+    "CUSTOMER": "src/base/ims/DBD/CUSTOMER.asm",
+    "CUSTTYPE": "src/base/ims/DBD/CUSTTYPE.asm",
+    "HISTORY": "src/base/ims/DBD/HISTORY.asm",
+    "TSTAT": "src/base/ims/DBD/TSTAT.asm",
+    "TSTATTYP": "src/base/ims/DBD/TSTATTYP.asm",
+    "TTYPE": "src/base/ims/DBD/TTYPE.asm",
+    "IB": "src/base/ims/PSB/IB.asm",
+    "IBLOAD": "src/base/ims/PSB/IBLOAD.asm",
+    "IBLOGIN": "src/base/ims/PSB/IBLOGIN.asm"
   },
   "calls": {
     "BANKDATA": {
@@ -675,6 +687,32 @@
       ],
       "writes": [
         "ACCOUNT",
+        "PROCTRAN"
+      ]
+    }
+  },
+  "dclgens": {
+    "ACCDB2": {
+      "path": "src/base/cics/copy/ACCDB2.cpy",
+      "tables": [
+        "ACCOUNT"
+      ]
+    },
+    "CONTDB2": {
+      "path": "src/base/cics/copy/CONTDB2.cpy",
+      "tables": [
+        "STTESTER.CONTROL"
+      ]
+    },
+    "CUSTDB2": {
+      "path": "src/base/cics/copy/CUSTDB2.cpy",
+      "tables": [
+        "CUSTOMER"
+      ]
+    },
+    "PROCDB2": {
+      "path": "src/base/cics/copy/PROCDB2.cpy",
+      "tables": [
         "PROCTRAN"
       ]
     }

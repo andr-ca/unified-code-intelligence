@@ -51,6 +51,7 @@ class ImpactAnalyzer:
         tests = self._tests(target)
         config = self._config_for(target)
         data = self._data_for(target)
+        overrides = self._overrides(target)
         churn = self.metadata.get_churn(self.repo_id, target.provenance.path) or {}
         risk = self._risk(callers, callees, tests, churn)
 
@@ -96,6 +97,7 @@ class ImpactAnalyzer:
             "tests": [h.to_dict() for h in tests],
             "config": [h.to_dict() for h in config],
             "data": [h.to_dict() for h in data],
+            "overrides": [h.to_dict() for h in overrides],
             "churn": {
                 "commits": churn.get("commits", 0),
                 "authors": churn.get("authors", []),
@@ -226,6 +228,41 @@ class ImpactAnalyzer:
                     seen.add(key.id)
                     hits.append(RetrievalHit.from_entity(
                         key, 0.5, ["keyword"], "Config key referenced in the target's code"))
+        return hits
+
+    def _overrides(self, target: Entity) -> list[RetrievalHit]:
+        """Polymorphic risk: same-named methods on sibling/sub classes of the target's class
+        (retrieval-strategy §4 'overrides'). A change here may need parallel changes there."""
+        if target.kind != EntityType.METHOD:
+            return []
+        cls_qname = target.qualified_name.rsplit(".", 1)[0]
+        method = simple_name(target.qualified_name)
+        classes = [e for e in self.graph.find_by_name(simple_name(cls_qname))
+                   if e.qualified_name == cls_qname and e.kind == EntityType.CLASS]
+        if not classes:
+            return []
+        cls = classes[0]
+        related: dict[str, Entity] = {}
+        for rel in self.graph.out_relationships(cls.id, [RelationType.EXTENDS, RelationType.IMPLEMENTS]):
+            base = self.graph.get_entity(rel.dst_id)
+            if base is None:
+                continue
+            for sib_rel in self.graph.in_relationships(base.id, [RelationType.EXTENDS, RelationType.IMPLEMENTS]):
+                sib = self.graph.get_entity(sib_rel.src_id)
+                if sib and sib.id != cls.id:
+                    related[sib.qualified_name] = sib
+            related.setdefault(base.qualified_name, base)
+        for sub_rel in self.graph.in_relationships(cls.id, [RelationType.EXTENDS, RelationType.IMPLEMENTS]):
+            sub = self.graph.get_entity(sub_rel.src_id)
+            if sub:
+                related.setdefault(sub.qualified_name, sub)
+        hits: list[RetrievalHit] = []
+        for other_qname in sorted(related):
+            for cand in self.graph.find_by_name(method):
+                if cand.qualified_name == f"{other_qname}.{method}" and cand.kind == EntityType.METHOD:
+                    hits.append(RetrievalHit.from_entity(
+                        cand, 0.8, ["graph"],
+                        f"Same-named method on related class {other_qname} (polymorphic risk)"))
         return hits
 
     def _data_for(self, target: Entity) -> list[RetrievalHit]:

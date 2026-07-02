@@ -112,14 +112,25 @@ class HybridRetriever:
             overlap = len(q_tokens & tokens)
             if overlap:
                 scored[entity.id] += overlap + (2.0 if entity.name.lower() in q_tokens else 0.0)
-        # chunks: match stored token set, map to owning entity
-        for chunk in self.metadata.iter_chunks(self.repo_id):
-            entity_id = chunk.get("entity_id")
-            if not entity_id:
-                continue
-            overlap = len(q_tokens & set(chunk.get("tokens", [])))
-            if overlap:
-                scored[entity_id] += 0.5 * overlap
+        # chunk text: BM25 via FTS5 when available (comments and bodies, not just identifiers);
+        # falls back to the stored-token overlap scan on SQLite builds without fts5
+        fts = self.metadata.search_text(self.repo_id, query, limit=30)
+        if fts is not None:
+            if fts:
+                best = max(score for _cid, score in fts) or 1.0
+                for chunk_id, score in fts:
+                    chunk = self.metadata.get_chunk(chunk_id)
+                    entity_id = chunk.get("entity_id") if chunk else None
+                    if entity_id:
+                        scored[entity_id] += 2.0 * (score / best if best > 0 else 0.0)
+        else:
+            for chunk in self.metadata.iter_chunks(self.repo_id):
+                entity_id = chunk.get("entity_id")
+                if not entity_id:
+                    continue
+                overlap = len(q_tokens & set(chunk.get("tokens", [])))
+                if overlap:
+                    scored[entity_id] += 0.5 * overlap
         return [eid for eid, _ in sorted(scored.items(), key=lambda kv: kv[1], reverse=True)[:30]]
 
     def _semantic_signal(self, query: str) -> list[str]:

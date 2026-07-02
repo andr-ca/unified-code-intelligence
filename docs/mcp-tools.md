@@ -48,7 +48,7 @@ Fields required on every hit: `entity_id`, `path`, `start_line`/`end_line`, `rea
 | `find_symbol` | `name`, `exact?`, `kind?` | Matching symbols with definition site |
 | `get_callers` | `symbol`, `depth?` | Reverse-CALLS neighbors with paths |
 | `get_callees` | `symbol`, `depth?` | Forward-CALLS neighbors with paths |
-| `impact_analysis` | `symbol_or_file` | Full impact pack (callers/callees/tests/config/data/churn/risk) |
+| `impact_analysis` | `symbol_or_file` | Full impact pack (callers/callees/tests/config/data/**overrides**/churn/risk) |
 | `explain_module` | `module_or_path` | Overview: purpose, key symbols, deps, layer, entry points |
 | `retrieve_edit_context` | `symbol` | Source + callers/callees/tests/imports + edit checklist |
 | `find_tests_for_symbol` | `symbol` | Tests via reverse-TESTS + heuristic name match |

@@ -70,15 +70,33 @@ keeps vendor imports out of the report. Spec: [`next-iteration-gap-registry.md`]
   `XCTL PROGRAM(var)`) → unresolved sites (honest completeness); `COPY`/`EXEC SQL INCLUDE` →
   copybook dependency edges with external-vs-missing gap classification; `EXEC SQL` →
   `READS`/`WRITES` `DATABASE_TABLE` edges.
-- ✅ JCL parser (`parser/jcl_parser.py`): `JCL_JOB` `RUNS` program (`EXEC PGM=`); PROC refs
-  gap-tracked; symbolic (`PGM=&VAR`) → dynamic sites.
-- ✅ CSD parser (`parser/csd_parser.py`): `TRANSACTION_CODE` `INVOKES` `LEGACY_PROGRAM`.
-- ✅ Scored against real repos (`evals/`): **mainframe track 91/100** (CardDemo, Bank-of-Z,
-  cash-account) — calls/copybook-impact/jobs/transactions/data-access at or near 1.0;
-  retrieval (`queries`) is the known remaining gap (FTS5 work).
-- ⏳ `PARAGRAPH` structure, BMS `SCREEN` maps, DCLGEN `MAPS_TO`, DB2 catalog ingester
-  (SYSPACKDEP), IMS PSB/gen, HLASM linkage (CSECT/EXTRN/V-cons), dataflow for
-  `MOVE 'X' TO var` dynamic-call resolution.
+- ✅ JCL parser (`parser/jcl_parser.py`): `JCL_JOB` `RUNS` program (`EXEC PGM=`); **`.prc`/`.proc`
+  PROC members parsed** (job → proc → program chains resolve instead of gapping);
+  `DD DSN=` → `DATASET` `READS`/`WRITES` edges (DISP heuristic, labeled); symbolic
+  (`PGM=&VAR`) → dynamic sites.
+- ✅ CSD parser (`parser/csd_parser.py`): `TRANSACTION_CODE` `INVOKES` `LEGACY_PROGRAM`;
+  `DEFINE FILE` → logical `DATASET` (with physical `DSNAME`); `DEFINE MAPSET` → `SCREEN`.
+- ✅ BMS parser (`parser/bms_parser.py`): `DFHMSD`/`DFHMDI` → `SCREEN` entities;
+  COBOL `EXEC CICS SEND/RECEIVE MAP` → `USES` edges landing on them.
+- ✅ HLASM linkage parser (`parser/hlasm_parser.py`): CSECT/ENTRY → `LEGACY_PROGRAM`;
+  `CALL` macro + `V(sym)` → call edges; `EXTRN/WXTRN` → `DEPENDS_ON`; `COPY` → copybook
+  edges. COBOL→assembler calls (CardDemo `COBDATFT`/`MVSWAIT`) now resolve instead of
+  gapping. Macro expansion stays with the Che4z LSP bridge (⏳).
+- ✅ DCLGEN detector (in the COBOL parser): `EXEC SQL DECLARE <table> TABLE` copybooks →
+  `MAPS_TO` `DATABASE_TABLE` lineage edges (`maps_to` eval category at 1.0).
+- ✅ COBOL depth: VSAM/file access (`SELECT…ASSIGN` + `OPEN` modes, `EXEC CICS READ/WRITE FILE`)
+  → `DATASET` `READS`/`WRITES`; `PARAGRAPH` symbols + `PERFORM` → intra-program `CALLS`;
+  fixed-format **continuation lines joined** before matching; **literal dataflow**
+  (`MOVE 'X' TO var` / `VALUE 'X'`) recovers single-literal dynamic calls at the *inferred*
+  (R2) rung — with **taint tracking** (any non-literal MOVE or subscripted table target keeps
+  the site honestly unresolved; the CardDemo menu-router pattern).
+- ✅ Scored against real repos (`evals/`): **mainframe track 94.7/100** (CardDemo 94.7,
+  Bank-of-Z ~93, cash-account 96.6) — every structural + honesty category
+  (calls/copybook-impact/jobs/transactions/data-access/maps_to/completeness/gaps) at or near 1.0;
+  `queries` (NL retrieval over COBOL) is the remaining sub-0.9 cell even after FTS5.
+- ⏳ DDL parsing (CREATE TABLE incl. JCL SYSIN streams), DB2 catalog ingester (SYSPACKDEP),
+  column-level DCLGEN mapping, IMS PSB/gen semantics (PCB `PROCOPT` read/write intent),
+  PL/I + REXX, Che4z LSP bridge (macro expansion, copybook line mapping).
 - ⏳ Modernization: `LEGACY_MODULE → CANDIDATE_FOR_MIGRATION → TargetService` with mapping reports.
 
 ## Cross-cutting adapter roadmap (behind interfaces, config-selectable)
@@ -88,8 +106,8 @@ keeps vendor imports out of the report. Spec: [`next-iteration-gap-registry.md`]
 | Vector | SQLite/numpy | **Qdrant** | LanceDB, pgvector |
 | Metadata | SQLite | — | **Postgres** |
 | Embeddings | Noop / Local(hash) | **Ollama** | OpenAI, Anthropic, Gemini |
-| Text search | Python / SQLite FTS | **ripgrep** | — |
-| Parsers | Python, JS/TS | Java, C#, Go, Rust | COBOL/JCL (experimental) |
+| Text search | **SQLite FTS5 (BM25)** ✅ + token fallback | ripgrep | — |
+| Parsers | Python, JS/TS, **COBOL, JCL/PROC, CSD, HLASM, BMS** ✅ | Java, C#, Go, Rust | PL/I, REXX |
 
 Deliverables per profile: `docker-compose.local-pro.yml` (Memgraph + Qdrant + Ollama) and a three-profile
 `.env.example` ship now; the adapters themselves land in the phases above.

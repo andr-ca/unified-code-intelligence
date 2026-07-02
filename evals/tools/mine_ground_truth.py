@@ -82,15 +82,23 @@ def is_external(name: str) -> bool:
     return up in EXTERNAL_UTILITIES or any(up.startswith(p) for p in EXTERNAL_PREFIXES)
 
 
+RE_SQL_DECLARE = re.compile(r"\bDECLARE\s+([A-Z_][A-Z_0-9]*(?:\.[A-Z_][A-Z_0-9]*)?)\s+TABLE", re.IGNORECASE)
+
+
 def mine(repo: Path) -> dict:
     cbl_files = sorted(
         p for p in repo.rglob("*")
         if p.suffix.lower() in (".cbl", ".cob") and ".git" not in p.parts
     )
+    asm_files = sorted(
+        p for p in repo.rglob("*")
+        if p.suffix.lower() in (".asm", ".hlasm") and ".git" not in p.parts
+    )
     cpy_files = {p.stem.upper(): p for p in repo.rglob("*") if p.suffix.lower() == ".cpy" and ".git" not in p.parts}
     jcl_files = sorted(p for p in repo.rglob("*.jcl") if ".git" not in p.parts)
     csd_files = sorted(p for p in repo.rglob("*") if p.suffix.lower() == ".csd" and ".git" not in p.parts)
-    program_names = {p.stem.upper() for p in cbl_files}
+    # assembler members are call/PGM= targets too (COBOL CALL 'COBDATFT' -> app/asm/COBDATFT.asm)
+    program_names = {p.stem.upper() for p in cbl_files} | {p.stem.upper() for p in asm_files}
 
     calls: dict[str, dict] = {}
     copy_dependents: dict[str, set] = defaultdict(set)
@@ -185,14 +193,26 @@ def mine(repo: Path) -> dict:
         for member, deps in sorted(copy_dependents.items())
     }
 
+    # DCLGEN copybooks: EXEC SQL DECLARE <table> TABLE inside a .cpy member
+    dclgens: dict[str, dict] = {}
+    for member, path in sorted(cpy_files.items()):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        tables = sorted({m.group(1).upper() for m in RE_SQL_DECLARE.finditer(text)})
+        if tables:
+            dclgens[member] = {"path": str(path.relative_to(repo)), "tables": tables}
+
     return {
         "repo": str(repo),
-        "programs": {p.stem.upper(): str(p.relative_to(repo)) for p in cbl_files},
+        "programs": {p.stem.upper(): str(p.relative_to(repo)) for p in cbl_files + asm_files},
         "calls": calls,
         "copybooks": copybooks,
         "jobs": jobs,
         "transactions": sorted(transactions, key=lambda t: t["tran"]),
         "data_access": data_access,
+        "dclgens": dclgens,
         "dynamic_dispatch": {k: v for k, v in sorted(dynamic_sites.items())},
     }
 

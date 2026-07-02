@@ -157,7 +157,7 @@ find_symbol, env weights), `tests/test_impact.py` (stratification, completeness,
 staleness), `tests/test_mcp.py` (dynamic availability), `tests/test_gaps.py` (gap registry, **Phase-4**: internal
 base-class gaps, stub labeling/exclusion), plus **Phase-5** resolution tests (impact/get_callees parity,
 binds-miss gapping, external-stub labeling).
-**145 tests pass (incl. the full-suite eval baseline gate, `tests/test_evals_gate.py`), no Docker/network.**
+**152 tests pass (incl. the full-suite eval baseline gate, `tests/test_evals_gate.py`, and the dashboard ops console), no Docker/network.**
 
 Beyond the unit suite, the **eval suite** (`evals/run_eval.py`, contract `evals/docs/scoring.md`) is the
 measurement gate for every retrieval/extraction change: `supported` **98.6/100** (regression gate,

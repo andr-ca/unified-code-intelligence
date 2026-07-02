@@ -40,6 +40,7 @@ class EntityType(str, Enum):
     # --- Data ---
     DATABASE_TABLE = "database_table"
     DATABASE_COLUMN = "database_column"
+    DATASET = "dataset"          # z/OS dataset / VSAM file (JCL DD DSN=, COBOL ASSIGN TO)
     QUERY = "query"
     DTO = "dto"
 

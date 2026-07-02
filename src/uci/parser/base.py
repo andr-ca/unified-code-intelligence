@@ -53,6 +53,8 @@ class ParsedCall:
     dynamic: bool = False             # target is a variable (COBOL CALL WS-PGM, CICS XCTL(var)):
                                       # never resolvable from source — recorded as an unresolved
                                       # site so completeness stays honest, not as an edge
+    via_dataflow: bool = False        # target recovered by literal dataflow (MOVE 'X' TO var):
+                                      # resolvable, but labeled "inferred" (R2), never "syntactic"
 
 
 @dataclass

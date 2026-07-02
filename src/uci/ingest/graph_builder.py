@@ -27,7 +27,7 @@ _CLASSISH = frozenset({EntityType.CLASS, EntityType.INTERFACE})
 
 #: Languages using the flat member-library convention (name == origin; a literal reference
 #: that doesn't resolve is a missing artifact, never a global name-match fallback).
-_MAINFRAME_LANGS = frozenset({"cobol", "jcl", "csd"})
+_MAINFRAME_LANGS = frozenset({"cobol", "jcl", "csd", "hlasm"})
 
 #: z/OS system utilities commonly executed from JCL — external by convention, never gaps.
 _SYSTEM_UTILITIES = frozenset({
@@ -40,7 +40,17 @@ _LINK_RELATIONS = {
     "invokes": RelationType.INVOKES,
     "reads": RelationType.READS,
     "writes": RelationType.WRITES,
+    "maps_to": RelationType.MAPS_TO,        # DCLGEN copybook -> table
+    "depends_on": RelationType.DEPENDS_ON,  # HLASM EXTRN/WXTRN -> external symbol
+    "uses": RelationType.USES,              # program -> BMS screen (SEND/RECEIVE MAP)
+    "performs": RelationType.CALLS,         # paragraph -> paragraph (intra-program)
 }
+
+#: Link target kinds that are *materialized* (created on first reference) rather than resolved:
+#: tables, datasets, and screens are named artifacts, not source members.
+_MATERIALIZED_KINDS = frozenset({
+    EntityType.DATABASE_TABLE.value, EntityType.DATASET.value, EntityType.SCREEN.value,
+})
 
 #: If a bare name matches more than this many symbols, emit no edge (record it as unresolved).
 _FANOUT_CAP = 5
@@ -440,13 +450,16 @@ class GraphBuilder:
                     continue
                 if fp.language in _MAINFRAME_LANGS:
                     # a literal CALL/XCTL/LINK names its member exactly (flat namespace):
-                    # unique member -> provable edge; external API -> external stub; else gap
+                    # unique member -> provable edge; external API -> external stub; else gap.
+                    # Dataflow-recovered targets (MOVE 'X' TO var) are R2 "inferred", never R0.
+                    resolution = "inferred" if call.via_dataflow else "syntactic"
+                    confidence = 0.9 if call.via_dataflow else 1.0
                     target = self._resolve_member(call.callee_name)
                     if target is not None:
                         prov = Provenance(self.repo_id, fp.path, call.start_line, call.start_line,
-                                          f"{fp.language}_parser", 1.0)
+                                          f"{fp.language}_parser", confidence)
                         self._add_rel(RelationType.CALLS, caller.id, target.id, prov,
-                                      {"callee": call.callee_name, "resolution": "syntactic",
+                                      {"callee": call.callee_name, "resolution": resolution,
                                        "fan_out": 1})
                     else:
                         self._emit_mainframe_call(caller, call, fp)
@@ -540,8 +553,12 @@ class GraphBuilder:
     _LINK_SRC_KINDS = {
         "runs": (EntityType.JCL_JOB,),
         "invokes": (EntityType.TRANSACTION_CODE,),
-        "reads": (EntityType.LEGACY_PROGRAM, EntityType.FUNCTION, EntityType.METHOD),
-        "writes": (EntityType.LEGACY_PROGRAM, EntityType.FUNCTION, EntityType.METHOD),
+        "reads": (EntityType.LEGACY_PROGRAM, EntityType.JCL_JOB, EntityType.FUNCTION, EntityType.METHOD),
+        "writes": (EntityType.LEGACY_PROGRAM, EntityType.JCL_JOB, EntityType.FUNCTION, EntityType.METHOD),
+        "maps_to": (EntityType.COPYBOOK,),
+        "depends_on": (EntityType.LEGACY_PROGRAM,),
+        "uses": (EntityType.LEGACY_PROGRAM,),
+        "performs": (EntityType.PARAGRAPH, EntityType.LEGACY_PROGRAM),
     }
 
     def _resolve_links(self, files: list[FileParse]) -> None:
@@ -551,16 +568,29 @@ class GraphBuilder:
                 rtype = _LINK_RELATIONS.get(link.relation)
                 sources = self.by_qname.get(link.src_qname, [])
                 preferred = self._LINK_SRC_KINDS.get(link.relation, ())
-                src = next((s for s in sources if s.kind in preferred),
-                           next((s for s in sources if s.kind in SYMBOL_KINDS),
-                                sources[0] if sources else None))
+                # same member name can exist as .jcl AND .prc (CardDemo TRANREPT): anchor the
+                # link on the symbol from *this* file, falling back to kind preference
+                src = (next((s for s in sources
+                             if s.kind in preferred and s.provenance.path == fp.path), None)
+                       or next((s for s in sources if s.kind in preferred), None)
+                       or next((s for s in sources if s.kind in SYMBOL_KINDS), None)
+                       or (sources[0] if sources else None))
                 if rtype is None or src is None:
                     continue
                 prov = Provenance(self.repo_id, fp.path, link.start_line, link.start_line,
                                   f"{fp.language}_parser", 1.0)
-                if rtype in (RelationType.READS, RelationType.WRITES):
-                    table = self._ensure_table(link.target_name, prov)
-                    self._add_rel(rtype, src.id, table.id, prov, {"resolution": "syntactic"})
+                if link.target_kind in _MATERIALIZED_KINDS:
+                    target = self._ensure_named(EntityType(link.target_kind), link.target_name, prov)
+                    self._add_rel(rtype, src.id, target.id, prov,
+                                  {"resolution": "syntactic", **link.attributes})
+                    continue
+                if link.relation == "performs":
+                    # intra-program paragraph reference: PROGRAM.PARA (no gap when absent —
+                    # sections/exits are commonly perform targets without their own label)
+                    program = link.attributes.get("program", "")
+                    para = self._by_qname_kind(f"{program}.{link.target_name}", EntityType.PARAGRAPH)
+                    if para is not None:
+                        self._add_rel(rtype, src.id, para.id, prov, {"resolution": "syntactic"})
                     continue
                 target = self._resolve_member(link.target_name)
                 if target is not None:
@@ -603,12 +633,23 @@ class GraphBuilder:
                 return entity
         return None
 
-    def _ensure_table(self, table: str, prov: Provenance) -> Entity:
-        qname = table.upper()
-        return self._add_entity(
-            EntityType.DATABASE_TABLE, "", qname, qname.split(".")[-1], prov,
-            {"table": True},
+    def _ensure_named(self, kind: EntityType, name: str, prov: Provenance) -> Entity:
+        """Resolve a named artifact (table / dataset / screen) to an already-parsed entity of the
+        same kind (e.g. a BMS-defined SCREEN, a CSD-defined DATASET), or materialize it on first
+        reference."""
+        qname = name.upper()
+        existing = self._by_qname_kind(qname, kind) or (
+            next((e for e in self.by_name.get(qname.lower(), []) if e.kind == kind), None)
         )
+        if existing is not None:
+            return existing
+        return self._add_entity(kind, "", qname, qname.split(".")[-1], prov, {kind.value: True})
+
+    def _by_qname_kind(self, qname: str, kind: EntityType) -> Entity | None:
+        for entity in self.by_qname.get(qname, []):
+            if entity.kind == kind:
+                return entity
+        return None
 
     def _unresolved_reason(self, call, fan_out: int, binds: dict[str, str]) -> str | None:
         """Classify an unattributed call so completeness never silently reports 'exact' for a symbol

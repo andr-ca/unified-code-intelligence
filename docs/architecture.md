@@ -25,7 +25,7 @@ Conceptual modules (the `uci-*` names in the brief) are implemented as subpackag
 | --- | --- | --- |
 | `uci-core` | `uci.core` | Canonical entity/relationship schema, stable IDs, normalization, provenance, shared types |
 | `uci-ingest` | `uci.ingest` | Repo scanner, ignore rules, language detection, file hashing, git metadata, incremental orchestration |
-| `uci-parser` | `uci.parser` | Parser abstraction + language plugins (Python, JS/TS); symbol/import/call/reference extraction |
+| `uci-parser` | `uci.parser` | Parser abstraction + language plugins (Python, JS/TS, **COBOL, JCL/PROC, CICS CSD, HLASM, BMS**, config); symbol/import/call/reference extraction incl. mainframe RUNS/INVOKES/READS/WRITES/MAPS_TO/USES links |
 | `uci-embeddings` | `uci.embeddings` | Symbol-aware chunking, embedding provider abstraction (Noop/Local/Ollama/OpenAI) |
 | `uci-graph` | `uci.graph` | `GraphStore` interface, `InMemoryGraphStore`, `SQLiteGraphStore`, traversal API |
 | `uci-store` | `uci.store` | `MetadataStore` (SQLite), `VectorStore` (SQLite/numpy), SQL schema |

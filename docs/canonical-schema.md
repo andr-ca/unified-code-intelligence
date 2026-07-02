@@ -60,7 +60,8 @@ extractors; MCP tools advertise `available: false` for fact types not yet presen
 ### Data
 | Type | Notes |
 | --- | --- |
-| `DATABASE_TABLE` | Table |
+| `DATABASE_TABLE` * | Table (materialized from `EXEC SQL` / DCLGEN references) |
+| `DATASET` * | z/OS dataset / VSAM file (JCL `DD DSN=`, COBOL `ASSIGN TO`, CICS `FILE(...)`, CSD `DEFINE FILE`) |
 | `DATABASE_COLUMN` | Column |
 | `QUERY` | SQL/ORM query site |
 | `DTO` | API/data-transfer model |
@@ -96,12 +97,12 @@ extractors; MCP tools advertise `available: false` for fact types not yet presen
 ### Legacy modernization
 | Type | Notes |
 | --- | --- |
-| `LEGACY_PROGRAM` | COBOL program |
-| `COPYBOOK` | COBOL copybook |
-| `JCL_JOB` | JCL job |
-| `PARAGRAPH` | COBOL paragraph/section |
-| `TRANSACTION_CODE` | CICS/IMS transaction code |
-| `SCREEN` | Terminal screen/map |
+| `LEGACY_PROGRAM` * | COBOL/HLASM program (PROGRAM-ID / CSECT / member stem) |
+| `COPYBOOK` * | COBOL copybook (incl. DCLGEN detection) |
+| `JCL_JOB` * | JCL job or PROC member |
+| `PARAGRAPH` * | COBOL paragraph (PERFORM targets) |
+| `TRANSACTION_CODE` * | CICS transaction (CSD `DEFINE TRANSACTION`) |
+| `SCREEN` * | BMS mapset/map (`DFHMSD`/`DFHMDI`, CSD `DEFINE MAPSET`) |
 
 ## 3. Relationship types (`RelationType`)
 
@@ -116,8 +117,8 @@ extractors; MCP tools advertise `available: false` for fact types not yet presen
 | `IMPORTS` * | Module/File → Module/Package | Import edge |
 | `EXTENDS` * | Class → Class | Inheritance |
 | `IMPLEMENTS` * | Class → Interface | Interface implementation |
-| `READS` | Function → Table/File/Queue/Topic/Column | Data read |
-| `WRITES` | Function → Table/File/Queue/Topic/Column | Data write |
+| `READS` * | Function/Program/Job → Table/Dataset | Data read (`EXEC SQL`, `OPEN INPUT`, CICS `READ FILE`, JCL `DD DISP=SHR`) |
+| `WRITES` * | Function/Program/Job → Table/Dataset | Data write (`INSERT/UPDATE/DELETE`, `OPEN OUTPUT`, CICS `WRITE`, JCL `DISP=NEW`) |
 | `CONFIGURES` * | ConfigKey → Component/Function | Configuration binding |
 | `CONTROLS` | FeatureFlag → CodePath/Function | Flag gates code |
 | `TESTS` * | Test → Function/Class/Module | Test targets symbol |
@@ -126,15 +127,15 @@ extractors; MCP tools advertise `available: false` for fact types not yet presen
 | `CHANGED` * | Commit → File/Symbol | Commit touched entity |
 | `RELATES_TO` | Ticket → Commit/Module/Capability | Loose relation |
 | `IMPLEMENTS_CAPABILITY` | Module/Service/Function → BusinessCapability | Capability realization |
-| `RUNS` | Job/Schedule/JCLJob → Program/Script | Execution |
+| `RUNS` * | JCLJob/PROC → Program/PROC | Execution (`EXEC PGM=` / `EXEC PROC=`) |
 | `SCHEDULES` | Scheduler → Job | Scheduling |
-| `MAPS_TO` | Field/DTO/LegacyProgram → Field/Entity/Service | Mapping/lineage |
+| `MAPS_TO` * | DCLGEN Copybook → Table | Mapping/lineage (`EXEC SQL DECLARE <t> TABLE`) |
 | `DEPENDS_ON` * | Module/Component → Module/ExternalPackage | Dependency |
 | `EMITS` | Function → LogEvent | Log/metric emission |
 | `HANDLES` | Endpoint → Function/Controller | Request handling |
 | `CANDIDATE_FOR_MIGRATION` | LegacyModule → TargetService | Modernization candidate |
-| `USES` | UserFlow → API/Function/Table | Flow usage |
-| `INVOKES` | TransactionCode → Program/Screen | Legacy invocation |
+| `USES` * | Program → Screen (CICS `SEND/RECEIVE MAP`); UserFlow → API/Function/Table | Usage |
+| `INVOKES` * | TransactionCode → Program | CICS routing (CSD) |
 
 The schema records, for each relationship type, its **allowed source/target entity kinds** and whether
 it is **directed**. `validate_relationship()` warns (not fails) on unexpected src/dst kinds so new

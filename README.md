@@ -21,6 +21,13 @@ Embedding-only tools answer "what looks similar?" but not the questions that mat
 UCI models these as **explicit, traceable edges**, so answers are deterministic and **every fact
 cites a file and line range**. Embeddings then add fuzzy recall on top of a structurally correct core.
 
+**Parsed today:** Python · JavaScript/TypeScript · config (.env/yaml/toml/json/ini) · and the
+mainframe estate: **COBOL** (calls, copybooks, embedded SQL, VSAM files, paragraphs, CICS
+commands, literal dataflow with taint tracking) · **JCL + PROC** (jobs→programs, DD datasets) ·
+**CICS CSD** (transactions, files, mapsets) · **HLASM** (CSECT/EXTRN linkage) · **BMS** screens ·
+DCLGEN→table lineage. Scored continuously against real repos in [`evals/`](evals/README.md)
+(mainframe track ≈ 94/100).
+
 ## Design principles
 
 1. **Graph is the source of truth.** Every extracted fact is a node or edge.

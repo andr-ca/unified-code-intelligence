@@ -15,6 +15,7 @@ from .base import LanguageParser, ParsedLink, ParsedSymbol, ParseResult
 _RE_DEFINE = re.compile(r"DEFINE\s+(TRANSACTION|PROGRAM|FILE|MAPSET)\s*\(\s*([A-Z0-9$#@]+)\s*\)", re.IGNORECASE)
 _RE_PROGRAM_ATTR = re.compile(r"\bPROGRAM\s*\(\s*([A-Z0-9$#@-]+)\s*\)", re.IGNORECASE)
 _RE_GROUP = re.compile(r"\bGROUP\s*\(\s*([A-Z0-9$#@]+)\s*\)", re.IGNORECASE)
+_RE_DSNAME = re.compile(r"\bDSNAME\s*\(\s*([A-Z0-9$#@.]+)\s*\)", re.IGNORECASE)
 
 
 class CsdParser(LanguageParser):
@@ -48,20 +49,37 @@ class CsdParser(LanguageParser):
             if not dm:
                 continue
             kind, name = dm.group(1).upper(), dm.group(2).upper()
-            if kind != "TRANSACTION":
-                continue
             gm = _RE_GROUP.search(block)
-            result.symbols.append(ParsedSymbol(
-                name=name, qualified_name=name, kind=EntityType.TRANSACTION_CODE,
-                start_line=line, end_line=line,
-                attributes={"group": gm.group(1).upper() if gm else "", "file_module": module_qname},
-            ))
-            # PROGRAM(...) inside the transaction block, excluding the DEFINE name itself
-            pm = _RE_PROGRAM_ATTR.search(block, dm.end())
-            if pm:
-                result.links.append(ParsedLink(
-                    relation="invokes", src_qname=name, target_name=pm.group(1).upper(),
-                    target_kind=EntityType.LEGACY_PROGRAM.value, start_line=line,
+            group = gm.group(1).upper() if gm else ""
+            if kind == "TRANSACTION":
+                result.symbols.append(ParsedSymbol(
+                    name=name, qualified_name=name, kind=EntityType.TRANSACTION_CODE,
+                    start_line=line, end_line=line,
+                    attributes={"group": group, "file_module": module_qname},
+                ))
+                # PROGRAM(...) inside the transaction block, excluding the DEFINE name itself
+                pm = _RE_PROGRAM_ATTR.search(block, dm.end())
+                if pm:
+                    result.links.append(ParsedLink(
+                        relation="invokes", src_qname=name, target_name=pm.group(1).upper(),
+                        target_kind=EntityType.LEGACY_PROGRAM.value, start_line=line,
+                    ))
+            elif kind == "MAPSET":
+                result.symbols.append(ParsedSymbol(
+                    name=name, qualified_name=name, kind=EntityType.SCREEN,
+                    start_line=line, end_line=line,
+                    attributes={"csd": "mapset", "group": group, "file_module": module_qname},
+                ))
+            elif kind == "FILE":
+                # the CSD binds the logical CICS file name to its physical dataset — this is
+                # what makes COBOL `READ FILE('ACCTDAT')` traceable to a real DSN
+                dsn = _RE_DSNAME.search(block)
+                result.symbols.append(ParsedSymbol(
+                    name=name, qualified_name=name, kind=EntityType.DATASET,
+                    start_line=line, end_line=line,
+                    attributes={"csd": "file", "group": group,
+                                "dsname": dsn.group(1).upper() if dsn else "",
+                                "file_module": module_qname},
                 ))
         return result
 

@@ -12,17 +12,52 @@ _NAV = [
     ("/architecture", "Architecture"),
     ("/gaps", "Gaps"),
     ("/onboarding", "Onboarding"),
+    ("/build", "Build"),
+    ("/projects", "Projects"),
 ]
+
+_SHOW_EVALS = False
+_PROJECTS: list[dict] = []
+_ACTIVE: str | None = None
+
+
+def configure(show_evals: bool) -> None:
+    """Toggle capabilities that depend on the served workspace (currently the Evals tab)."""
+    global _SHOW_EVALS
+    _SHOW_EVALS = show_evals
+
+
+def set_project_context(projects: list[dict], active: str | None) -> None:
+    """Feed the top-bar project switcher (called per page render)."""
+    global _PROJECTS, _ACTIVE
+    _PROJECTS, _ACTIVE = projects, active
+
+
+def _nav_items() -> list[tuple[str, str]]:
+    items = list(_NAV)
+    if _SHOW_EVALS:
+        items.append(("/evals", "Evals"))
+    return items
 
 
 def _e(text) -> str:
     return html.escape(str(text if text is not None else ""))
 
 
+def _switcher() -> str:
+    if not _PROJECTS:
+        return ""
+    opts = "".join(
+        f'<option value="{_e(p["name"])}"{" selected" if p.get("active") else ""}>{_e(p["name"])}</option>'
+        for p in _PROJECTS
+    )
+    return f'<label class="proj-switch">project <select id="project-switcher">{opts}</select></label>'
+
+
 def layout(title: str, active: str, body: str) -> str:
     nav = "".join(
         f'<a href="{href}" class="{"active" if href == active else ""}">{_e(label)}</a>'
-        for href, label in _NAV
+        for href, label in _nav_items()
     )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -32,10 +67,199 @@ def layout(title: str, active: str, body: str) -> str:
 <header class="topbar">
   <span class="brand"><b>UCI</b> · Unified Code Intelligence</span>
   <nav class="main">{nav}</nav>
+  <span class="topbar-right">{_switcher()}</span>
 </header>
 {body}
 <script src="/static/app.js"></script>
 </body></html>"""
+
+
+# --------------------------------------------------------------------------- ops pages
+def build_page(repo_name, status: dict, caps: dict, active_job) -> str:
+    running = active_job is not None
+    status_rows = "".join(
+        f"<tr><td>{_e(k)}</td><td class='mono'>{_e(v)}</td></tr>"
+        for k, v in (
+            ("generation", status.get("generation", 0)),
+            ("head_sha", status.get("head_sha") or "—"),
+            ("indexed_at", status.get("indexed_at") or "—"),
+            ("commits_behind", status.get("commits_behind", 0)),
+        )
+    )
+    active_tools = ", ".join(name for name, on in caps.items() if on) or "core only"
+    disabled = "disabled" if running else ""
+    body = f"""<div class="container">
+  <h1>Build &amp; index</h1>
+  <p class="sub">Re-index <b>{_e(repo_name or 'this repository')}</b> from the working tree.
+  The graph is rebuilt every run; embeddings update incrementally for changed files only.</p>
+  <div class="split">
+    <div>
+      <div class="card">
+        <div class="card-h">Index status</div>
+        <table class="kv"><tbody>{status_rows}</tbody></table>
+        <p class="muted small">Optional tools with facts: {_e(active_tools)}</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-h">Run a build</div>
+        <div class="btnrow">
+          <button class="btn primary" data-build="full" {disabled}>Rebuild (full)</button>
+          <button class="btn ghost" data-build="incremental" {disabled}>Incremental</button>
+          <span id="job-state" class="jobstate">{'running…' if running else 'idle'}</span>
+        </div>
+        <pre id="job-log" class="joblog" data-kind="build"></pre>
+      </div>
+    </div>
+  </div>
+</div>"""
+    return layout("Build", "/build", body)
+
+
+def _track_cell(tracks: dict) -> str:
+    if not tracks:
+        return "<span class='muted'>—</span>"
+    return " ".join(
+        f"<span class='pill score'>{_e(t)} "
+        f"{('%.1f' % v) if isinstance(v, (int, float)) else '—'}</span>"
+        for t, v in tracks.items()
+    )
+
+
+def evals_page(reports: list[dict], datasets: list[str], projects: list[dict] | None = None) -> str:
+    opts = "".join(f"<option value='{_e(d)}'>{_e(d)}</option>" for d in datasets)
+    proj_opts = "".join(f"<option value='{_e(p['name'])}'>{_e(p['name'])}</option>"
+                        for p in (projects or []))
+    ds_opts = "".join(f"<option value='{_e(d)}'>{_e(d)}</option>" for d in datasets)
+    rep_rows = "".join(
+        f"<tr data-report='{_e(r['name'])}'>"
+        f"<td>{'★ ' if r.get('baseline') else ''}<span class='mono small'>{_e(r.get('run') or r['name'])}</span></td>"
+        f"<td>{_track_cell(r.get('tracks', {}))}</td></tr>"
+        for r in reports
+    ) or "<tr><td colspan='2' class='muted'>No reports yet — run the suite.</td></tr>"
+    body = f"""<div class="container">
+  <h1>Evaluations</h1>
+  <p class="sub">Run UCI's own eval suite and browse reports. The <b>supported</b> track is the
+  regression gate; <b>mainframe</b> is a progress meter until the COBOL extractors land.</p>
+  <div class="card">
+    <div class="card-h">Run</div>
+    <div class="btnrow">
+      <label class="lbl">Dataset
+        <select id="eval-dataset"><option value="">all datasets</option>{opts}</select>
+      </label>
+      <label class="lbl chk"><input type="checkbox" id="eval-baseline"> gate vs baseline</label>
+      <button class="btn primary" id="eval-run">Run evaluation</button>
+      <span id="job-state" class="jobstate">idle</span>
+    </div>
+    <pre id="job-log" class="joblog" data-kind="eval"></pre>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="card-h">Create an eval from a project</div>
+    <p class="muted small">Snapshots the selected project's current extraction (symbols, resolved
+    calls, queries, impact) into a golden dataset you can then run and edit below.</p>
+    <div class="btnrow">
+      <label class="lbl">Project <select id="eval-create-project">{proj_opts}</select></label>
+      <label class="lbl">Name <input id="eval-create-name" class="pathin" style="min-width:180px" placeholder="my-repo-snapshot"></label>
+      <button class="btn primary" id="eval-create">Create dataset</button>
+      <span id="eval-create-msg" class="muted small"></span>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="card-h">Edit a dataset</div>
+    <div class="btnrow">
+      <label class="lbl">Dataset <select id="eval-edit-select"><option value="">—</option>{ds_opts}</select></label>
+      <button class="btn ghost small" id="eval-edit-load">Load</button>
+      <button class="btn primary small" id="eval-edit-save">Save</button>
+      <span id="eval-edit-msg" class="muted small"></span>
+    </div>
+    <textarea id="eval-edit-text" class="jsonedit" spellcheck="false" placeholder="Load a dataset to edit its golden JSON…"></textarea>
+  </div>
+  <div class="eval-cols" style="margin-top:22px">
+    <div class="card">
+      <div class="card-h">Reports</div>
+      <table class="tbl reports"><thead><tr><th>run</th><th>tracks</th></tr></thead>
+      <tbody id="report-list">{rep_rows}</tbody></table>
+    </div>
+    <div class="card">
+      <div class="card-h">Report detail</div>
+      <div id="report-view"><span class="muted small">Select a report to view its dataset × category matrix.</span></div>
+    </div>
+  </div>
+</div>"""
+    return layout("Evals", "/evals", body)
+
+
+def evals_unavailable_page() -> str:
+    body = """<div class="container"><h1>Evaluations</h1>
+  <p class="muted">The eval suite (<span class="mono">evals/</span>) isn't part of this workspace, so
+  there's nothing to run here. Serve the UCI project itself to use this tab.</p></div>"""
+    return layout("Evals", "/evals", body)
+
+
+def _project_row(p: dict) -> str:
+    name = _e(p["name"])
+    dot = '<span class="dot-active"></span> ' if p.get("active") else ""
+    status = "indexed" if p.get("indexed") else "<span class='muted'>not indexed</span>"
+    activate = "" if p.get("active") else f'<button class="btn ghost small" data-activate="{name}">activate</button>'
+    actions = (f'{activate}'
+               f'<button class="btn ghost small" data-index="{name}">index</button>'
+               f'<button class="btn ghost small danger" data-remove="{name}">remove</button>')
+    return (f"<tr><td>{dot}<b>{name}</b></td>"
+            f"<td class='mono small'>{_e(p['path'])}</td>"
+            f"<td>{status}</td>"
+            f"<td class='sc'>{p.get('entities', 0)}</td>"
+            f"<td class='btnrow'>{actions}</td></tr>")
+
+
+def projects_page(projects: list[dict], active: str | None) -> str:
+    rows = "".join(_project_row(p) for p in projects) or \
+        "<tr><td colspan='5' class='muted'>No projects yet — add one below.</td></tr>"
+    body = f"""<div class="container">
+  <h1>Projects</h1>
+  <p class="sub">Each project is indexed into its <b>own</b> database
+    (<span class="mono">&lt;path&gt;/.uci/uci.db</span>) — no cross-project bleed. Switch the active
+    project from the top-right selector.</p>
+  <div class="card">
+    <div class="card-h">Registered projects</div>
+    <table id="project-table" class="tbl"><thead><tr>
+      <th>name</th><th>path</th><th>status</th><th class="sc">entities</th><th>actions</th>
+    </tr></thead><tbody>{rows}</tbody></table>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="card-h">Add a project</div>
+    <div class="btnrow">
+      <input id="proj-path" class="pathin" placeholder="/absolute/path/to/repository" autocomplete="off">
+      <button class="btn primary" id="proj-add">Add &amp; index</button>
+      <span id="job-state" class="jobstate">idle</span>
+    </div>
+    <pre id="job-log" class="joblog"></pre>
+  </div>
+</div>"""
+    return layout("Projects", "/projects", body)
+
+
+def no_projects_page() -> str:
+    body = """<div class="container"><h1>No project selected</h1>
+  <p class="muted">Add a repository on the <a href="/projects">Projects</a> page to start exploring.</p></div>"""
+    return layout("Overview", "/", body)
+
+
+def unindexed_page(name: str) -> str:
+    body = f"""<div class="container">
+  <h1>{_e(name or 'This project')} isn't indexed yet</h1>
+  <p class="sub">This project is registered but has no index in <span class="mono">.uci/</span>
+    (for example, an eval run with <span class="mono">--clean</span> may have removed it). Build it
+    to explore its graph, symbols, and impact.</p>
+  <div class="card">
+    <div class="card-h">Index this project</div>
+    <div class="btnrow">
+      <button class="btn primary" data-build="full">Index now</button>
+      <span id="job-state" class="jobstate">idle</span>
+    </div>
+    <pre id="job-log" class="joblog" data-kind="build"></pre>
+  </div>
+</div>"""
+    return layout("Index", "/build", body)
 
 
 def _kind_pill(kind: str) -> str:
@@ -132,10 +356,16 @@ def search_page(query: str, results: list[dict]) -> str:
 def graph_page(root_id: str, root_label: str) -> str:
     body = f"""<div class="container wide">
   <h1>Graph explorer</h1>
-  <p class="sub">Drag to pan, scroll to zoom, double-click a node to expand its neighborhood.
-    Rooted at <b>{_e(root_label)}</b>. <span id="node-info" class="mono muted"></span></p>
+  <p class="sub">Scroll or pinch to zoom (toward the cursor), drag to pan, click a node to open it,
+    double-click to expand its neighborhood. Rooted at <b>{_e(root_label)}</b>.
+    <span id="node-info" class="mono muted"></span></p>
   <div id="graph-wrap">
-    <canvas id="graph"></canvas>
+    <canvas id="graph" data-root="{_e(root_id)}"></canvas>
+    <div class="graph-controls">
+      <button type="button" data-graph="in" title="zoom in">+</button>
+      <button type="button" data-graph="out" title="zoom out">−</button>
+      <button type="button" data-graph="fit" title="fit to view">⤢</button>
+    </div>
     <div class="legend">
       <div class="row"><span class="dot" style="background:#4c8dff"></span>function/method</div>
       <div class="row"><span class="dot" style="background:#7c5cff"></span>class/interface</div>
@@ -144,7 +374,6 @@ def graph_page(root_id: str, root_label: str) -> str:
       <div class="row"><span class="dot" style="background:#d29922"></span>config/commit</div>
     </div>
   </div>
-  <script>UCI.initGraph({root_id!r});</script>
 </div>"""
     return layout("Graph", "/graph", body)
 

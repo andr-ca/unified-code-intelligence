@@ -48,6 +48,8 @@ def test_index_resolves_calls(indexed_engine):
 def test_all_facts_have_provenance(indexed_engine):
     for e in indexed_engine.graph.entities(repo_id=indexed_engine.repo_id):
         assert e.provenance.repo_id == indexed_engine.repo_id
+        if e.attributes.get("missing") or e.attributes.get("external"):
+            continue  # placeholder stubs have no source location by definition
         if e.kind in (EntityType.FUNCTION, EntityType.METHOD, EntityType.CLASS):
             assert e.provenance.path and e.provenance.start_line >= 1
 
