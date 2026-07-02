@@ -165,11 +165,15 @@ def evals_page(reports: list[dict], datasets: list[str], projects: list[dict] | 
     </div>
   </div>
   <div class="card" style="margin-top:18px">
-    <div class="card-h">Edit a dataset</div>
+    <div class="card-h">Edit a dataset <span id="eval-edit-version" class="muted small"></span></div>
+    <p class="muted small">Every save creates a new version. Use History to view or restore a
+    previous version (restoring appends a new version — history is never lost).</p>
     <div class="btnrow">
       <label class="lbl">Dataset <select id="eval-edit-select"><option value="">—</option>{ds_opts}</select></label>
       <button class="btn ghost small" id="eval-edit-load">Load</button>
-      <button class="btn primary small" id="eval-edit-save">Save</button>
+      <button class="btn primary small" id="eval-edit-save">Save new version</button>
+      <label class="lbl">History <select id="eval-edit-history"><option value="">—</option></select></label>
+      <button class="btn ghost small" id="eval-edit-restore">Restore</button>
       <span id="eval-edit-msg" class="muted small"></span>
     </div>
     <textarea id="eval-edit-text" class="jsonedit" spellcheck="false" placeholder="Load a dataset to edit its golden JSON…"></textarea>

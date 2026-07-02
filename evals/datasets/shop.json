@@ -1,38 +1,95 @@
 {
   "name": "shop",
+  "version": 2,
   "track": "supported",
   "repo": "fixtures/shop",
-  "notes": "Original Python golden fixture: resolution ladder, tests, config keys. Migrated to the unified dataset schema (evals/docs/evaluation.md §3); golden content unchanged.",
+  "notes": "Original Python golden fixture: resolution ladder, tests, config keys. Migrated to the unified dataset schema (evals/docs/evaluation.md \u00a73); golden content unchanged.",
   "categories": {
     "symbol_lookup": [
-      {"name": "PricingCalculator", "path": "pricing.py"},
-      {"name": "place_order", "path": "checkout.py"}
+      {
+        "name": "PricingCalculator",
+        "path": "pricing.py"
+      },
+      {
+        "name": "place_order",
+        "path": "checkout.py"
+      }
     ],
     "calls": [
-      {"from": "pricing.PricingCalculator.calculate", "to": "pricing.DiscountRule.apply", "class": "internal", "expect_resolved": true},
-      {"from": "checkout.place_order", "to": "pricing.PricingCalculator.calculate", "class": "internal", "expect_resolved": true},
-      {"from": "tests.test_pricing.test_calculate", "to": "pricing.PricingCalculator.calculate", "class": "internal", "expect_resolved": true}
+      {
+        "from": "pricing.PricingCalculator.calculate",
+        "to": "pricing.DiscountRule.apply",
+        "class": "internal",
+        "expect_resolved": true
+      },
+      {
+        "from": "checkout.place_order",
+        "to": "pricing.PricingCalculator.calculate",
+        "class": "internal",
+        "expect_resolved": true
+      },
+      {
+        "from": "tests.test_pricing.test_calculate",
+        "to": "pricing.PricingCalculator.calculate",
+        "class": "internal",
+        "expect_resolved": true
+      }
     ],
     "impact": [
       {
         "symbol": "PricingCalculator.calculate",
-        "callers": ["checkout.place_order", "tests.test_pricing.test_calculate"],
-        "tests": ["tests.test_pricing.test_calculate"],
+        "callers": [
+          "checkout.place_order",
+          "tests.test_pricing.test_calculate"
+        ],
+        "tests": [
+          "tests.test_pricing.test_calculate"
+        ],
         "config": []
       },
-      {"symbol": "pricing", "callers": [], "tests": [], "config": ["MAX_DISCOUNT"]}
+      {
+        "symbol": "pricing",
+        "callers": [],
+        "tests": [],
+        "config": [
+          "MAX_DISCOUNT"
+        ]
+      }
     ],
     "queries": [
-      {"q": "pricing calculator", "expected": ["pricing.PricingCalculator", "pricing.PricingCalculator.calculate"]},
-      {"q": "discount rule apply", "expected": ["pricing.DiscountRule", "pricing.DiscountRule.apply"]},
-      {"q": "place order checkout", "expected": ["checkout.place_order"]}
+      {
+        "q": "pricing calculator",
+        "expected": [
+          "pricing.PricingCalculator",
+          "pricing.PricingCalculator.calculate"
+        ]
+      },
+      {
+        "q": "discount rule apply",
+        "expected": [
+          "pricing.DiscountRule",
+          "pricing.DiscountRule.apply"
+        ]
+      },
+      {
+        "q": "place order checkout",
+        "expected": [
+          "checkout.place_order"
+        ]
+      }
     ],
     "completeness": [
-      {"symbol": "PricingCalculator.calculate", "expect_exact": true, "why": "all callers are static (constructor-inferred or direct); no dynamic dispatch in fixture"}
+      {
+        "symbol": "PricingCalculator.calculate",
+        "expect_exact": true,
+        "why": "all callers are static (constructor-inferred or direct); no dynamic dispatch in fixture"
+      }
     ],
     "gaps": {
       "must_report_missing": [],
-      "must_not_report_missing": ["os"],
+      "must_not_report_missing": [
+        "os"
+      ],
       "evidence": "stdlib imports (os in pricing.py) must classify external, never as acquisition targets"
     }
   }

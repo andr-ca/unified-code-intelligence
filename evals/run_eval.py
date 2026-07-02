@@ -17,6 +17,7 @@ Only public Engine surfaces are used (same code paths as CLI/MCP/API).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -31,12 +32,41 @@ sys.path.insert(0, str(ROOT / "src"))
 from uci import Config, Engine  # noqa: E402
 from uci.core.relationships import RESOLVED_LEVELS  # noqa: E402
 
+#: Scoring-spec version (evals/docs/versioning.md). Bump whenever a formula, weight, matching
+#: rule, or vacuity rule changes — scores across scoring versions are not comparable.
+SCORING_VERSION = "1.0"
+
 WEIGHTS = {
     "calls": 2.0, "copybook_impact": 2.0, "impact": 2.0,
     "jobs": 1.5, "transactions": 1.5, "data_access": 1.5, "maps_to": 1.5,
     "completeness": 1.5, "gaps": 1.5,
     "symbol_lookup": 1.0, "queries": 1.0,
 }
+
+
+def dataset_fingerprint(ds: dict, ds_path: Path) -> str:
+    """Content hash of everything that defines a dataset's questions: the dataset JSON
+    (canonicalized) plus the mined reference facts it derives categories from. Two runs are
+    apples-to-apples for a dataset iff version AND fingerprint match."""
+    h = hashlib.sha256()
+    h.update(json.dumps(ds, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    if ds.get("mined"):
+        mined_path = EVALS / "datasets" / ds["mined"]
+        if mined_path.exists():
+            h.update(mined_path.read_bytes())
+    return h.hexdigest()[:12]
+
+
+def suite_identity(datasets: list[tuple[dict, str]]) -> dict:
+    """The comparability contract for a run: scoring version + every dataset's (version, fp)."""
+    entries = {ds["name"]: {"version": ds.get("version", 0), "fingerprint": fp}
+               for ds, fp in datasets}
+    h = hashlib.sha256(SCORING_VERSION.encode("utf-8"))
+    for name in sorted(entries):
+        e = entries[name]
+        h.update(f"{name}:{e['version']}:{e['fingerprint']}".encode("utf-8"))
+    return {"scoring_version": SCORING_VERSION, "datasets": entries,
+            "suite_fingerprint": h.hexdigest()[:12]}
 
 
 # ---------------------------------------------------------------- helpers
@@ -604,22 +634,28 @@ def main() -> int:
     ap.add_argument("-v", "--verbose", action="store_true", help="include per-item failures in the report")
     args = ap.parse_args()
 
-    datasets = []
+    datasets: list[tuple[dict, str]] = []
     for path in sorted((EVALS / "datasets").glob("*.json")):
         ds = json.loads(path.read_text(encoding="utf-8"))
         if args.dataset and ds.get("name") != args.dataset:
             continue
         if "track" not in ds:
             continue  # mined candidate files etc.
-        datasets.append(ds)
+        if "version" not in ds:
+            print(f"WARNING: dataset {ds.get('name')} has no 'version' field "
+                  f"(see evals/docs/versioning.md)", file=sys.stderr)
+        datasets.append((ds, dataset_fingerprint(ds, path)))
     if not datasets:
         print("no datasets matched", file=sys.stderr)
         return 2
+    suite = suite_identity(datasets)
 
     tracks: dict[str, dict] = {}
-    for ds in datasets:
-        print(f"[eval] {ds['name']} ({ds['track']}) …", flush=True)
+    for ds, fp in datasets:
+        print(f"[eval] {ds['name']} (v{ds.get('version', 0)}/{fp}, {ds['track']}) …", flush=True)
         result = run_dataset(ds, verbose=args.verbose)
+        result["version"] = ds.get("version", 0)
+        result["fingerprint"] = fp
         tracks.setdefault(ds["track"], {"datasets": {}})["datasets"][ds["name"]] = result
         print(f"        score {result['score']:.1f}  categories " +
               " ".join(f"{c}={v['score']:.2f}" for c, v in result["categories"].items()))
@@ -634,6 +670,7 @@ def main() -> int:
     report = {
         "run": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "git_sha": git_sha(),
+        "suite": suite,
         "tracks": tracks,
     }
 
@@ -648,30 +685,78 @@ def main() -> int:
 
     if args.baseline and args.baseline.exists():
         base = json.loads(args.baseline.read_text(encoding="utf-8"))
-        failed = False
-        sup_new = tracks.get("supported", {}).get("score")
-        sup_old = base.get("tracks", {}).get("supported", {}).get("score")
-        # track-level gate only on full runs — a --dataset subset mean isn't comparable
-        if not args.dataset and sup_new is not None and sup_old is not None:
-            if sup_new < sup_old - 1.0:
-                print(f"REGRESSION: supported track {sup_old} -> {sup_new}")
-                failed = True
-            for name, d in base["tracks"].get("supported", {}).get("datasets", {}).items():
-                new_d = tracks.get("supported", {}).get("datasets", {}).get(name)
-                if not new_d:
-                    continue
-                for cat, val in d["categories"].items():
-                    new_val = new_d["categories"].get(cat, {}).get("score", 0.0)
-                    if new_val < val["score"] - 0.05:
-                        print(f"REGRESSION: {name}/{cat} {val['score']:.2f} -> {new_val:.2f}")
-                        failed = True
-        mf_new = tracks.get("mainframe", {}).get("score")
-        mf_old = base.get("tracks", {}).get("mainframe", {}).get("score")
-        if mf_new is not None and mf_old is not None:
-            print(f"mainframe track delta: {mf_old} -> {mf_new}")
-        if failed:
+        if compare_baseline(base, report, subset=bool(args.dataset)):
             return 1
     return 0
+
+
+def _dataset_comparable(name: str, base_ds: dict, new_ds: dict, base_suite: dict, suite: dict) -> bool:
+    """Apples-to-apples per dataset: same version AND same content fingerprint (either recorded
+    in the dataset result — new format — or in the suite block)."""
+    bv = base_ds.get("version", base_suite.get("datasets", {}).get(name, {}).get("version"))
+    bf = base_ds.get("fingerprint", base_suite.get("datasets", {}).get(name, {}).get("fingerprint"))
+    nv, nf = new_ds.get("version"), new_ds.get("fingerprint")
+    return bv is not None and bv == nv and bf == nf
+
+
+def compare_baseline(base: dict, report: dict, subset: bool) -> bool:
+    """Version-aware regression gate (evals/docs/versioning.md). Returns True on regression.
+
+    - Scoring-version mismatch: nothing is comparable — informational only, never gates.
+    - Per dataset: gate only when (version, fingerprint) match the baseline; drifted datasets
+      print an informational delta and are excluded from gating (re-baseline to adopt them).
+    - Track-level gate: full runs only, and only when every baseline dataset in the track is
+      still comparable.
+    """
+    tracks = report["tracks"]
+    suite = report.get("suite", {})
+    base_suite = base.get("suite", {})
+    failed = False
+
+    if base_suite.get("scoring_version") not in (None, suite.get("scoring_version")):
+        print(f"NOT COMPARABLE: scoring version {base_suite.get('scoring_version')} (baseline) "
+              f"vs {suite.get('scoring_version')} (run) — gate skipped; re-baseline required")
+        return False
+    if not base_suite:
+        print("note: baseline predates suite versioning — gating on scores only "
+              "(re-baseline to enable apples-to-apples checks)")
+
+    for track_name, base_track in base.get("tracks", {}).items():
+        new_track = tracks.get(track_name)
+        if new_track is None:
+            continue
+        comparable = {}
+        for name, base_ds in base_track.get("datasets", {}).items():
+            new_ds = new_track.get("datasets", {}).get(name)
+            if new_ds is None:
+                continue
+            if not base_suite or _dataset_comparable(name, base_ds, new_ds, base_suite, suite):
+                comparable[name] = (base_ds, new_ds)
+            else:
+                print(f"drift: {name} v{base_ds.get('version', '?')}/{base_ds.get('fingerprint', '?')}"
+                      f" -> v{new_ds.get('version', '?')}/{new_ds.get('fingerprint', '?')} — "
+                      f"score {base_ds['score']:.1f} -> {new_ds['score']:.1f} (informational, not gated)")
+        gate_track = track_name == "supported"
+        for name, (base_ds, new_ds) in comparable.items():
+            if not gate_track:
+                continue
+            for cat, val in base_ds.get("categories", {}).items():
+                new_val = new_ds.get("categories", {}).get(cat, {}).get("score", 0.0)
+                if new_val < val["score"] - 0.05:
+                    print(f"REGRESSION: {name}/{cat} {val['score']:.2f} -> {new_val:.2f}")
+                    failed = True
+        all_comparable = len(comparable) == len(base_track.get("datasets", {}))
+        old_score, new_score = base_track.get("score"), new_track.get("score")
+        if old_score is None or new_score is None:
+            continue
+        if gate_track and not subset and all_comparable:
+            if new_score < old_score - 1.0:
+                print(f"REGRESSION: {track_name} track {old_score} -> {new_score}")
+                failed = True
+        else:
+            suffix = "" if all_comparable else " (partially comparable)"
+            print(f"{track_name} track delta: {old_score} -> {new_score}{suffix}")
+    return failed
 
 
 if __name__ == "__main__":

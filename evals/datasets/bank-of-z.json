@@ -1,5 +1,6 @@
 {
   "name": "bank-of-z",
+  "version": 2,
   "track": "mainframe",
   "repo": "demo-repos/Bank-of-Z",
   "mined": "mined/Bank-of-Z.json",

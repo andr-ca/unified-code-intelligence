@@ -1,5 +1,6 @@
 {
   "name": "cash-account",
+  "version": 2,
   "track": "mainframe",
   "repo": "demo-repos/cash-account-cobol",
   "mined": "mined/cash-account-cobol.json",

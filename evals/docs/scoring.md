@@ -1,5 +1,7 @@
 # UCI Evaluation — Scoring System
 
+**Scoring spec version: 1.0** (mirrored by `SCORING_VERSION` in `run_eval.py`; bump both together — see `versioning.md`).
+
 Companion to `evaluation.md`. This document is the **exact** contract: every number in an eval report is defined here, and the implementation in `evals/run_eval.py` must match this document (when they disagree, this document wins and the runner is fixed).
 
 ---

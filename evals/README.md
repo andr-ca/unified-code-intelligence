@@ -15,6 +15,10 @@ evals/
   reports/         run reports + baseline.json (the regression gate)
 ```
 
+Datasets and scoring are **versioned + fingerprinted** (docs/versioning.md, datasets/CHANGELOG.md):
+the baseline gate only compares apples-to-apples; drifted datasets show informational deltas
+until re-baselined.
+
 Quick start:
 
 ```bash

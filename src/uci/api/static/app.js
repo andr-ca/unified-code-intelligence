@@ -400,16 +400,49 @@
         const sel = document.getElementById("eval-edit-select");
         const text = document.getElementById("eval-edit-text");
         const msg = document.getElementById("eval-edit-msg");
+        const verLabel = document.getElementById("eval-edit-version");
+        const hist = document.getElementById("eval-edit-history");
+        const fillHistory = (versions) => {
+            if (!hist) return;
+            hist.innerHTML = '<option value="">history…</option>' + (versions || []).map((v) =>
+                `<option value="${v.version}">v${v.version} · ${esc(v.updated_at || "")}</option>`).join("");
+        };
+        const setVer = (d) => { if (verLabel) verLabel.textContent = d && d.version ? "· v" + d.version + (d.updated_at ? " · " + d.updated_at : "") : ""; };
         const load = (name) => {
             if (!name) return;
             fetch("/api/evals/dataset?name=" + encodeURIComponent(name)).then((r) => r.json()).then((d) => {
-                if (d.ok) { text.value = JSON.stringify(d.dataset, null, 2); if (msg) msg.textContent = "loaded " + name; }
-                else if (msg) msg.textContent = "not found";
+                if (!d.ok) { if (msg) msg.textContent = "not found"; return; }
+                text.value = JSON.stringify(d.dataset, null, 2);
+                setVer(d.dataset);
+                if (msg) msg.textContent = "loaded " + name;
+                fetch("/api/evals/versions?name=" + encodeURIComponent(name)).then((r) => r.json())
+                    .then((v) => { if (v.ok) fillHistory(v.versions); });
             });
         };
         const loadBtn = document.getElementById("eval-edit-load");
         if (loadBtn) loadBtn.addEventListener("click", () => load(sel.value));
         if (sel) sel.addEventListener("change", () => load(sel.value));
+        if (hist) hist.addEventListener("change", () => {
+            if (!hist.value) return;
+            fetch("/api/evals/version?name=" + encodeURIComponent(sel.value) + "&version=" + hist.value)
+                .then((r) => r.json()).then((d) => {
+                    if (!d.ok) return;
+                    text.value = JSON.stringify(d.dataset, null, 2);
+                    if (msg) msg.textContent = "viewing v" + hist.value + " — Save to make current, or Restore";
+                });
+        });
+        const restoreBtn = document.getElementById("eval-edit-restore");
+        if (restoreBtn) restoreBtn.addEventListener("click", () => {
+            const name = sel.value, v = hist ? hist.value : "";
+            if (!name || !v) { if (msg) msg.textContent = "pick a version to restore"; return; }
+            restoreBtn.disabled = true;
+            post("/api/evals/restore", { name, version: Number(v) }).then((r) => r.json()).then((d) => {
+                restoreBtn.disabled = false;
+                if (!d.ok) { if (msg) msg.textContent = (d.error && d.error.message) || "restore failed"; return; }
+                if (msg) msg.textContent = "restored v" + v + " as the latest version";
+                load(name);
+            });
+        });
         const saveBtn = document.getElementById("eval-edit-save");
         if (saveBtn) saveBtn.addEventListener("click", () => {
             const name = sel.value;
@@ -420,7 +453,11 @@
             saveBtn.disabled = true;
             post("/api/evals/dataset", { name, content }).then((r) => r.json()).then((d) => {
                 saveBtn.disabled = false;
-                if (msg) msg.textContent = d.ok ? "saved ✓" : ((d.error && d.error.message) || "save failed");
+                if (!d.ok) { if (msg) msg.textContent = (d.error && d.error.message) || "save failed"; return; }
+                fillHistory(d.versions);
+                const latest = d.versions && d.versions[0];
+                setVer(latest);
+                if (msg) msg.textContent = "saved as v" + (latest ? latest.version : "?");
             });
         });
     }

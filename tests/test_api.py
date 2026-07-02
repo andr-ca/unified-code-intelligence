@@ -276,29 +276,45 @@ def test_unindexed_project_prompts_build(project_server):
 
 
 @pytest.mark.skipif(not _evals_present(), reason="eval suite not in this workspace")
-def test_evals_create_and_edit_dataset(project_server):
+def test_evals_create_edit_and_version(project_server):
     base, _, _ = project_server
+    import shutil
+
     from uci.api import evals
     name = "pytest_sample_snapshot"
     path = evals.dataset_path(name)
+    vdir = evals._versions_dir(name)
     try:
         status, data = _post(base, "/api/evals/create", {"project": "sample", "name": name})
         assert status == 200 and data["ok"], data
-        assert path.exists()
-        cats = data["dataset"]["categories"]
-        assert cats["symbol_lookup"] and cats["calls"]  # snapshot captured real facts
-        assert name in json.loads(_get(base, "/api/evals/reports")[0])["datasets"]  # now runnable
+        assert data["dataset"]["categories"]["symbol_lookup"] and data["dataset"]["categories"]["calls"]
+        assert name in json.loads(_get(base, "/api/evals/reports")[0])["datasets"]
+
         loaded = json.loads(_get(base, "/api/evals/dataset?name=" + name)[0])["dataset"]
-        assert loaded["track"] == "custom"
-        loaded["notes"] = "edited by test"
+        assert loaded["version"] == 1 and loaded["track"] == "custom"  # create == v1
+
+        loaded["notes"] = "curated"
         status, saved = _post(base, "/api/evals/dataset", {"name": name, "content": loaded})
-        assert status == 200 and saved["ok"]
-        assert evals.read_dataset(name)["notes"] == "edited by test"
+        assert status == 200 and saved["versions"][0]["version"] == 2  # edit == v2
+        assert evals.read_dataset(name)["notes"] == "curated"
+
+        vers = json.loads(_get(base, "/api/evals/versions?name=" + name)[0])["versions"]
+        assert [v["version"] for v in vers] == [2, 1]
+        v1 = json.loads(_get(base, "/api/evals/version?name=" + name + "&version=1")[0])["dataset"]
+        assert v1["version"] == 1
+
+        status, rest = _post(base, "/api/evals/restore", {"name": name, "version": 1})
+        assert status == 200 and rest["ok"]
+        cur = evals.read_dataset(name)
+        assert cur["version"] == 3 and cur["notes"] == v1["notes"]  # restore appends v3 with v1's content
+
         status, bad = _post(base, "/api/evals/dataset", {"name": name, "content": {"no": "cats"}})
         assert status == 400 and not bad["ok"]
     finally:
         if path and path.exists():
             path.unlink()
+        if vdir and vdir.exists():
+            shutil.rmtree(vdir, ignore_errors=True)
 
 
 @pytest.mark.skipif(not _evals_present(), reason="eval suite not in this workspace")

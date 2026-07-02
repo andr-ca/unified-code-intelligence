@@ -196,6 +196,8 @@ def make_handler(target, jobs: JobRunner | None = None):
                 return self._create_eval(payload.get("project", ""), payload.get("name", ""))
             if parsed.path == "/api/evals/dataset":
                 return self._save_dataset(payload.get("name", ""), payload.get("content"))
+            if parsed.path == "/api/evals/restore":
+                return self._restore_dataset(payload.get("name", ""), payload.get("version"))
             if parsed.path == "/api/projects":
                 return self._add_project(payload.get("path", ""), payload.get("name") or None)
             if parsed.path == "/api/projects/activate":
@@ -233,6 +235,13 @@ def make_handler(target, jobs: JobRunner | None = None):
                 if dataset is None:
                     return self._json({"ok": False, "error": {"code": "not_found"}}, 404)
                 return self._json({"ok": True, "dataset": dataset})
+            if path == "/api/evals/versions":
+                return self._json({"ok": True, "versions": evals_mod.list_versions(q.get("name", ""))})
+            if path == "/api/evals/version":
+                content = evals_mod.read_version(q.get("name", ""), int(q.get("version", 0) or 0))
+                if content is None:
+                    return self._json({"ok": False, "error": {"code": "not_found"}}, 404)
+                return self._json({"ok": True, "dataset": content})
             return self._json({"ok": False, "error": {"code": "not_found", "message": path}}, 404)
 
         def _start_build(self, name, full: bool) -> None:
@@ -323,7 +332,16 @@ def make_handler(target, jobs: JobRunner | None = None):
                 stem = evals_mod.write_dataset(name, content)
             except (ValueError, TypeError) as exc:
                 return self._json({"ok": False, "error": {"code": "bad_request", "message": str(exc)}}, 400)
-            return self._json({"ok": True, "name": stem})
+            return self._json({"ok": True, "name": stem, "versions": evals_mod.list_versions(stem)})
+
+        def _restore_dataset(self, name: str, version) -> None:
+            if evals_mod.evals_dir() is None:
+                return self._json({"ok": False, "error": {"code": "unavailable"}}, 404)
+            try:
+                stem = evals_mod.restore_version(name, int(version))
+            except (ValueError, TypeError) as exc:
+                return self._json({"ok": False, "error": {"code": "bad_request", "message": str(exc)}}, 400)
+            return self._json({"ok": True, "name": stem, "versions": evals_mod.list_versions(stem)})
 
     return Handler
 

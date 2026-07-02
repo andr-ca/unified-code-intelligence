@@ -1,5 +1,6 @@
 {
   "name": "carddemo",
+  "version": 2,
   "track": "mainframe",
   "repo": "demo-repos/aws-mainframe-modernization-carddemo",
   "mined": "mined/aws-mainframe-modernization-carddemo.json",

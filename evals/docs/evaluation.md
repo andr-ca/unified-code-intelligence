@@ -81,6 +81,13 @@ Golden answers come from two sources, and every entry records which:
 
 **Refresh:** `python evals/tools/mine_ground_truth.py <repo-dir>` regenerates the mined candidate facts to stdout; datasets are updated deliberately (reviewed diff), not automatically.
 
+## 4.1 Versioning
+
+Datasets, the scoring spec, and whole runs are versioned and fingerprinted so scores are only
+ever compared apples-to-apples — see **`versioning.md`** for the axes, bump rules, changelog
+requirements, and how the `--baseline` gate handles drift. Every golden change bumps the
+dataset `version` and gets a `datasets/CHANGELOG.md` entry.
+
 ## 5. Running the eval
 
 ```bash

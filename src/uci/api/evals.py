@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # source-checkout layout: src/uci/api/evals.py -> parents[3] == repo root that holds evals/
@@ -134,6 +135,13 @@ def dataset_path(name: str) -> Path | None:
     return path if path.parent == ddir else None
 
 
+def _versions_dir(stem: str) -> Path | None:
+    directory = evals_dir()
+    if directory is None:
+        return None
+    return directory / "datasets" / ".versions" / _safe_stem(stem)
+
+
 def read_dataset(name: str) -> dict | None:
     path = dataset_path(name)
     if path is None or not path.exists():
@@ -145,7 +153,11 @@ def read_dataset(name: str) -> dict | None:
 
 
 def write_dataset(name: str, content: dict) -> str:
-    """Validate + persist a golden dataset to ``evals/datasets/<stem>.json``. Returns the stem."""
+    """Validate + persist a golden dataset, assigning a new **version** and archiving history.
+
+    Every save bumps ``version`` and writes an immutable copy under
+    ``evals/datasets/.versions/<stem>/`` so the full change history is queryable.
+    """
     if not isinstance(content, dict) or "categories" not in content:
         raise ValueError("dataset must be an object with a 'categories' field")
     if not isinstance(content.get("categories"), dict):
@@ -154,10 +166,63 @@ def write_dataset(name: str, content: dict) -> str:
     if path is None:
         raise ValueError("eval suite not available in this workspace")
     stem = _safe_stem(name)
+
+    prev_version = 0
+    if path.exists():
+        try:
+            prev_version = int(json.loads(path.read_text(encoding="utf-8")).get("version", 0))
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            prev_version = 0
+
+    content = {k: v for k, v in content.items() if k not in ("version", "updated_at")}
     content.setdefault("name", stem)
     content.setdefault("track", "custom")
-    path.write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
+    content["version"] = prev_version + 1
+    content["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    serialized = json.dumps(content, indent=2) + "\n"
+    path.write_text(serialized, encoding="utf-8")
+    vdir = _versions_dir(stem)
+    if vdir is not None:
+        vdir.mkdir(parents=True, exist_ok=True)
+        (vdir / f"v{content['version']:04d}.json").write_text(serialized, encoding="utf-8")
     return stem
+
+
+def list_versions(name: str) -> list[dict]:
+    """History for a dataset, newest first: ``[{version, updated_at}]``."""
+    vdir = _versions_dir(name)
+    if vdir is None or not vdir.exists():
+        return []
+    out: list[dict] = []
+    for path in sorted(vdir.glob("v*.json"), reverse=True):
+        try:
+            content = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        out.append({"version": content.get("version"), "updated_at": content.get("updated_at")})
+    return out
+
+
+def read_version(name: str, version: int) -> dict | None:
+    vdir = _versions_dir(name)
+    if vdir is None:
+        return None
+    path = vdir / f"v{int(version):04d}.json"
+    if not path.exists() or path.parent != vdir:
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def restore_version(name: str, version: int) -> str:
+    """Restore an earlier version as a *new* version (history is append-only)."""
+    content = read_version(name, version)
+    if content is None:
+        raise ValueError(f"no version {version} for {name}")
+    return write_dataset(name, content)
 
 
 def create_dataset(engine, repo_path: str, name: str, *, max_calls: int = 30, max_symbols: int = 12) -> dict:
@@ -229,4 +294,7 @@ __all__ = [
     "read_dataset",
     "write_dataset",
     "create_dataset",
+    "list_versions",
+    "read_version",
+    "restore_version",
 ]
