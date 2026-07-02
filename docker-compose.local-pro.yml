@@ -1,0 +1,42 @@
+# local-pro profile: optional external services for larger repos / team dev.
+# Start with:  docker compose -f docker-compose.local-pro.yml up -d
+# Then set UCI_PROFILE=local-pro (see .env.example). None of this is required
+# for the default local-lite profile.
+
+services:
+  memgraph:
+    image: memgraph/memgraph:2.18
+    container_name: uci-memgraph
+    ports:
+      - "7687:7687" # Bolt (used by UCI's neo4j-driver adapter)
+      - "7444:7444" # logs
+    volumes:
+      - memgraph_data:/var/lib/memgraph
+    command: ["--log-level=WARNING"]
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.0
+    container_name: uci-qdrant
+    ports:
+      - "6333:6333" # REST
+      - "6334:6334" # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: uci-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # After it is up, pull an embedding model:
+    #   docker exec uci-ollama ollama pull nomic-embed-text
+
+volumes:
+  memgraph_data:
+  qdrant_data:
+  ollama_data:

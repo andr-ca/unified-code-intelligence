@@ -1,0 +1,69 @@
+{
+  "repo": "/home/andrey/projects/code-analyzer/unified-code-intelligence/evals/demo-repos/cash-account-cobol",
+  "programs": {
+    "CASH00": "COBOL/CASH00.cbl"
+  },
+  "calls": {},
+  "copybooks": {
+    "DCLCASH": {
+      "exists_in_repo": true,
+      "path": "COBOL/DCLCASH.cpy",
+      "external": false,
+      "dependents": [
+        "CASH00"
+      ]
+    },
+    "DCLFRANK": {
+      "exists_in_repo": true,
+      "path": "COBOL/DCLFRANK.cpy",
+      "external": false,
+      "dependents": [
+        "CASH00"
+      ]
+    },
+    "SQLCA": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "CASH00"
+      ]
+    }
+  },
+  "jobs": {
+    "DB2BIND": {
+      "path": "DB2-DDL/DB2BIND.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "DB2DDL": {
+      "path": "DB2-DDL/DB2DDL.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "DEFKSDS": {
+      "path": "VSAM/DEFKSDS.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    }
+  },
+  "transactions": [],
+  "data_access": {
+    "CASH00": {
+      "reads": [
+        "STOCKTRD.CASHACCOUNTY",
+        "STOCKTRD.FRANKFURT1"
+      ],
+      "writes": [
+        "STOCKTRD.CASHACCOUNTY"
+      ]
+    }
+  },
+  "dynamic_dispatch": {}
+}

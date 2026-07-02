@@ -1,0 +1,1584 @@
+{
+  "repo": "/home/andrey/projects/code-analyzer/unified-code-intelligence/evals/demo-repos/aws-mainframe-modernization-carddemo",
+  "programs": {
+    "CBPAUP0C": "app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl",
+    "COPAUA0C": "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+    "COPAUS0C": "app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl",
+    "COPAUS1C": "app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl",
+    "COPAUS2C": "app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl",
+    "DBUNLDGS": "app/app-authorization-ims-db2-mq/cbl/DBUNLDGS.CBL",
+    "PAUDBLOD": "app/app-authorization-ims-db2-mq/cbl/PAUDBLOD.CBL",
+    "PAUDBUNL": "app/app-authorization-ims-db2-mq/cbl/PAUDBUNL.CBL",
+    "COBTUPDT": "app/app-transaction-type-db2/cbl/COBTUPDT.cbl",
+    "COTRTLIC": "app/app-transaction-type-db2/cbl/COTRTLIC.cbl",
+    "COTRTUPC": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl",
+    "COACCT01": "app/app-vsam-mq/cbl/COACCT01.cbl",
+    "CODATE01": "app/app-vsam-mq/cbl/CODATE01.cbl",
+    "CBACT01C": "app/cbl/CBACT01C.cbl",
+    "CBACT02C": "app/cbl/CBACT02C.cbl",
+    "CBACT03C": "app/cbl/CBACT03C.cbl",
+    "CBACT04C": "app/cbl/CBACT04C.cbl",
+    "CBCUS01C": "app/cbl/CBCUS01C.cbl",
+    "CBEXPORT": "app/cbl/CBEXPORT.cbl",
+    "CBIMPORT": "app/cbl/CBIMPORT.cbl",
+    "CBSTM03A": "app/cbl/CBSTM03A.CBL",
+    "CBSTM03B": "app/cbl/CBSTM03B.CBL",
+    "CBTRN01C": "app/cbl/CBTRN01C.cbl",
+    "CBTRN02C": "app/cbl/CBTRN02C.cbl",
+    "CBTRN03C": "app/cbl/CBTRN03C.cbl",
+    "COACTUPC": "app/cbl/COACTUPC.cbl",
+    "COACTVWC": "app/cbl/COACTVWC.cbl",
+    "COADM01C": "app/cbl/COADM01C.cbl",
+    "COBIL00C": "app/cbl/COBIL00C.cbl",
+    "COBSWAIT": "app/cbl/COBSWAIT.cbl",
+    "COCRDLIC": "app/cbl/COCRDLIC.cbl",
+    "COCRDSLC": "app/cbl/COCRDSLC.cbl",
+    "COCRDUPC": "app/cbl/COCRDUPC.cbl",
+    "COMEN01C": "app/cbl/COMEN01C.cbl",
+    "CORPT00C": "app/cbl/CORPT00C.cbl",
+    "COSGN00C": "app/cbl/COSGN00C.cbl",
+    "COTRN00C": "app/cbl/COTRN00C.cbl",
+    "COTRN01C": "app/cbl/COTRN01C.cbl",
+    "COTRN02C": "app/cbl/COTRN02C.cbl",
+    "COUSR00C": "app/cbl/COUSR00C.cbl",
+    "COUSR01C": "app/cbl/COUSR01C.cbl",
+    "COUSR02C": "app/cbl/COUSR02C.cbl",
+    "COUSR03C": "app/cbl/COUSR03C.cbl",
+    "CSUTLDTC": "app/cbl/CSUTLDTC.cbl"
+  },
+  "calls": {
+    "COPAUA0C": {
+      "internal": [],
+      "external": [
+        "MQCLOSE",
+        "MQGET",
+        "MQOPEN",
+        "MQPUT1"
+      ],
+      "unclassified": []
+    },
+    "DBUNLDGS": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "PAUDBLOD": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "PAUDBUNL": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "COACCT01": {
+      "internal": [],
+      "external": [
+        "MQCLOSE",
+        "MQGET",
+        "MQOPEN",
+        "MQPUT"
+      ],
+      "unclassified": []
+    },
+    "CODATE01": {
+      "internal": [],
+      "external": [
+        "MQCLOSE",
+        "MQGET",
+        "MQOPEN",
+        "MQPUT"
+      ],
+      "unclassified": []
+    },
+    "CBACT01C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": [
+        "COBDATFT"
+      ]
+    },
+    "CBACT02C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBACT03C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBACT04C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBCUS01C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBEXPORT": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBIMPORT": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBSTM03A": {
+      "internal": [
+        "CBSTM03B"
+      ],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBTRN01C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBTRN02C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "CBTRN03C": {
+      "internal": [],
+      "external": [
+        "CEE3ABD"
+      ],
+      "unclassified": []
+    },
+    "COBSWAIT": {
+      "internal": [],
+      "external": [],
+      "unclassified": [
+        "MVSWAIT"
+      ]
+    },
+    "CORPT00C": {
+      "internal": [
+        "CSUTLDTC"
+      ],
+      "external": [],
+      "unclassified": []
+    },
+    "COTRN02C": {
+      "internal": [
+        "CSUTLDTC"
+      ],
+      "external": [],
+      "unclassified": []
+    }
+  },
+  "copybooks": {
+    "AUTHFRDS": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COPAUS2C"
+      ]
+    },
+    "CCPAUERY": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/CCPAUERY.cpy",
+      "external": false,
+      "dependents": [
+        "COPAUA0C"
+      ]
+    },
+    "CCPAURLY": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/CCPAURLY.cpy",
+      "external": false,
+      "dependents": [
+        "COPAUA0C"
+      ]
+    },
+    "CCPAURQY": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/CCPAURQY.cpy",
+      "external": false,
+      "dependents": [
+        "COPAUA0C"
+      ]
+    },
+    "CIPAUDTY": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/CIPAUDTY.cpy",
+      "external": false,
+      "dependents": [
+        "CBPAUP0C",
+        "COPAUA0C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "COPAUS2C",
+        "DBUNLDGS",
+        "PAUDBLOD",
+        "PAUDBUNL"
+      ]
+    },
+    "CIPAUSMY": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/CIPAUSMY.cpy",
+      "external": false,
+      "dependents": [
+        "CBPAUP0C",
+        "COPAUA0C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "DBUNLDGS",
+        "PAUDBLOD",
+        "PAUDBUNL"
+      ]
+    },
+    "CMQGMOV": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COACCT01",
+        "CODATE01",
+        "COPAUA0C"
+      ]
+    },
+    "CMQMDV": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COACCT01",
+        "CODATE01",
+        "COPAUA0C"
+      ]
+    },
+    "CMQODV": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COACCT01",
+        "CODATE01",
+        "COPAUA0C"
+      ]
+    },
+    "CMQPMOV": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COACCT01",
+        "CODATE01",
+        "COPAUA0C"
+      ]
+    },
+    "CMQTML": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COACCT01",
+        "CODATE01",
+        "COPAUA0C"
+      ]
+    },
+    "CMQV": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COACCT01",
+        "CODATE01",
+        "COPAUA0C"
+      ]
+    },
+    "COACTUP": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COACTUP.CPY",
+      "external": false,
+      "dependents": [
+        "COACTUPC"
+      ]
+    },
+    "COACTVW": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COACTVW.CPY",
+      "external": false,
+      "dependents": [
+        "COACTVWC"
+      ]
+    },
+    "COADM01": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COADM01.CPY",
+      "external": false,
+      "dependents": [
+        "COADM01C"
+      ]
+    },
+    "COADM02Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/COADM02Y.cpy",
+      "external": false,
+      "dependents": [
+        "COADM01C"
+      ]
+    },
+    "COBIL00": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COBIL00.CPY",
+      "external": false,
+      "dependents": [
+        "COBIL00C"
+      ]
+    },
+    "COCOM01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/COCOM01Y.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COADM01C",
+        "COBIL00C",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COMEN01C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "CORPT00C",
+        "COSGN00C",
+        "COTRN00C",
+        "COTRN01C",
+        "COTRN02C",
+        "COTRTLIC",
+        "COTRTUPC",
+        "COUSR00C",
+        "COUSR01C",
+        "COUSR02C",
+        "COUSR03C"
+      ]
+    },
+    "COCRDLI": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COCRDLI.CPY",
+      "external": false,
+      "dependents": [
+        "COCRDLIC"
+      ]
+    },
+    "COCRDSL": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COCRDSL.CPY",
+      "external": false,
+      "dependents": [
+        "COCRDSLC"
+      ]
+    },
+    "COCRDUP": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COCRDUP.CPY",
+      "external": false,
+      "dependents": [
+        "COCRDUPC"
+      ]
+    },
+    "CODATECN": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CODATECN.cpy",
+      "external": false,
+      "dependents": [
+        "CBACT01C"
+      ]
+    },
+    "COMEN01": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COMEN01.CPY",
+      "external": false,
+      "dependents": [
+        "COMEN01C"
+      ]
+    },
+    "COMEN02Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/COMEN02Y.cpy",
+      "external": false,
+      "dependents": [
+        "COMEN01C"
+      ]
+    },
+    "COPAU00": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy-bms/COPAU00.cpy",
+      "external": false,
+      "dependents": [
+        "COPAUS0C"
+      ]
+    },
+    "COPAU01": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy-bms/COPAU01.cpy",
+      "external": false,
+      "dependents": [
+        "COPAUS1C"
+      ]
+    },
+    "CORPT00": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/CORPT00.CPY",
+      "external": false,
+      "dependents": [
+        "CORPT00C"
+      ]
+    },
+    "COSGN00": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COSGN00.CPY",
+      "external": false,
+      "dependents": [
+        "COSGN00C"
+      ]
+    },
+    "COSTM01": {
+      "exists_in_repo": true,
+      "path": "app/cpy/COSTM01.CPY",
+      "external": false,
+      "dependents": [
+        "CBSTM03A"
+      ]
+    },
+    "COTRN00": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COTRN00.CPY",
+      "external": false,
+      "dependents": [
+        "COTRN00C"
+      ]
+    },
+    "COTRN01": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COTRN01.CPY",
+      "external": false,
+      "dependents": [
+        "COTRN01C"
+      ]
+    },
+    "COTRN02": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COTRN02.CPY",
+      "external": false,
+      "dependents": [
+        "COTRN02C"
+      ]
+    },
+    "COTRTLI": {
+      "exists_in_repo": true,
+      "path": "app/app-transaction-type-db2/cpy-bms/COTRTLI.cpy",
+      "external": false,
+      "dependents": [
+        "COTRTLIC"
+      ]
+    },
+    "COTRTUP": {
+      "exists_in_repo": true,
+      "path": "app/app-transaction-type-db2/cpy-bms/COTRTUP.cpy",
+      "external": false,
+      "dependents": [
+        "COTRTUPC"
+      ]
+    },
+    "COTTL01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/COTTL01Y.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COADM01C",
+        "COBIL00C",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COMEN01C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "CORPT00C",
+        "COSGN00C",
+        "COTRN00C",
+        "COTRN01C",
+        "COTRN02C",
+        "COTRTLIC",
+        "COTRTUPC",
+        "COUSR00C",
+        "COUSR01C",
+        "COUSR02C",
+        "COUSR03C"
+      ]
+    },
+    "COUSR00": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COUSR00.CPY",
+      "external": false,
+      "dependents": [
+        "COUSR00C"
+      ]
+    },
+    "COUSR01": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COUSR01.CPY",
+      "external": false,
+      "dependents": [
+        "COUSR01C"
+      ]
+    },
+    "COUSR02": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COUSR02.CPY",
+      "external": false,
+      "dependents": [
+        "COUSR02C"
+      ]
+    },
+    "COUSR03": {
+      "exists_in_repo": true,
+      "path": "app/cpy-bms/COUSR03.CPY",
+      "external": false,
+      "dependents": [
+        "COUSR03C"
+      ]
+    },
+    "CSDAT01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CSDAT01Y.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COADM01C",
+        "COBIL00C",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COMEN01C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "CORPT00C",
+        "COSGN00C",
+        "COTRN00C",
+        "COTRN01C",
+        "COTRN02C",
+        "COTRTLIC",
+        "COTRTUPC",
+        "COUSR00C",
+        "COUSR01C",
+        "COUSR02C",
+        "COUSR03C"
+      ]
+    },
+    "CSDB2RPY": {
+      "exists_in_repo": true,
+      "path": "app/app-transaction-type-db2/cpy/CSDB2RPY.cpy",
+      "external": false,
+      "dependents": [
+        "COTRTLIC"
+      ]
+    },
+    "CSDB2RWY": {
+      "exists_in_repo": true,
+      "path": "app/app-transaction-type-db2/cpy/CSDB2RWY.cpy",
+      "external": false,
+      "dependents": [
+        "COTRTLIC"
+      ]
+    },
+    "CSLKPCDY": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CSLKPCDY.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC"
+      ]
+    },
+    "CSMSG01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CSMSG01Y.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COADM01C",
+        "COBIL00C",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COMEN01C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "CORPT00C",
+        "COSGN00C",
+        "COTRN00C",
+        "COTRN01C",
+        "COTRN02C",
+        "COTRTLIC",
+        "COTRTUPC",
+        "COUSR00C",
+        "COUSR01C",
+        "COUSR02C",
+        "COUSR03C"
+      ]
+    },
+    "CSMSG02Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CSMSG02Y.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COPAUS0C",
+        "COPAUS1C",
+        "COTRTUPC"
+      ]
+    },
+    "CSSETATY": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CSSETATY.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COTRTUPC"
+      ]
+    },
+    "CSUSR01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CSUSR01Y.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COADM01C",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COMEN01C",
+        "COSGN00C",
+        "COTRTLIC",
+        "COTRTUPC",
+        "COUSR00C",
+        "COUSR01C",
+        "COUSR02C",
+        "COUSR03C"
+      ]
+    },
+    "CSUTLDPY": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CSUTLDPY.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC"
+      ]
+    },
+    "CUSTREC": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CUSTREC.cpy",
+      "external": false,
+      "dependents": [
+        "CBSTM03A"
+      ]
+    },
+    "CVACT01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVACT01Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBACT01C",
+        "CBACT04C",
+        "CBEXPORT",
+        "CBIMPORT",
+        "CBSTM03A",
+        "CBTRN01C",
+        "CBTRN02C",
+        "COACCT01",
+        "COACTUPC",
+        "COACTVWC",
+        "COBIL00C",
+        "COPAUA0C",
+        "COPAUS0C",
+        "COTRN02C"
+      ]
+    },
+    "CVACT02Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVACT02Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBACT02C",
+        "CBEXPORT",
+        "CBIMPORT",
+        "CBTRN01C",
+        "COACTVWC",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COPAUS0C",
+        "COTRTLIC"
+      ]
+    },
+    "CVACT03Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVACT03Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBACT03C",
+        "CBACT04C",
+        "CBEXPORT",
+        "CBIMPORT",
+        "CBSTM03A",
+        "CBTRN01C",
+        "CBTRN02C",
+        "CBTRN03C",
+        "COACTUPC",
+        "COACTVWC",
+        "COBIL00C",
+        "COPAUA0C",
+        "COPAUS0C",
+        "COTRN02C"
+      ]
+    },
+    "CVCRD01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVCRD01Y.cpy",
+      "external": false,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COTRTLIC",
+        "COTRTUPC"
+      ]
+    },
+    "CVCUS01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVCUS01Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBCUS01C",
+        "CBEXPORT",
+        "CBIMPORT",
+        "CBTRN01C",
+        "COACTUPC",
+        "COACTVWC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COPAUA0C",
+        "COPAUS0C"
+      ]
+    },
+    "CVEXPORT": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVEXPORT.cpy",
+      "external": false,
+      "dependents": [
+        "CBEXPORT",
+        "CBIMPORT"
+      ]
+    },
+    "CVTRA01Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVTRA01Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBACT04C",
+        "CBTRN02C"
+      ]
+    },
+    "CVTRA02Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVTRA02Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBACT04C"
+      ]
+    },
+    "CVTRA03Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVTRA03Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBTRN03C"
+      ]
+    },
+    "CVTRA04Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVTRA04Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBTRN03C"
+      ]
+    },
+    "CVTRA05Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVTRA05Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBACT04C",
+        "CBEXPORT",
+        "CBIMPORT",
+        "CBTRN01C",
+        "CBTRN02C",
+        "CBTRN03C",
+        "COBIL00C",
+        "CORPT00C",
+        "COTRN00C",
+        "COTRN01C",
+        "COTRN02C"
+      ]
+    },
+    "CVTRA06Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVTRA06Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBTRN01C",
+        "CBTRN02C"
+      ]
+    },
+    "CVTRA07Y": {
+      "exists_in_repo": true,
+      "path": "app/cpy/CVTRA07Y.cpy",
+      "external": false,
+      "dependents": [
+        "CBTRN03C"
+      ]
+    },
+    "DCLTRCAT": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COTRTUPC"
+      ]
+    },
+    "DCLTRTYP": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COBTUPDT",
+        "COTRTLIC",
+        "COTRTUPC"
+      ]
+    },
+    "DFHAID": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COADM01C",
+        "COBIL00C",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COMEN01C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "CORPT00C",
+        "COSGN00C",
+        "COTRN00C",
+        "COTRN01C",
+        "COTRN02C",
+        "COTRTLIC",
+        "COTRTUPC",
+        "COUSR00C",
+        "COUSR01C",
+        "COUSR02C",
+        "COUSR03C"
+      ]
+    },
+    "DFHBMSCA": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "COACTUPC",
+        "COACTVWC",
+        "COADM01C",
+        "COBIL00C",
+        "COCRDLIC",
+        "COCRDSLC",
+        "COCRDUPC",
+        "COMEN01C",
+        "COPAUS0C",
+        "COPAUS1C",
+        "CORPT00C",
+        "COSGN00C",
+        "COTRN00C",
+        "COTRN01C",
+        "COTRN02C",
+        "COTRTLIC",
+        "COTRTUPC",
+        "COUSR00C",
+        "COUSR01C",
+        "COUSR02C",
+        "COUSR03C"
+      ]
+    },
+    "IMSFUNCS": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/IMSFUNCS.cpy",
+      "external": false,
+      "dependents": [
+        "DBUNLDGS",
+        "PAUDBLOD",
+        "PAUDBUNL"
+      ]
+    },
+    "PADFLPCB": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/PADFLPCB.CPY",
+      "external": false,
+      "dependents": [
+        "DBUNLDGS"
+      ]
+    },
+    "PASFLPCB": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/PASFLPCB.CPY",
+      "external": false,
+      "dependents": [
+        "DBUNLDGS"
+      ]
+    },
+    "PAUTBPCB": {
+      "exists_in_repo": true,
+      "path": "app/app-authorization-ims-db2-mq/cpy/PAUTBPCB.CPY",
+      "external": false,
+      "dependents": [
+        "DBUNLDGS",
+        "PAUDBLOD",
+        "PAUDBUNL"
+      ]
+    },
+    "REPLACING": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "COACCT01",
+        "CODATE01"
+      ]
+    },
+    "SQLCA": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "COBTUPDT",
+        "COPAUS2C",
+        "COTRTLIC",
+        "COTRTUPC"
+      ]
+    }
+  },
+  "jobs": {
+    "CBPAUP0J": {
+      "path": "app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "DFSRRC00"
+      ]
+    },
+    "DBPAUTP0": {
+      "path": "app/app-authorization-ims-db2-mq/jcl/DBPAUTP0.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "DFSRRC00",
+        "IEFBR14"
+      ]
+    },
+    "CREADB21": {
+      "path": "app/app-transaction-type-db2/jcl/CREADB21.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IEFBR14",
+        "IKJEFT01"
+      ]
+    },
+    "MNTTRDB2": {
+      "path": "app/app-transaction-type-db2/jcl/MNTTRDB2.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "TRANEXTR": {
+      "path": "app/app-transaction-type-db2/jcl/TRANEXTR.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IEBGENER",
+        "IEFBR14",
+        "IKJEFT01"
+      ]
+    },
+    "ACCTFILE": {
+      "path": "app/jcl/ACCTFILE.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "CARDFILE": {
+      "path": "app/jcl/CARDFILE.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "SDSF"
+      ]
+    },
+    "CBADMCDJ": {
+      "path": "app/jcl/CBADMCDJ.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "DFHCSDUP"
+      ]
+    },
+    "CBEXPORT": {
+      "path": "app/jcl/CBEXPORT.jcl",
+      "programs_internal": [
+        "CBEXPORT"
+      ],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "CBIMPORT": {
+      "path": "app/jcl/CBIMPORT.jcl",
+      "programs_internal": [
+        "CBIMPORT"
+      ],
+      "programs_external": []
+    },
+    "CLOSEFIL": {
+      "path": "app/jcl/CLOSEFIL.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "SDSF"
+      ]
+    },
+    "COMBTRAN": {
+      "path": "app/jcl/COMBTRAN.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "SORT"
+      ]
+    },
+    "CUSTFILE": {
+      "path": "app/jcl/CUSTFILE.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "SDSF"
+      ]
+    },
+    "DALYREJS": {
+      "path": "app/jcl/DALYREJS.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "DEFCUST": {
+      "path": "app/jcl/DEFCUST.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "DEFGDGB": {
+      "path": "app/jcl/DEFGDGB.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "DEFGDGD": {
+      "path": "app/jcl/DEFGDGD.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "IEBGENER"
+      ]
+    },
+    "DISCGRP": {
+      "path": "app/jcl/DISCGRP.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "DUSRSECJ": {
+      "path": "app/jcl/DUSRSECJ.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "IEBGENER",
+        "IEFBR14"
+      ]
+    },
+    "ESDSRRDS": {
+      "path": "app/jcl/ESDSRRDS.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "IEBGENER",
+        "IEFBR14"
+      ]
+    },
+    "INTCALC": {
+      "path": "app/jcl/INTCALC.jcl",
+      "programs_internal": [
+        "CBACT04C"
+      ],
+      "programs_external": []
+    },
+    "OPENFIL": {
+      "path": "app/jcl/OPENFIL.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "SDSF"
+      ]
+    },
+    "POSTTRAN": {
+      "path": "app/jcl/POSTTRAN.jcl",
+      "programs_internal": [
+        "CBTRN02C"
+      ],
+      "programs_external": []
+    },
+    "PRTCATBL": {
+      "path": "app/jcl/PRTCATBL.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IEFBR14",
+        "SORT"
+      ]
+    },
+    "READACCT": {
+      "path": "app/jcl/READACCT.jcl",
+      "programs_internal": [
+        "CBACT01C"
+      ],
+      "programs_external": [
+        "IEFBR14"
+      ]
+    },
+    "READCARD": {
+      "path": "app/jcl/READCARD.jcl",
+      "programs_internal": [
+        "CBACT02C"
+      ],
+      "programs_external": []
+    },
+    "READCUST": {
+      "path": "app/jcl/READCUST.jcl",
+      "programs_internal": [
+        "CBCUS01C"
+      ],
+      "programs_external": []
+    },
+    "READXREF": {
+      "path": "app/jcl/READXREF.jcl",
+      "programs_internal": [
+        "CBACT03C"
+      ],
+      "programs_external": []
+    },
+    "REPTFILE": {
+      "path": "app/jcl/REPTFILE.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "TCATBALF": {
+      "path": "app/jcl/TCATBALF.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "TRANBKP": {
+      "path": "app/jcl/TRANBKP.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "TRANCATG": {
+      "path": "app/jcl/TRANCATG.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "TRANFILE": {
+      "path": "app/jcl/TRANFILE.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "SDSF"
+      ]
+    },
+    "TRANIDX": {
+      "path": "app/jcl/TRANIDX.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "TRANREPT": {
+      "path": "app/jcl/TRANREPT.jcl",
+      "programs_internal": [
+        "CBTRN03C"
+      ],
+      "programs_external": [
+        "SORT"
+      ]
+    },
+    "TRANTYPE": {
+      "path": "app/jcl/TRANTYPE.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "WAITSTEP": {
+      "path": "app/jcl/WAITSTEP.jcl",
+      "programs_internal": [
+        "COBSWAIT"
+      ],
+      "programs_external": []
+    },
+    "XREFFILE": {
+      "path": "app/jcl/XREFFILE.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS"
+      ]
+    },
+    "BMSCMP": {
+      "path": "samples/jcl/BMSCMP.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "SDSF"
+      ]
+    },
+    "CICCMP": {
+      "path": "samples/jcl/CICCMP.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "SDSF"
+      ]
+    },
+    "IMSMQCMP": {
+      "path": "samples/jcl/IMSMQCMP.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "DFHECP1$",
+        "IEBGENER",
+        "IEWL",
+        "IGYCRCTL"
+      ]
+    },
+    "LISTCAT": {
+      "path": "samples/jcl/LISTCAT.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IDCAMS",
+        "IEFBR14"
+      ]
+    },
+    "RACFCMDS": {
+      "path": "samples/jcl/RACFCMDS.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "SORTTEST": {
+      "path": "samples/jcl/SORTTEST.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "SORT"
+      ]
+    }
+  },
+  "transactions": [
+    {
+      "tran": "CA00",
+      "program": "COADM01C"
+    },
+    {
+      "tran": "CAUP",
+      "program": "COACTUPC"
+    },
+    {
+      "tran": "CAVW",
+      "program": "COACTVWC"
+    },
+    {
+      "tran": "CB00",
+      "program": "COBIL00C"
+    },
+    {
+      "tran": "CC00",
+      "program": "COSGN00C"
+    },
+    {
+      "tran": "CCDL",
+      "program": "COCRDSLC"
+    },
+    {
+      "tran": "CCLI",
+      "program": "COCRDLIC"
+    },
+    {
+      "tran": "CCUP",
+      "program": "COCRDUPC"
+    },
+    {
+      "tran": "CDRA",
+      "program": "COACCT01"
+    },
+    {
+      "tran": "CDRD",
+      "program": "CODATE01"
+    },
+    {
+      "tran": "CDV1",
+      "program": "COCRDSEC"
+    },
+    {
+      "tran": "CM00",
+      "program": "COMEN01C"
+    },
+    {
+      "tran": "CP00",
+      "program": "COPAUA0C"
+    },
+    {
+      "tran": "CPVD",
+      "program": "COPAUS1C"
+    },
+    {
+      "tran": "CPVS",
+      "program": "COPAUS0C"
+    },
+    {
+      "tran": "CR00",
+      "program": "CORPT00C"
+    },
+    {
+      "tran": "CT00",
+      "program": "COTRN00C"
+    },
+    {
+      "tran": "CT01",
+      "program": "COTRN01C"
+    },
+    {
+      "tran": "CT02",
+      "program": "COTRN02C"
+    },
+    {
+      "tran": "CTLI",
+      "program": "COTRTLIC"
+    },
+    {
+      "tran": "CTTU",
+      "program": "COTRTUPC"
+    },
+    {
+      "tran": "CU00",
+      "program": "COUSR00C"
+    },
+    {
+      "tran": "CU01",
+      "program": "COUSR01C"
+    },
+    {
+      "tran": "CU02",
+      "program": "COUSR02C"
+    },
+    {
+      "tran": "CU03",
+      "program": "COUSR03C"
+    }
+  ],
+  "data_access": {
+    "COPAUS2C": {
+      "reads": [],
+      "writes": [
+        "CARDDEMO.AUTHFRDS"
+      ]
+    },
+    "COBTUPDT": {
+      "reads": [
+        "CARDDEMO.TRANSACTION_TYPE"
+      ],
+      "writes": [
+        "CARDDEMO.TRANSACTION_TYPE"
+      ]
+    },
+    "COTRTLIC": {
+      "reads": [
+        "CARDDEMO.TRANSACTION_TYPE"
+      ],
+      "writes": [
+        "CARDDEMO.TRANSACTION_TYPE"
+      ]
+    },
+    "COTRTUPC": {
+      "reads": [
+        "CARDDEMO.TRANSACTION_TYPE"
+      ],
+      "writes": [
+        "CARDDEMO.TRANSACTION_TYPE"
+      ]
+    }
+  },
+  "dynamic_dispatch": {
+    "COADM01C": [
+      {
+        "line": 169,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COBIL00C": [
+      {
+        "line": 282,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COMEN01C": [
+      {
+        "line": 202,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COPAUS0C": [
+      {
+        "line": 323,
+        "via": "CDEMO-TO-PROGRAM"
+      },
+      {
+        "line": 675,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COPAUS1C": [
+      {
+        "line": 368,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "CORPT00C": [
+      {
+        "line": 549,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COTRN00C": [
+      {
+        "line": 193,
+        "via": "CDEMO-TO-PROGRAM"
+      },
+      {
+        "line": 519,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COTRN01C": [
+      {
+        "line": 206,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COTRN02C": [
+      {
+        "line": 509,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COUSR00C": [
+      {
+        "line": 197,
+        "via": "CDEMO-TO-PROGRAM"
+      },
+      {
+        "line": 207,
+        "via": "CDEMO-TO-PROGRAM"
+      },
+      {
+        "line": 515,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COUSR01C": [
+      {
+        "line": 176,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COUSR02C": [
+      {
+        "line": 259,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ],
+    "COUSR03C": [
+      {
+        "line": 206,
+        "via": "CDEMO-TO-PROGRAM"
+      }
+    ]
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "run": "2026-07-02T02:10:50Z",
+  "git_sha": "c1d71ba",
+  "tracks": {
+    "mainframe": {
+      "datasets": {
+        "bank-of-z": {
+          "score": 0.0,
+          "categories": {
+            "queries": {
+              "score": 0.0,
+              "items": 4,
+              "mrr": 0.0,
+              "recall_at_k": 0.0
+            },
+            "completeness": {
+              "score": 0.0,
+              "items": 1
+            },
+            "gaps": {
+              "score": 1.0,
+              "items": 1,
+              "vacuous": true
+            },
+            "symbol_lookup": {
+              "score": 0.0,
+              "items": 40
+            },
+            "copybook_impact": {
+              "score": 0.0,
+              "items": 25
+            },
+            "data_access": {
+              "score": 0.0,
+              "items": 12
+            }
+          },
+          "index_stats": {
+            "entities": 932,
+            "relationships": 978,
+            "files": 155,
+            "gaps": 0
+          },
+          "coverage": 0.167
+        },
+        "carddemo": {
+          "score": 0.0,
+          "categories": {
+            "queries": {
+              "score": 0.0,
+              "items": 6,
+              "mrr": 0.0,
+              "recall_at_k": 0.0
+            },
+            "completeness": {
+              "score": 0.0,
+              "items": 5
+            },
+            "gaps": {
+              "score": 1.0,
+              "items": 1,
+              "vacuous": true
+            },
+            "symbol_lookup": {
+              "score": 0.0,
+              "items": 44
+            },
+            "calls": {
+              "score": 0.0,
+              "items": 4
+            },
+            "copybook_impact": {
+              "score": 0.0,
+              "items": 59
+            },
+            "jobs": {
+              "score": 0.0,
+              "items": 10
+            },
+            "transactions": {
+              "score": 0.0,
+              "items": 25
+            },
+            "data_access": {
+              "score": 0.0,
+              "items": 4
+            }
+          },
+          "index_stats": {
+            "entities": 1,
+            "relationships": 0,
+            "files": 0,
+            "gaps": 0
+          },
+          "coverage": 0.0
+        },
+        "cash-account": {
+          "score": 0.0,
+          "categories": {
+            "queries": {
+              "score": 0.0,
+              "items": 2,
+              "mrr": 0.0,
+              "recall_at_k": 0.0
+            },
+            "completeness": {
+              "score": 0.0,
+              "items": 1
+            },
+            "gaps": {
+              "score": 1.0,
+              "items": 1,
+              "vacuous": true
+            },
+            "symbol_lookup": {
+              "score": 0.0,
+              "items": 1
+            },
+            "copybook_impact": {
+              "score": 0.0,
+              "items": 2
+            },
+            "data_access": {
+              "score": 0.0,
+              "items": 1
+            }
+          },
+          "index_stats": {
+            "entities": 1,
+            "relationships": 0,
+            "files": 0,
+            "gaps": 0
+          },
+          "coverage": 0.0
+        }
+      },
+      "score": 0.0
+    },
+    "supported": {
+      "datasets": {
+        "resolve_cases": {
+          "score": 97.2,
+          "categories": {
+            "calls": {
+              "score": 1.0,
+              "items": 4
+            },
+            "queries": {
+              "score": 0.875,
+              "items": 2,
+              "mrr": 0.75,
+              "recall_at_k": 1.0
+            },
+            "completeness": {
+              "score": 1.0,
+              "items": 1
+            },
+            "gaps": {
+              "score": 1.0,
+              "items": 1,
+              "vacuous": true
+            }
+          },
+          "index_stats": {
+            "entities": 17,
+            "relationships": 25,
+            "files": 4,
+            "gaps": 0
+          }
+        },
+        "shop": {
+          "score": 100.0,
+          "categories": {
+            "symbol_lookup": {
+              "score": 1.0,
+              "items": 2
+            },
+            "calls": {
+              "score": 1.0,
+              "items": 3
+            },
+            "impact": {
+              "score": 1.0,
+              "items": 2
+            },
+            "queries": {
+              "score": 1.0,
+              "items": 3,
+              "mrr": 1.0,
+              "recall_at_k": 1.0
+            },
+            "completeness": {
+              "score": 1.0,
+              "items": 1
+            },
+            "gaps": {
+              "score": 1.0,
+              "items": 1,
+              "vacuous": true
+            }
+          },
+          "index_stats": {
+            "entities": 20,
+            "relationships": 28,
+            "files": 4,
+            "gaps": 0
+          }
+        }
+      },
+      "score": 98.6
+    }
+  }
+}

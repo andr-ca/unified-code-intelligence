@@ -1,0 +1,1216 @@
+{
+  "repo": "/home/andrey/projects/code-analyzer/unified-code-intelligence/evals/demo-repos/Bank-of-Z",
+  "programs": {
+    "ABNDPROC": "src/base/cics/cobol/ABNDPROC.cbl",
+    "BANKDATA": "src/base/cics/cobol/BANKDATA.cbl",
+    "BNK1CAC": "src/base/cics/cobol/BNK1CAC.cbl",
+    "BNK1CCA": "src/base/cics/cobol/BNK1CCA.cbl",
+    "BNK1CCS": "src/base/cics/cobol/BNK1CCS.cbl",
+    "BNK1CRA": "src/base/cics/cobol/BNK1CRA.cbl",
+    "BNK1DAC": "src/base/cics/cobol/BNK1DAC.cbl",
+    "BNK1DCS": "src/base/cics/cobol/BNK1DCS.cbl",
+    "BNK1TFN": "src/base/cics/cobol/BNK1TFN.cbl",
+    "BNK1UAC": "src/base/cics/cobol/BNK1UAC.cbl",
+    "BNKMENU": "src/base/cics/cobol/BNKMENU.cbl",
+    "CRDTAGY1": "src/base/cics/cobol/CRDTAGY1.cbl",
+    "CRDTAGY2": "src/base/cics/cobol/CRDTAGY2.cbl",
+    "CRDTAGY3": "src/base/cics/cobol/CRDTAGY3.cbl",
+    "CRDTAGY4": "src/base/cics/cobol/CRDTAGY4.cbl",
+    "CRDTAGY5": "src/base/cics/cobol/CRDTAGY5.cbl",
+    "CREACC": "src/base/cics/cobol/CREACC.cbl",
+    "CRECUST": "src/base/cics/cobol/CRECUST.cbl",
+    "DBCRFUN": "src/base/cics/cobol/DBCRFUN.cbl",
+    "DELACC": "src/base/cics/cobol/DELACC.cbl",
+    "DELCUS": "src/base/cics/cobol/DELCUS.cbl",
+    "GETCOMPY": "src/base/cics/cobol/GETCOMPY.cbl",
+    "GETSCODE": "src/base/cics/cobol/GETSCODE.cbl",
+    "INQACC": "src/base/cics/cobol/INQACC.cbl",
+    "INQACCCU": "src/base/cics/cobol/INQACCCU.cbl",
+    "INQCUST": "src/base/cics/cobol/INQCUST.cbl",
+    "UPDACC": "src/base/cics/cobol/UPDACC.cbl",
+    "UPDCUST": "src/base/cics/cobol/UPDCUST.cbl",
+    "XFRFUN": "src/base/cics/cobol/XFRFUN.cbl",
+    "IBACSUM": "src/base/ims/cobol/IBACSUM.cbl",
+    "IBGCUDAT": "src/base/ims/cobol/IBGCUDAT.cbl",
+    "IBLOGIN1": "src/base/ims/cobol/IBLOGIN1.cbl",
+    "IBLOGOUT": "src/base/ims/cobol/IBLOGOUT.cbl",
+    "IBSCUDAT": "src/base/ims/cobol/IBSCUDAT.cbl",
+    "IBTRAN": "src/base/ims/cobol/IBTRAN.cbl",
+    "LOADACCT": "src/base/ims/cobol/LOADACCT.cbl",
+    "LOADCUSA": "src/base/ims/cobol/LOADCUSA.cbl",
+    "LOADCUST": "src/base/ims/cobol/LOADCUST.cbl",
+    "LOADHIST": "src/base/ims/cobol/LOADHIST.cbl",
+    "LOADTSTA": "src/base/ims/cobol/LOADTSTA.cbl"
+  },
+  "calls": {
+    "BANKDATA": {
+      "internal": [],
+      "external": [
+        "CEEDATM",
+        "CEEGMT"
+      ],
+      "unclassified": []
+    },
+    "IBACSUM": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "IBGCUDAT": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "IBLOGIN1": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "IBLOGOUT": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "IBSCUDAT": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    },
+    "IBTRAN": {
+      "internal": [],
+      "external": [
+        "CBLTDLI"
+      ],
+      "unclassified": []
+    }
+  },
+  "copybooks": {
+    "ABNDINFO": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/ABNDINFO.cpy",
+      "external": false,
+      "dependents": [
+        "ABNDPROC",
+        "BNK1CAC",
+        "BNK1CCA",
+        "BNK1CCS",
+        "BNK1CRA",
+        "BNK1DAC",
+        "BNK1DCS",
+        "BNK1TFN",
+        "BNK1UAC",
+        "BNKMENU",
+        "CRDTAGY1",
+        "CRDTAGY2",
+        "CRDTAGY3",
+        "CRDTAGY4",
+        "CRDTAGY5",
+        "CREACC",
+        "CRECUST",
+        "DBCRFUN",
+        "DELACC",
+        "DELCUS",
+        "INQACC",
+        "INQACCCU",
+        "INQCUST",
+        "UPDACC",
+        "UPDCUST",
+        "XFRFUN"
+      ]
+    },
+    "ACCDB2": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/ACCDB2.cpy",
+      "external": false,
+      "dependents": [
+        "BANKDATA",
+        "CREACC",
+        "DBCRFUN",
+        "DELACC",
+        "INQACC",
+        "INQACCCU",
+        "UPDACC",
+        "XFRFUN"
+      ]
+    },
+    "ACCOUNT": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/ACCOUNT.cpy",
+      "external": false,
+      "dependents": [
+        "CREACC",
+        "DBCRFUN",
+        "DELACC",
+        "DELCUS",
+        "INQACC",
+        "INQACCCU",
+        "UPDACC",
+        "XFRFUN"
+      ]
+    },
+    "ACCTCTRL": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/ACCTCTRL.cpy",
+      "external": false,
+      "dependents": [
+        "BANKDATA",
+        "CREACC",
+        "DELACC"
+      ]
+    },
+    "BNK1ACC": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1CCA"
+      ]
+    },
+    "BNK1CAM": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1CAC"
+      ]
+    },
+    "BNK1CCM": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1CCS"
+      ]
+    },
+    "BNK1CDM": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1CRA"
+      ]
+    },
+    "BNK1DAM": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1DAC"
+      ]
+    },
+    "BNK1DCM": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1DCS"
+      ]
+    },
+    "BNK1MAI": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNKMENU"
+      ]
+    },
+    "BNK1TFM": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1TFN"
+      ]
+    },
+    "BNK1UAM": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": false,
+      "dependents": [
+        "BNK1UAC"
+      ]
+    },
+    "CEEIGZCT": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "CRECUST"
+      ]
+    },
+    "CONTDB2": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/CONTDB2.cpy",
+      "external": false,
+      "dependents": [
+        "BANKDATA",
+        "CRECUST"
+      ]
+    },
+    "CREACC": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/CREACC.cpy",
+      "external": false,
+      "dependents": [
+        "CREACC"
+      ]
+    },
+    "CRECUST": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/CRECUST.cpy",
+      "external": false,
+      "dependents": [
+        "CRECUST"
+      ]
+    },
+    "CUSTCTRL": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/CUSTCTRL.cpy",
+      "external": false,
+      "dependents": [
+        "BANKDATA",
+        "CRECUST"
+      ]
+    },
+    "CUSTDB2": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/CUSTDB2.cpy",
+      "external": false,
+      "dependents": [
+        "BANKDATA",
+        "CRECUST",
+        "DELCUS",
+        "INQCUST",
+        "UPDCUST"
+      ]
+    },
+    "CUSTOMER": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/CUSTOMER.cpy",
+      "external": false,
+      "dependents": [
+        "BANKDATA",
+        "CRDTAGY1",
+        "CRDTAGY2",
+        "CRDTAGY3",
+        "CRDTAGY4",
+        "CRDTAGY5",
+        "CREACC",
+        "CRECUST",
+        "DELCUS",
+        "INQACCCU",
+        "INQCUST",
+        "UPDCUST"
+      ]
+    },
+    "DELACC": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/DELACC.cpy",
+      "external": false,
+      "dependents": [
+        "DELACC"
+      ]
+    },
+    "DELCUS": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/DELCUS.cpy",
+      "external": false,
+      "dependents": [
+        "BNK1DCS",
+        "DELCUS"
+      ]
+    },
+    "DFHAID": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "BNK1CAC",
+        "BNK1CCA",
+        "BNK1CCS",
+        "BNK1CRA",
+        "BNK1DAC",
+        "BNK1DCS",
+        "BNK1TFN",
+        "BNK1UAC",
+        "BNKMENU"
+      ]
+    },
+    "DFHBMSCA": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "BNK1DCS"
+      ]
+    },
+    "GETCOMPY": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/GETCOMPY.cpy",
+      "external": false,
+      "dependents": [
+        "GETCOMPY"
+      ]
+    },
+    "GETSCODE": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/GETSCODE.cpy",
+      "external": false,
+      "dependents": [
+        "GETSCODE"
+      ]
+    },
+    "INQACC": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/INQACC.cpy",
+      "external": false,
+      "dependents": [
+        "BNK1DAC",
+        "INQACC"
+      ]
+    },
+    "INQACCCU": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/INQACCCU.cpy",
+      "external": false,
+      "dependents": [
+        "BNK1CCA",
+        "CREACC",
+        "DELCUS",
+        "INQACCCU"
+      ]
+    },
+    "INQCUSTZ": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/INQCUSTZ.cpy",
+      "external": false,
+      "dependents": [
+        "BNK1DCS",
+        "CREACC",
+        "DELCUS",
+        "INQACCCU",
+        "INQCUST"
+      ]
+    },
+    "JNI": {
+      "exists_in_repo": true,
+      "path": "src/base/ims/copy/JNI.cpy",
+      "external": false,
+      "dependents": [
+        "IBTRAN"
+      ]
+    },
+    "PAYDBCR": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/PAYDBCR.cpy",
+      "external": false,
+      "dependents": [
+        "DBCRFUN"
+      ]
+    },
+    "PROCDB2": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/PROCDB2.cpy",
+      "external": false,
+      "dependents": [
+        "CREACC",
+        "CRECUST",
+        "DBCRFUN",
+        "DELACC",
+        "DELCUS",
+        "XFRFUN"
+      ]
+    },
+    "PROCTRAN": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/PROCTRAN.cpy",
+      "external": false,
+      "dependents": [
+        "CREACC",
+        "CRECUST",
+        "DBCRFUN",
+        "DELACC",
+        "DELCUS",
+        "XFRFUN"
+      ]
+    },
+    "SORTCODE": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/SORTCODE.cpy",
+      "external": false,
+      "dependents": [
+        "BANKDATA",
+        "CRDTAGY1",
+        "CRDTAGY2",
+        "CRDTAGY3",
+        "CRDTAGY4",
+        "CRDTAGY5",
+        "CREACC",
+        "CRECUST",
+        "DBCRFUN",
+        "DELACC",
+        "DELCUS",
+        "GETSCODE",
+        "INQACC",
+        "INQACCCU",
+        "INQCUST",
+        "UPDACC",
+        "UPDCUST",
+        "XFRFUN"
+      ]
+    },
+    "SQLCA": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "BANKDATA",
+        "CREACC",
+        "CRECUST",
+        "DBCRFUN",
+        "DELACC",
+        "DELCUS",
+        "INQACC",
+        "INQACCCU",
+        "INQCUST",
+        "UPDACC",
+        "UPDCUST",
+        "XFRFUN"
+      ]
+    },
+    "SQLDA": {
+      "exists_in_repo": false,
+      "path": null,
+      "external": true,
+      "dependents": [
+        "XFRFUN"
+      ]
+    },
+    "UPDACC": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/UPDACC.cpy",
+      "external": false,
+      "dependents": [
+        "UPDACC"
+      ]
+    },
+    "UPDCUST": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/UPDCUST.cpy",
+      "external": false,
+      "dependents": [
+        "BNK1DCS",
+        "UPDCUST"
+      ]
+    },
+    "XFRFUN": {
+      "exists_in_repo": true,
+      "path": "src/base/cics/copy/XFRFUN.cpy",
+      "external": false,
+      "dependents": [
+        "XFRFUN"
+      ]
+    }
+  },
+  "jobs": {
+    "DB2-BIND": {
+      "path": ".setup/jcl/cics/Db2-bind.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "DB2-CREATE": {
+      "path": ".setup/jcl/ims/Db2-create.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "DB2-DROP": {
+      "path": ".setup/jcl/ims/Db2-drop.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "DB2-GRANT": {
+      "path": ".setup/jcl/cics/Db2-grant.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "DB2-INSERT": {
+      "path": ".setup/jcl/cics/Db2-insert.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    },
+    "BNKSTMT": {
+      "path": "src/base/batch/jcl/BNKSTMT.jcl",
+      "programs_internal": [],
+      "programs_external": [
+        "IKJEFT01"
+      ]
+    }
+  },
+  "transactions": [],
+  "data_access": {
+    "BANKDATA": {
+      "reads": [
+        "ACCOUNT",
+        "CONTROL",
+        "CUSTOMER"
+      ],
+      "writes": [
+        "ACCOUNT",
+        "CONTROL",
+        "CUSTOMER"
+      ]
+    },
+    "CREACC": {
+      "reads": [
+        "CONTROL"
+      ],
+      "writes": [
+        "ACCOUNT",
+        "CONTROL",
+        "PROCTRAN"
+      ]
+    },
+    "CRECUST": {
+      "reads": [
+        "CONTROL"
+      ],
+      "writes": [
+        "CONTROL",
+        "CUSTOMER",
+        "PROCTRAN"
+      ]
+    },
+    "DBCRFUN": {
+      "reads": [
+        "ACCOUNT"
+      ],
+      "writes": [
+        "ACCOUNT",
+        "PROCTRAN"
+      ]
+    },
+    "DELACC": {
+      "reads": [
+        "ACCOUNT"
+      ],
+      "writes": [
+        "ACCOUNT",
+        "PROCTRAN"
+      ]
+    },
+    "DELCUS": {
+      "reads": [
+        "CUSTOMER"
+      ],
+      "writes": [
+        "CUSTOMER",
+        "PROCTRAN"
+      ]
+    },
+    "INQACC": {
+      "reads": [
+        "ACC",
+        "ACCOUNT"
+      ],
+      "writes": []
+    },
+    "INQACCCU": {
+      "reads": [
+        "ACC",
+        "ACCOUNT"
+      ],
+      "writes": []
+    },
+    "INQCUST": {
+      "reads": [
+        "CUSTOMER"
+      ],
+      "writes": []
+    },
+    "UPDACC": {
+      "reads": [
+        "ACCOUNT"
+      ],
+      "writes": [
+        "ACCOUNT"
+      ]
+    },
+    "UPDCUST": {
+      "reads": [
+        "CUSTOMER"
+      ],
+      "writes": [
+        "CUSTOMER"
+      ]
+    },
+    "XFRFUN": {
+      "reads": [
+        "ACCOUNT"
+      ],
+      "writes": [
+        "ACCOUNT",
+        "PROCTRAN"
+      ]
+    }
+  },
+  "dynamic_dispatch": {
+    "BNK1CAC": [
+      {
+        "line": 309,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 416,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 834,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1027,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1104,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1182,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1260,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNK1CCA": [
+      {
+        "line": 304,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 413,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 514,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 702,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 778,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 857,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 936,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNK1CCS": [
+      {
+        "line": 346,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 477,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 574,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1052,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1203,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1286,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1365,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1444,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1523,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1603,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNK1CRA": [
+      {
+        "line": 318,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 425,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 566,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 705,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 780,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 856,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 934,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNK1DAC": [
+      {
+        "line": 351,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 482,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 609,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 884,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 964,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1040,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1119,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNK1DCS": [
+      {
+        "line": 419,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 616,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 691,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 921,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1066,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1271,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1566,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1644,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1723,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1825,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1912,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1993,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNK1TFN": [
+      {
+        "line": 302,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 411,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 551,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 728,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 803,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 879,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 957,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNK1UAC": [
+      {
+        "line": 350,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 474,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 822,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1009,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1131,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1208,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1285,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1364,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "BNKMENU": [
+      {
+        "line": 225,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 337,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 441,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 513,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 586,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 659,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 732,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 805,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 878,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 952,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1035,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1111,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1189,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1268,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "CRDTAGY1": [
+      {
+        "line": 166,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "CRDTAGY2": [
+      {
+        "line": 165,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "CRDTAGY3": [
+      {
+        "line": 165,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "CRDTAGY4": [
+      {
+        "line": 166,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "CRDTAGY5": [
+      {
+        "line": 165,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "CREACC": [
+      {
+        "line": 564,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 655,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 753,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 839,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1149,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "CRECUST": [
+      {
+        "line": 1441,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "DBCRFUN": [
+      {
+        "line": 620,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 807,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "DELACC": [
+      {
+        "line": 603,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "DELCUS": [
+      {
+        "line": 303,
+        "via": "INQCUST-PROGRAM"
+      },
+      {
+        "line": 535,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 691,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 859,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "INQACC": [
+      {
+        "line": 321,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 401,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 516,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 738,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 810,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 924,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "INQACCCU": [
+      {
+        "line": 321,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 424,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 563,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 794,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "INQCUST": [
+      {
+        "line": 506,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 628,
+        "via": "WS-ABEND-PGM"
+      }
+    ],
+    "XFRFUN": [
+      {
+        "line": 364,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 463,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 573,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 664,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 737,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 813,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 881,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1165,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1262,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1341,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1459,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1541,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1701,
+        "via": "WS-ABEND-PGM"
+      },
+      {
+        "line": 1873,
+        "via": "WS-ABEND-PGM"
+      }
+    ]
+  }
+}

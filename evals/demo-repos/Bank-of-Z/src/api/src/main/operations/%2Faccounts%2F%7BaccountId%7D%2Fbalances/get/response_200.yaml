@@ -1,0 +1,29 @@
+---
+version: "1.2"
+mappings:
+- body:
+    mappings:
+    - balanceType:
+        required: true
+        nullable: false
+        template: "AVAILABLE"
+    - amount:
+        required: true
+        nullable: false
+        expression: "$zosAssetResponse.commarea.\"INQACC-COMMAREA\".\"INQACC-AVAIL-BAL\""
+    - currency:
+        required: true
+        nullable: false
+        template: "GBP"
+    - creditDebitIndicator:
+        required: false
+        nullable: false
+        template: "{{$zosAssetResponse.commarea.\"INQACC-COMMAREA\".\"INQACC-AVAIL-BAL\"\
+          \ < 0 ? 'DEBIT' : 'CREDIT'}}"
+    - dateTime:
+        required: true
+        nullable: false
+        template: "{{$zosAssetResponse.commarea.\"INQACC-COMMAREA\".\"INQACC-LAST-STMT-GROUP\"\
+          .\"INQACC-LAST-STMT-YEAR\"}}-{{$zosAssetResponse.commarea.\"INQACC-COMMAREA\"\
+          .\"INQACC-LAST-STMT-GROUP\".\"INQACC-LAST-STMT-MONTH\"}}-{{$zosAssetResponse.commarea.\"\
+          INQACC-COMMAREA\".\"INQACC-LAST-STMT-GROUP\".\"INQACC-LAST-STMT-DAY\"}}T00:00:00Z"

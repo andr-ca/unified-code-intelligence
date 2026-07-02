@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unified-code-intelligence"
+version = "0.1.0"
+description = "Local-first code intelligence platform where a canonical knowledge graph is the source of truth for both agents and humans."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "UCI Contributors" }]
+keywords = ["code-intelligence", "knowledge-graph", "rag", "mcp", "static-analysis", "tree-sitter"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+]
+
+# Local-lite profile requires NOTHING beyond the Python standard library.
+dependencies = []
+
+[project.optional-dependencies]
+# Real local embeddings (ONNX, no API key). Optional upgrade over the hash-based default.
+embeddings = ["fastembed>=0.3"]
+# Optional external backends (adapters import these lazily; core never depends on them).
+qdrant = ["qdrant-client>=1.7"]
+lancedb = ["lancedb>=0.6"]
+memgraph = ["neo4j>=5.0"]     # Memgraph speaks the Bolt/Neo4j protocol
+neo4j = ["neo4j>=5.0"]
+postgres = ["psycopg[binary]>=3.1"]
+ollama = ["httpx>=0.27"]
+openai = ["openai>=1.0"]
+# Nicer API server (optional; the default `uci serve` uses the stdlib http.server).
+api = ["fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4", "mypy>=1.8"]
+all = [
+    "fastembed>=0.3", "qdrant-client>=1.7", "lancedb>=0.6", "neo4j>=5.0",
+    "psycopg[binary]>=3.1", "httpx>=0.27", "openai>=1.0",
+    "fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1",
+]
+
+[project.scripts]
+uci = "uci.cli.main:main"
+
+[project.urls]
+Documentation = "https://example.com/uci/docs"
+Source = "https://example.com/uci"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+uci = ["api/templates/*.html", "api/static/*.css", "api/static/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["fixtures", "examples", ".uci", ".git", "*.egg"]
+markers = [
+    "optional_backend: tests that require an optional external backend (skipped by default in CI)",
+    "slow: slower integration tests",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+ignore_missing_imports = true

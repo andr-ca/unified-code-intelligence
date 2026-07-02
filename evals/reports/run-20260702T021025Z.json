@@ -1,0 +1,49 @@
+{
+  "run": "2026-07-02T02:10:25Z",
+  "git_sha": "c1d71ba",
+  "tracks": {
+    "supported": {
+      "datasets": {
+        "shop": {
+          "score": 100.0,
+          "categories": {
+            "symbol_lookup": {
+              "score": 1.0,
+              "items": 2
+            },
+            "calls": {
+              "score": 1.0,
+              "items": 3
+            },
+            "impact": {
+              "score": 1.0,
+              "items": 2
+            },
+            "queries": {
+              "score": 1.0,
+              "items": 3,
+              "mrr": 1.0,
+              "recall_at_k": 1.0
+            },
+            "completeness": {
+              "score": 1.0,
+              "items": 1
+            },
+            "gaps": {
+              "score": 1.0,
+              "items": 1,
+              "vacuous": true
+            }
+          },
+          "index_stats": {
+            "entities": 20,
+            "relationships": 28,
+            "files": 4,
+            "gaps": 0
+          }
+        }
+      },
+      "score": 100.0
+    }
+  }
+}

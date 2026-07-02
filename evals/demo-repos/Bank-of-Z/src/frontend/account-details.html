@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <title>Account Details - Bank of Z</title>
+
+    <!-- Carbon Design System Styles -->
+    <link rel="stylesheet" href="css/carbon-styles.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/pages.css">
+    <link rel="stylesheet" href="css/carbon-overrides.css">
+</head>
+
+<body>
+    <!-- Header Container -->
+    <div id="header-container"></div>
+
+    <!-- Main Content -->
+    <div class="cds--content landing-page">
+        <!-- Banner -->
+        <div class="cds--white landing-page__banner">
+            <div class="landing-page__heading">
+                <cds-breadcrumb>
+                    <cds-breadcrumb-item>
+                        <cds-breadcrumb-link href="index.html">Home</cds-breadcrumb-link>
+                    </cds-breadcrumb-item>
+                    <cds-breadcrumb-item>
+                        <cds-breadcrumb-link href="admin.html">Control Panel</cds-breadcrumb-link>
+                    </cds-breadcrumb-item>
+                    <cds-breadcrumb-item>
+                        <cds-breadcrumb-link href="account-details.html">Account Details</cds-breadcrumb-link>
+                    </cds-breadcrumb-item>
+                </cds-breadcrumb>
+                <h1>View/Update Account Details</h1>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="cds--row">
+            <div class="cds--col-lg-16 cds--col-md-8 cds--col-sm-4">
+                <div class="search-section">
+                    <cds-text-input id="accountId" label="Account Number" placeholder="Enter account number">
+                    </cds-text-input>
+                    <cds-button id="search-btn">Search</cds-button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Details Section -->
+        <div id="details-section" class="cds--row" style="display: none;">
+            <div class="cds--col-lg-16 cds--col-md-8 cds--col-sm-4">
+                <h3>Account Information</h3>
+                <form id="account-form">
+                    <div class="cds--row">
+                        <div class="cds--col-md-4 cds--col-lg-4">
+                            <cds-text-input id="accountNumber" label="Account ID" readonly></cds-text-input>
+                            <cds-text-input id="customerNumber" label="Customer ID" readonly></cds-text-input>
+                            <cds-text-input id="availableBalance" label="Available Balance" readonly></cds-text-input>
+                            <cds-text-input id="accountType" label="Account Type" readonly></cds-text-input>
+                            <cds-text-input id="currency" label="Currency" readonly></cds-text-input>
+                            <cds-text-input id="status" label="Status" readonly></cds-text-input>
+                        </div>
+                        <div class="cds--col-md-4 cds--col-lg-4">
+                            <cds-text-input id="accountNumberField" label="Account Number" readonly></cds-text-input>
+                            <cds-text-input id="sortCode" label="Sort Code" readonly></cds-text-input>
+                            <cds-text-input id="iban" label="IBAN" readonly></cds-text-input>
+                            <cds-text-input id="nickname" label="Nickname"></cds-text-input>
+                            <cds-text-input id="openingDate" label="Opening Date" readonly></cds-text-input>
+                        </div>
+                    </div>
+                    <br>
+                    <cds-button id="update-btn">Update Account</cds-button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carbon Web Components - Component-specific imports -->
+    <script type="module"
+        src="https://1.www.s81c.com/common/carbon/web-components/version/v2.47.0/ui-shell.min.js"></script>
+    <script type="module"
+        src="https://1.www.s81c.com/common/carbon/web-components/version/v2.47.0/breadcrumb.min.js"></script>
+    <script type="module"
+        src="https://1.www.s81c.com/common/carbon/web-components/version/v2.47.0/text-input.min.js"></script>
+    <script type="module"
+        src="https://1.www.s81c.com/common/carbon/web-components/version/v2.47.0/button.min.js"></script>
+    <script type="module"
+        src="https://1.www.s81c.com/common/carbon/web-components/version/v2.47.0/dropdown.min.js"></script>
+    <script type="module"
+        src="https://1.www.s81c.com/common/carbon/web-components/version/v2.47.0/number-input.min.js"></script>
+    <script type="module"
+        src="https://1.www.s81c.com/common/carbon/web-components/version/v2.47.0/modal.min.js"></script>
+
+    <!-- Page Script -->
+    <script type="module">
+        import { createAdminHeader } from './js/components/headers.js';
+        import api from './js/api.js';
+        import { showLoadingModal, hideLoadingModal, showSuccessModal, showErrorModal, formatCurrency } from './js/utils.js';
+
+        let currentAccount = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inject header
+            document.getElementById('header-container').innerHTML = createAdminHeader();
+
+            // Check for account ID and customer ID in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const accountId = urlParams.get('id') || urlParams.get('accountId');
+            const customerId = urlParams.get('customerId');
+            
+            if (accountId) {
+                document.getElementById('accountId').value = accountId;
+                searchAccount(customerId);
+            }
+
+            // Handle search
+            document.getElementById('search-btn').addEventListener('click', () => searchAccount());
+            document.getElementById('accountId').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') searchAccount();
+            });
+
+            // Handle update
+            document.getElementById('update-btn').addEventListener('click', updateAccount);
+        });
+
+        async function searchAccount(customerId = null) {
+            const accountId = document.getElementById('accountId').value.trim();
+
+            if (!accountId) {
+                showErrorModal('Validation Error', 'Please enter an account number');
+                return;
+            }
+
+            showLoadingModal('Searching for account...');
+
+            try {
+                // Pass customerId if available (for IMS accounts)
+                const response = await api.accounts.getAccount(accountId, customerId);
+                
+                // Handle IMS response which may return multiple accounts
+                let account = response;
+                
+                // Helper function to parse array-like strings or return actual arrays
+                const parseArrayField = (field) => {
+                    if (Array.isArray(field)) return field;
+                    if (typeof field === 'string' && field.startsWith('[')) {
+                        try {
+                            return JSON.parse(field);
+                        } catch (e) {
+                            console.warn('Failed to parse array field:', field);
+                            return [field];
+                        }
+                    }
+                    return field;
+                };
+                
+                // Check if accountId is an array (or array-like string)
+                const accountIds = parseArrayField(response.accountId);
+                if (Array.isArray(accountIds)) {
+                    // IMS returns arrays - find the matching account
+                    const accountIndex = accountIds.findIndex(id => id.toString() === accountId);
+                    if (accountIndex === -1) {
+                        throw new Error('Account not found in response');
+                    }
+                    
+                    // Extract single account data from arrays
+                    const extractValue = (field) => {
+                        const parsed = parseArrayField(field);
+                        return Array.isArray(parsed) ? parsed[accountIndex] : parsed;
+                    };
+                    
+                    account = {
+                        accountId: accountIds[accountIndex],
+                        customerId: extractValue(response.customerId),
+                        accountType: extractValue(response.accountType),
+                        currency: extractValue(response.currency),
+                        status: extractValue(response.status),
+                        sortCode: extractValue(response.sortCode),
+                        accountNumber: extractValue(response.accountNumber),
+                        iban: extractValue(response.iban),
+                        openingDate: extractValue(response.openingDate),
+                        nickname: extractValue(response.nickname)
+                    };
+                    account._accountIndex = accountIndex; // Store index for balance lookup
+                }
+                
+                currentAccount = account;
+                currentAccount._customerId = customerId; // Store for later use
+                hideLoadingModal();
+                await displayAccountDetails(account, customerId);
+            } catch (error) {
+                hideLoadingModal();
+                showErrorModal('Error', 'Account not found or error loading data');
+            }
+        }
+
+        async function displayAccountDetails(account, customerId = null) {
+            document.getElementById('accountNumber').value = account.accountId || '';
+            document.getElementById('customerNumber').value = account.customerId || '';
+            document.getElementById('accountType').value = account.accountType || '';
+            document.getElementById('currency').value = account.currency || '';
+            document.getElementById('status').value = account.status || '';
+            document.getElementById('sortCode').value = account.sortCode || '';
+            document.getElementById('accountNumberField').value = account.accountNumber || '';
+            document.getElementById('iban').value = account.iban || '';
+            document.getElementById('nickname').value = account.nickname || '';
+            document.getElementById('openingDate').value = account.openingDate || '';
+            document.getElementById('availableBalance').value = 'Loading...';
+
+            document.getElementById('details-section').style.display = 'block';
+
+            try {
+                // For IMS accounts, use customerId; for CICS, use accountId
+                const balance = await api.accounts.getAccountBalances(
+                    customerId ? null : account.accountId,
+                    customerId
+                );
+                
+                // Handle IMS array response - use the account index if available
+                let balanceAmount;
+                if (Array.isArray(balance?.amount)) {
+                    const index = account._accountIndex !== undefined ? account._accountIndex : 0;
+                    balanceAmount = balance.amount[index];
+                } else {
+                    balanceAmount = balance?.amount;
+                }
+                
+                document.getElementById('availableBalance').value =
+                    balanceAmount !== undefined
+                        ? formatCurrency(balanceAmount, balance.currency)
+                        : 'N/A';
+            } catch (error) {
+                console.error(`Error loading balance for account ${account.accountId}:`, error);
+                document.getElementById('availableBalance').value = 'Error';
+            }
+        }
+
+        async function updateAccount() {
+            if (!currentAccount) return;
+
+            const updatedData = {
+                nickname: document.getElementById('nickname').value
+            };
+
+            showLoadingModal('Updating account...');
+
+            try {
+                await api.accounts.updateAccount(currentAccount.accountId, updatedData);
+                hideLoadingModal();
+                showSuccessModal('Success', 'Account updated successfully');
+            } catch (error) {
+                hideLoadingModal();
+                
+                if (error.message.includes('not supported') || error.message.includes('not implemented')) {
+                    showErrorModal('Feature Not Implemented', error.message);
+                } else if (error.message.includes('Failed to fetch')) {
+                    showErrorModal('Network Error', 'Failed to connect to the server. Please check your connection.');
+                } else {
+                    showErrorModal('Error', error.message || 'Failed to update account');
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

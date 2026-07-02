@@ -1,0 +1,33 @@
+{
+  "name": "carddemo",
+  "track": "mainframe",
+  "repo": "demo-repos/aws-mainframe-modernization-carddemo",
+  "mined": "mined/aws-mainframe-modernization-carddemo.json",
+  "mined_categories": ["symbol_lookup", "calls", "copybook_impact", "jobs", "transactions", "data_access"],
+  "notes": "AWS CardDemo: COBOL/CICS/VSAM with JCL batch + CSD-defined transactions. All online navigation is DYNAMIC (EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM)) — zero literal XCTL targets exist, so no tool can produce exact online caller graphs from source alone; completeness entries encode that. COBDATFT/MVSWAIT are in-repo HLASM (app/asm/) called from COBOL — deliberately neutral in gaps (cross-language; reporting them as gaps is honest until HLASM support lands, so neither rewarded nor punished).",
+  "categories": {
+    "queries": [
+      {"q": "account update program", "expected": ["COACTUPC"], "evidence": "app/cbl/COACTUPC.cbl header: accept and process account update"},
+      {"q": "where are credit card transactions posted in batch", "expected": ["CBTRN02C", "POSTTRAN"], "evidence": "app/jcl/POSTTRAN.jcl runs CBTRN02C (post records from daily transaction file)"},
+      {"q": "which program prints account statements", "expected": ["CBSTM03A"], "evidence": "app/cbl/CBSTM03A.cbl statement generation, calls CBSTM03B for file I/O"},
+      {"q": "signon screen program", "expected": ["COSGN00C"], "evidence": "app/cbl/COSGN00C.cbl signon screen; CSD tran CC00"},
+      {"q": "date validation utility", "expected": ["CSUTLDTC"], "evidence": "app/cbl/CSUTLDTC.cbl date conversion/validation, called by CORPT00C and COTRN02C"},
+      {"q": "common communication area copybook", "expected": ["COCOM01Y"], "evidence": "app/cpy/COCOM01Y.cpy, COPY'd by 21 programs"}
+    ],
+    "completeness": [
+      {"symbol": "COMEN01C", "expect_exact": false, "why": "reached only via dynamic XCTL PROGRAM(CDEMO-TO-PROGRAM); its own dispatch is dynamic too (menu router)"},
+      {"symbol": "COACTUPC", "expect_exact": false, "why": "invoked via CSD transaction CAUP and dynamic XCTL — no literal caller exists in source"},
+      {"symbol": "COSGN00C", "expect_exact": false, "why": "dynamic XCTL at line ~ (CDEMO-TO-PROGRAM); entry via CSD tran CC00"},
+      {"symbol": "CBSTM03B", "expect_exact": true, "why": "called only via literal CALL 'CBSTM03B' from CBSTM03A (batch, fully static)"},
+      {"symbol": "CSUTLDTC", "expect_exact": true, "why": "called only via literal CALL 'CSUTLDTC' (CORPT00C, COTRN02C)"}
+    ],
+    "gaps": {
+      "must_report_missing": [],
+      "must_not_report_missing": [
+        "DFHBMSCA", "DFHAID", "DFHCOMMAREA", "MQOPEN", "MQCLOSE", "MQPUT", "MQPUT1", "MQGET",
+        "CEE3ABD", "SQLCA", "IDCAMS", "IEBGENER", "IEFBR14", "SORT", "SDSF", "DFHCSDUP"
+      ],
+      "evidence": "CICS (DFH*), MQ (MQ*), LE (CEE*), DB2 (SQLCA) and z/OS utilities are platform-provided; a gap report naming them as acquisition targets is noise. The repo itself is complete, so must_report_missing is empty."
+    }
+  }
+}

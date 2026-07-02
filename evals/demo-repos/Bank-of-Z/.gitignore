@@ -1,0 +1,23 @@
+/.project
+/.settings/
+/.bob/*.json
+/.setup/.env
+provisioning/
+/.pydevproject
+build.log
+/bin/
+/logs/
+.DS_Store
+src/base/ims/java/src/main/java/nazare/jmp/standalone/*
+/build/
+zowe.config.user.json
+/.host.yaml
+/.zdx.json
+# VSIX extension downloads
+vsix-extensions/
+*.vsix
+/.taz-unit-test
+tools/
+imsbank_provisioning/
+.setup/jcl/ims/Db2-grant-sysadm.jcl
+docs/_site

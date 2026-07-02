@@ -1,0 +1,26 @@
+{
+  "name": "resolve_cases",
+  "track": "supported",
+  "repo": "fixtures/resolve_cases",
+  "notes": "Resolution-ladder edge cases (inheritance, constructor inference, import tracing). Migrated to the unified dataset schema; golden content unchanged.",
+  "categories": {
+    "calls": [
+      {"from": "base.Animal.describe", "to": "base.Animal.speak", "class": "internal", "expect_resolved": true},
+      {"from": "dog.Dog.greet", "to": "base.Animal.describe", "class": "internal", "expect_resolved": true},
+      {"from": "main.run", "to": "dog.Dog.speak", "class": "internal", "expect_resolved": true},
+      {"from": "main.run", "to": "helpers.helper", "class": "internal", "expect_resolved": true}
+    ],
+    "queries": [
+      {"q": "animal speak", "expected": ["base.Animal.speak", "dog.Dog.speak"]},
+      {"q": "helper function", "expected": ["helpers.helper"]}
+    ],
+    "completeness": [
+      {"symbol": "helpers.helper", "expect_exact": true, "why": "single import-traced caller (main.run); nothing dynamic"}
+    ],
+    "gaps": {
+      "must_report_missing": [],
+      "must_not_report_missing": [],
+      "evidence": "fixture has no external imports and nothing missing"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "cash-account",
+  "track": "mainframe",
+  "repo": "demo-repos/cash-account-cobol",
+  "mined": "mined/cash-account-cobol.json",
+  "mined_categories": ["symbol_lookup", "copybook_impact", "jobs", "data_access"],
+  "notes": "Minimal DB2 smoke repo: one program (CASH00) with 15 EXEC SQL statements against STOCKTRD.CASHACCOUNTY / STOCKTRD.FRANKFURT1, two DCLGEN copybooks (DCLCASH, DCLFRANK) pulled in via EXEC SQL INCLUDE, and JCL for DDL/BIND/VSAM setup. The perfect first target for the DB2/DCLGEN extractors (lsp-refactoring-recommendations §3.5).",
+  "categories": {
+    "queries": [
+      {"q": "cash account balance program", "expected": ["CASH00"], "evidence": "COBOL/CASH00.cbl is the only program"},
+      {"q": "which table stores cash accounts", "expected": ["STOCKTRD.CASHACCOUNTY", "CASHACCOUNTY", "DCLCASH"], "evidence": "DB2-DDL/DB2DDL.jcl creates STOCKTRD.CASHACCOUNTY; DCLCASH.cpy is its DCLGEN"}
+    ],
+    "completeness": [
+      {"symbol": "CASH00", "expect_exact": true, "why": "no dynamic calls; all SQL static; single standalone program"}
+    ],
+    "gaps": {
+      "must_report_missing": [],
+      "must_not_report_missing": ["SQLCA", "DSNTIAD", "IKJEFT01"],
+      "evidence": "SQLCA is the DB2-provided communication area (EXEC SQL INCLUDE SQLCA); DSNTIAD/IKJEFT01 are system utilities in the JCL"
+    }
+  }
+}

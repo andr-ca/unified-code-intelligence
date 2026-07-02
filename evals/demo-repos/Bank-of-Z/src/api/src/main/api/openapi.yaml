@@ -1,0 +1,1059 @@
+openapi: 3.0.3
+info:
+  title: Bank of Z - OpenBanking API
+  description: |
+    OpenBanking-compliant API for Bank of Z providing access to customer information and account data.
+    This API follows the OpenBanking UK specification standards for secure access to banking data.
+  version: 1.0.0
+  contact:
+    name: Bank of Z API Support
+    email: api-support@bankofz.example.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+tags:
+  - name: Customers
+    description: Customer information endpoints
+  - name: Accounts
+    description: Account information endpoints
+  - name: Balances
+    description: Account balance endpoints
+  - name: Transactions
+    description: Transaction history endpoints
+
+security:
+  - OAuth2:
+      - accounts
+      - customers
+
+paths:
+  /ims/customers/{customerId}:
+    get:
+      tags:
+        - Customers
+      summary: Get customer information
+      description: Retrieve detailed information about a specific customer
+      operationId: getIMSCustomer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique identifier for the customer
+          schema:
+            type: string
+            example: "CUST123456"
+      responses:
+        '200':
+          description: Customer information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /ims/customers/{customerId}/accounts:
+    get:
+      tags:
+        - Accounts
+      summary: Get customer accounts
+      description: Retrieve all accounts associated with a customer
+      operationId: getIMSCustomerAccounts
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique identifier for the customer
+          schema:
+            type: string
+            example: "CUST123456"
+      responses:
+        '200':
+          description: Accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /ims/accounts/{accountId}:
+    get:
+      tags:
+        - Accounts
+      summary: Get account details
+      description: Retrieve detailed information about a specific account
+      operationId: getIMSAccount
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          description: Unique identifier for the account
+          schema:
+            type: string
+            example: "ACC987654321" #pragma: allowlist secret
+      responses:
+        '200':
+          description: Account details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /ims/accounts/{accountId}/balances:
+    get:
+      tags:
+        - Balances
+      summary: Get account balances
+      description: Retrieve current balance information for a specific account
+      operationId: getIMSAccountBalances
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          description: Unique identifier for the account
+          schema:
+            type: string
+            example: "ACC987654321" #pragma: allowlist secret
+      responses:
+        '200':
+          description: Balance information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /customers:
+    post:
+      tags:
+        - Customers
+      summary: Create a new customer
+      description: Create a new customer record via the CICS CRECUST program
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedCustomer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /customers/{customerId}:
+    get:
+      tags:
+        - Customers
+      summary: Get customer information
+      description: Retrieve detailed information about a specific customer
+      operationId: getCustomer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique identifier for the customer
+          schema:
+            type: string
+            example: "CUST123456"
+      responses:
+        '200':
+          description: Customer information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Customers
+      summary: Update customer information
+      description: Update detailed information for a specific customer
+      operationId: updateCustomer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique identifier for the customer
+          schema:
+            type: string
+            example: "0000010000000001"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+      responses:
+        '200':
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+
+  /customers/{customerId}/accounts:
+    get:
+      tags:
+        - Accounts
+      summary: Get customer accounts
+      description: Retrieve all accounts associated with a customer
+      operationId: getCustomerAccounts
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique identifier for the customer
+          schema:
+            type: string
+            example: "CUST123456"
+      responses:
+        '200':
+          description: Accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts:
+    get:
+      tags:
+        - Accounts
+      summary: Get all accounts
+      description: Retrieve all accounts accessible by the authenticated user
+      operationId: getAccounts
+      parameters:
+        - name: accountType
+          in: query
+          description: Filter by account type
+          schema:
+            type: string
+            enum: [CURRENT, SAVINGS, CREDIT_CARD, LOAN]
+        - name: status
+          in: query
+          description: Filter by account status
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, CLOSED]
+      responses:
+        '200':
+          description: Accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{accountId}:
+    get:
+      tags:
+        - Accounts
+      summary: Get account details
+      description: Retrieve detailed information about a specific account
+      operationId: getAccount
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          description: Unique identifier for the account
+          schema:
+            type: string
+            example: "ACC987654321" #pragma: allowlist secret
+      responses:
+        '200':
+          description: Account details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{accountId}/balances:
+    get:
+      tags:
+        - Balances
+      summary: Get account balances
+      description: Retrieve current balance information for a specific account
+      operationId: getAccountBalances
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          description: Unique identifier for the account
+          schema:
+            type: string
+            example: "ACC987654321" #pragma: allowlist secret
+      responses:
+        '200':
+          description: Balance information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{accountId}/deposit:
+    post:
+      tags:
+        - Accounts
+      summary: Deposit funds to account
+      description: Deposit funds into a specific account
+      operationId: depositToAccount
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          description: Unique identifier for the account
+          schema:
+            type: string
+            example: "ACC987654321" #pragma: allowlist secret
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositRequest'
+      responses:
+        '201':
+          description: Deposit successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepositResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{accountId}/transactions:
+    get:
+      tags:
+        - Transactions
+      summary: Get account transactions
+      description: Retrieve transaction history for a specific account
+      operationId: getAccountTransactions
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          description: Unique identifier for the account
+          schema:
+            type: string
+            example: "ACC987654321" #pragma: allowlist secret
+        - name: fromDate
+          in: query
+          description: Start date for transaction history (ISO 8601 format)
+          schema:
+            type: string
+            format: date
+            example: "2026-01-01"
+        - name: toDate
+          in: query
+          description: End date for transaction history (ISO 8601 format)
+          schema:
+            type: string
+            format: date
+            example: "2026-03-13"
+        - name: limit
+          in: query
+          description: Maximum number of transactions to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Number of transactions to skip for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Transactions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{accountId}/transactions/{transactionId}:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction details
+      description: Retrieve detailed information about a specific transaction
+      operationId: getTransaction
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          description: Unique identifier for the account
+          schema:
+            type: string
+            example: "ACC987654321" #pragma: allowlist secret
+        - name: transactionId
+          in: path
+          required: true
+          description: Unique identifier for the transaction
+          schema:
+            type: string
+            example: "TXN456789"
+      responses:
+        '200':
+          description: Transaction details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: OAuth2 authentication for secure API access
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.bankofz.example.com/oauth/authorize
+          tokenUrl: https://auth.bankofz.example.com/oauth/token
+          scopes:
+            accounts: Access to account information
+            customers: Access to customer information
+            transactions: Access to transaction history
+
+  schemas:
+    CreateCustomerRequest:
+      type: object
+      required:
+        - firstName
+        - lastName
+      properties:
+        title:
+          type: string
+          description: Customer title (must be one of the valid values accepted by CRECUST)
+          enum: [Professor, Mr, Mrs, Miss, Ms, Dr, Drs, Lord, Sir, Lady]
+          example: "Mr"
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Customer first name
+          example: "John"
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Customer last name
+          example: "Smith"
+        dateOfBirth:
+          type: string
+          format: date
+          description: Customer date of birth (YYYY-MM-DD)
+          example: "1985-06-15"
+        phoneNumber:
+          type: string
+          maxLength: 20
+          description: Customer phone number
+          example: "+44 20 7946 0958"
+        address:
+          $ref: '#/components/schemas/Address'
+        customerStatus:
+          type: string
+          maxLength: 10
+          description: Customer status
+          example: "ACTIVE"
+
+    CreatedCustomer:
+      type: object
+      required:
+        - customerId
+        - sortCode
+      properties:
+        customerId:
+          type: string
+          description: The newly assigned customer ID
+          example: "0000000042"
+        sortCode:
+          type: string
+          description: The bank sort code for this customer
+          example: "987654"
+
+    Customer:
+      type: object
+      required:
+        - customerId
+        - firstName
+        - lastName
+      properties:
+        customerId:
+          type: string
+          description: Unique identifier for the customer
+          example: "CUST123456"
+        title:
+          type: string
+          description: Customer title
+          example: "Mr"
+        firstName:
+          type: string
+          description: Customer first name
+          example: "John"
+        lastName:
+          type: string
+          description: Customer last name
+          example: "Smith"
+        dateOfBirth:
+          type: string
+          format: date
+          description: Customer date of birth
+          example: "1985-06-15"
+        phoneNumber:
+          type: string
+          description: Customer phone number
+          example: "+44 20 7946 0958"
+        address:
+          $ref: '#/components/schemas/Address'
+        customerStatus:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+          description: Current status of the customer
+          example: "ACTIVE"
+        createdDate:
+          type: string
+          format: date-time
+          description: Date when customer account was created
+          example: "2020-01-15T10:30:00Z"
+
+    Address:
+      type: object
+      properties:
+        addressLine1:
+          type: string
+          example: "123 High Street"
+        addressLine2:
+          type: string
+          example: "Apartment 4B"
+        city:
+          type: string
+          example: "London"
+        postalCode:
+          type: string
+          example: "SW1A 1AA"
+        country:
+          type: string
+          example: "United Kingdom"
+    CustomerUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Customer title
+          example: "Mr"
+          enum: [Professor, Mr, Mrs, Miss, Ms, Dr, Drs, Lord, Sir, Lady]
+        firstName:
+          type: string
+          description: Customer first name
+          example: "John"
+          maxLength: 50
+        lastName:
+          type: string
+          description: Customer last name
+          example: "Smith"
+          maxLength: 50
+        dateOfBirth:
+          type: string
+          format: date
+          description: Customer date of birth
+          example: "1985-06-15"
+        phoneNumber:
+          type: string
+          description: Customer phone number
+          example: "+44 20 7946 0958"
+          maxLength: 20
+        address:
+          type: object
+          properties:
+            addressLine1:
+              type: string
+              example: "123 High Street"
+              maxLength: 50
+            addressLine2:
+              type: string
+              example: "Apartment 4B"
+              maxLength: 50
+            city:
+              type: string
+              example: "London"
+              maxLength: 50
+            postalCode:
+              type: string
+              example: "SW1A 1AA"
+              maxLength: 10
+            country:
+              type: string
+              example: "United Kingdom"
+              maxLength: 50
+        customerStatus:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+          description: Current status of the customer
+          example: "ACTIVE"
+
+
+    AccountList:
+      type: object
+      required:
+        - accounts
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        totalCount:
+          type: integer
+          description: Total number of accounts
+          example: 3
+
+    Account:
+      type: object
+      required:
+        - accountId
+        - accountType
+        - currency
+        - status
+      properties:
+        accountId:
+          type: string
+          description: Unique identifier for the account
+          example: "ACC987654321" #pragma: allowlist secret
+        accountType:
+          type: string
+          enum: [CURRENT, SAVINGS, CREDIT_CARD, LOAN]
+          description: Type of account
+          example: "CURRENT"
+        accountSubType:
+          type: string
+          description: Sub-type of account
+          example: "PERSONAL_CURRENT"
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "GBP"
+        nickname:
+          type: string
+          description: Customer-defined nickname for the account
+          example: "My Main Account"
+        accountNumber:
+          type: string
+          description: Account number
+          example: "12345678"
+        sortCode:
+          type: string
+          description: Bank sort code
+          example: "12-34-56"
+        iban:
+          type: string
+          description: International Bank Account Number
+          example: "GB29NWBK60161331926819"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, CLOSED]
+          description: Current status of the account
+          example: "ACTIVE"
+        openingDate:
+          type: string
+          format: date
+          description: Date when account was opened
+          example: "2020-01-15"
+        customerId:
+          type: string
+          description: Customer ID associated with this account
+          example: "CUST123456"
+
+    BalanceList:
+      type: object
+      required:
+        - balances
+      properties:
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/Balance'
+
+    Balance:
+      type: object
+      required:
+        - balanceType
+        - amount
+        - currency
+        - dateTime
+      properties:
+        balanceType:
+          type: string
+          enum: [AVAILABLE, CURRENT, OPENING_AVAILABLE, OPENING_BOOKED]
+          description: Type of balance
+          example: "AVAILABLE"
+        amount:
+          type: number
+          format: double
+          description: Balance amount
+          example: 1234.56
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "GBP"
+        creditDebitIndicator:
+          type: string
+          enum: [CREDIT, DEBIT]
+          description: Indicates if balance is credit or debit
+          example: "CREDIT"
+        dateTime:
+          type: string
+          format: date-time
+          description: Date and time of the balance
+          example: "2026-03-13T09:57:22Z"
+
+    TransactionList:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        totalCount:
+          type: integer
+          description: Total number of transactions
+          example: 150
+        limit:
+          type: integer
+          description: Maximum number of transactions returned
+          example: 50
+        offset:
+          type: integer
+          description: Number of transactions skipped
+          example: 0
+
+    Transaction:
+      type: object
+      required:
+        - transactionId
+        - accountId
+        - amount
+        - currency
+        - creditDebitIndicator
+        - status
+        - bookingDateTime
+      properties:
+        transactionId:
+          type: string
+          description: Unique identifier for the transaction
+          example: "TXN456789"
+        accountId:
+          type: string
+          description: Account identifier
+          example: "ACC987654321" #pragma: allowlist secret
+        amount:
+          type: number
+          format: double
+          description: Transaction amount
+          example: 50.00
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "GBP"
+        creditDebitIndicator:
+          type: string
+          enum: [CREDIT, DEBIT]
+          description: Indicates if transaction is credit or debit
+          example: "DEBIT"
+        status:
+          type: string
+          enum: [PENDING, BOOKED, CANCELLED]
+          description: Transaction status
+          example: "BOOKED"
+        bookingDateTime:
+          type: string
+          format: date-time
+          description: Date and time when transaction was booked
+          example: "2026-03-12T14:30:00Z"
+        valueDateTime:
+          type: string
+          format: date-time
+          description: Date and time when transaction value is applied
+          example: "2026-03-12T14:30:00Z"
+        transactionInformation:
+          type: string
+          description: Additional information about the transaction
+          example: "Payment to ABC Store"
+        merchantDetails:
+          $ref: '#/components/schemas/MerchantDetails'
+        balance:
+          $ref: '#/components/schemas/Balance'
+
+    MerchantDetails:
+      type: object
+      properties:
+        merchantName:
+          type: string
+          description: Name of the merchant
+          example: "ABC Store"
+        merchantCategoryCode:
+          type: string
+          description: Merchant category code
+          example: "5411"
+
+    DepositRequest:
+      type: object
+      required:
+        - amount
+        - sortCode
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          description: Deposit amount (must be positive)
+          example: 100.00
+        sortCode:
+          type: string
+          pattern: '^\d{6}$'
+          description: 6-digit bank sort code
+          example: "987654"
+        description:
+          type: string
+          maxLength: 40
+          description: Optional description of the deposit
+          example: "Cash deposit"
+
+    DepositResponse:
+      type: object
+      required:
+        - accountId
+        - availableBalance
+        - actualBalance
+      properties:
+        accountId:
+          type: string
+          description: Account identifier
+          example: "ACC987654321" #pragma: allowlist secret
+        availableBalance:
+          type: number
+          format: double
+          description: Available balance after deposit
+          example: 1334.56
+        actualBalance:
+          type: number
+          format: double
+          description: Actual balance after deposit
+          example: 1334.56
+        transactionReference:
+          type: string
+          description: Transaction reference number
+          example: "DEP20260619001"
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code
+          example: "INVALID_REQUEST"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "The request parameters are invalid"
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: "accountId"
+              issue:
+                type: string
+                example: "Account ID must be a valid format"
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "BAD_REQUEST"
+            message: "Invalid request parameters"
+
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "UNAUTHORIZED"
+            message: "Authentication credentials are missing or invalid"
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "FORBIDDEN"
+            message: "You do not have permission to access this resource"
+
+    NotFound:
+      description: Not found - resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "NOT_FOUND"
+            message: "The requested resource was not found"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INTERNAL_ERROR"
+            message: "An unexpected error occurred"
+
+# Made with Bob
