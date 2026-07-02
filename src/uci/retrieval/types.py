@@ -23,6 +23,7 @@ class RetrievalHit:
     relationship_path: list[str] = field(default_factory=list)
     resolution: str = ""
     missing: bool = False
+    summary: str = ""
     external: bool = False
 
     def to_dict(self) -> dict:
@@ -41,6 +42,7 @@ class RetrievalHit:
             "relationship_path": self.relationship_path,
             "resolution": self.resolution,
             "missing": self.missing,
+            "summary": self.summary,
             "external": self.external,
         }
 
@@ -68,6 +70,7 @@ class RetrievalHit:
             confidence=confidence,
             relationship_path=relationship_path or [],
             missing=bool(entity.attributes.get("missing")),
+            summary=entity.attributes.get("summary", ""),
             external=bool(entity.attributes.get("external")),
         )
 

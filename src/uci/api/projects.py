@@ -113,10 +113,20 @@ class ProjectManager:
                 raise KeyError(name)
             engine = self._engines.get(name)
             if engine is None:
-                engine = Engine(Config.from_env(self._projects[name]["path"]))
+                from .config_store import load_overrides
+                path = self._projects[name]["path"]
+                engine = Engine(Config.from_env(path, overrides=load_overrides(path)))
                 self._engines[name] = engine
                 self._locks.setdefault(name, threading.Lock())
             return engine
+
+    def reload(self, name: str) -> bool:
+        """Drop the cached engine so the next open re-reads config overrides (after a Config change)."""
+        with self._lock:
+            engine = self._engines.pop(name, None)
+            if engine is not None:
+                engine.close()
+            return name in self._projects
 
     def lock_for(self, name: str) -> threading.Lock:
         with self._lock:

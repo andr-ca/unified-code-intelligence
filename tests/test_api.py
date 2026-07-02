@@ -69,6 +69,24 @@ def test_api_overview_json(server):
     assert data["totals"]["classes"] >= 3
 
 
+def test_api_metrics(server):
+    base, _ = server
+    raw, _ = _get(base, "/api/metrics")
+    data = json.loads(raw)
+    assert data["ok"], data  # collected at index time by the fixture
+    m = data["metrics"]
+    assert m["files"] > 0 and m["lines"]["code"] > 0
+    assert "call_resolution_distribution" in m and "by_language" in m
+
+
+def test_metrics_page_and_nav(server):
+    base, _ = server
+    raw, _ = _get(base, "/metrics")
+    assert b"Code metrics" in raw and (b"By language" in raw or b"Collect metrics" in raw)
+    home, _ = _get(base, "/")
+    assert b'href="/metrics"' in home
+
+
 def test_dashboard_html(server):
     base, _ = server
     raw, ctype = _get(base, "/")
@@ -82,6 +100,16 @@ def test_api_graph_neighborhood(server):
     raw, _ = _get(base, "/api/graph?id=" + urllib.parse.quote(root) + "&depth=2")
     data = json.loads(raw)
     assert data["ok"] and data["nodes"]
+
+
+def test_api_graph_views(server):
+    base, _ = server
+    for view in ("repository", "entry_points", "hubs", "modules"):
+        data = json.loads(_get(base, "/api/graph?view=" + view)[0])
+        assert data["ok"] and data["view"] == view
+    assert json.loads(_get(base, "/api/graph?view=repository")[0])["nodes"]
+    raw, _ = _get(base, "/graph")
+    assert b'id="graph-view"' in raw and b'value="entry_points"' in raw
 
 
 def test_api_impact(server):
@@ -204,6 +232,8 @@ def test_evals_page_html_and_nav(server):
     base, _ = server
     raw, _ = _get(base, "/evals")
     assert b"Evaluations" in raw and b"eval-run" in raw
+    # the LLM-enrichment eval is surfaced here too (with a link to the Enrich tab)
+    assert b"LLM enrichment eval" in raw and b'href="/enrich"' in raw
     # nav advertises both ops tabs when the suite is present
     home, _ = _get(base, "/")
     assert b'href="/build"' in home and b'href="/evals"' in home
@@ -260,6 +290,64 @@ def test_projects_add_rejects_bad_path(project_server):
     base, _, _ = project_server
     status, data = _post(base, "/api/projects", {"path": "/no/such/dir/xyzzy"})
     assert status == 400 and not data["ok"]
+
+
+def test_api_config_get_save_and_reset(project_server):
+    base, _, _ = project_server
+    data = json.loads(_get(base, "/api/config")[0])
+    assert data["ok"] and data["config"]["profile"] == "local-lite"
+    assert "weight_symbol" in data["config"] and "rrf_k" in data["config"]
+
+    status, saved = _post(base, "/api/config", {"values": {"weight_symbol": 2.5, "rrf_k": 42}})
+    assert status == 200 and saved["ok"]
+    assert saved["config"]["weight_symbol"] == 2.5 and saved["config"]["rrf_k"] == 42
+    # merge: a second change keeps the first
+    _post(base, "/api/config", {"values": {"weight_graph": 0.9}})
+    after = json.loads(_get(base, "/api/config")[0])
+    assert after["config"]["weight_symbol"] == 2.5 and after["config"]["weight_graph"] == 0.9
+    assert set(after["overrides"]) == {"weight_symbol", "rrf_k", "weight_graph"}
+
+    _post(base, "/api/config", {"reset": True})
+    reset = json.loads(_get(base, "/api/config")[0])
+    assert reset["overrides"] == {} and reset["config"]["weight_symbol"] == 1.4
+
+
+def test_api_config_rejects_bad_value(project_server):
+    base, _, _ = project_server
+    status, data = _post(base, "/api/config", {"values": {"rrf_k": "not-a-number"}})
+    assert status == 400 and not data["ok"]
+
+
+def test_config_page_and_nav(project_server):
+    base, _, _ = project_server
+    raw, _ = _get(base, "/config")
+    assert b"Configuration" in raw and b"weight_symbol" in raw and b'id="cfg-save"' in raw
+    home, _ = _get(base, "/")
+    assert b'href="/config"' in home
+
+
+def test_api_enrich_status_and_page(project_server):
+    base, _, _ = project_server
+    data = json.loads(_get(base, "/api/enrich")[0])
+    assert data["ok"] and "available" in data["status"] and data["passes"]
+    assert data["status"]["protocol"] in ("ollama", "openai", "anthropic")
+    ev = data["eval"]
+    assert set(ev) >= {"summaries", "capabilities", "candidates", "fields", "honesty"}
+    assert ev["honesty"]["ok"] is True  # no llm-suggested fact may leak into the resolution ladder
+    raw, _ = _get(base, "/enrich")
+    assert b"LLM enrichment" in raw and b"enrich-run" in raw and b"enrichment eval" in raw
+    home, _ = _get(base, "/")
+    assert b'href="/enrich"' in home
+
+
+def test_api_enrich_run_job(project_server):
+    base, _, _ = project_server
+    # 'fields' processes copybooks — the Python fixture has none, so no LLM call is made
+    status, d = _post(base, "/api/enrich", {"passes": ["fields"], "limit": 1})
+    assert status == 200 and d["ok"], d
+    job = _poll(base, d["job"]["id"], timeout=60)
+    assert job["state"] == "done" and "stats" in job["result"]
+    assert job["result"]["stats"]["field_dictionaries"] == 0
 
 
 def test_unindexed_project_prompts_build(project_server):

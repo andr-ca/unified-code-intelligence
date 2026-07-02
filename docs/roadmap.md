@@ -99,6 +99,16 @@ keeps vendor imports out of the report. Spec: [`next-iteration-gap-registry.md`]
   PL/I + REXX, Che4z LSP bridge (macro expansion, copybook line mapping).
 - ⏳ Modernization: `LEGACY_MODULE → CANDIDATE_FOR_MIGRATION → TargetService` with mapping reports.
 
+## LLM enrichment (optional layer)  ✅ (docs/llm-enrichment.md, docs/agentic-enrichment.md)
+- `uci.enrich`: protocol-pluggable client (ollama / openai-compatible / anthropic; stdlib HTTP,
+  configured via `UCI_LLM_PROTOCOL/URL/API_KEY/MODEL`); passes: summaries (what/why per module,
+  indexed into retrieval), capabilities, dynamic-dispatch candidates (`llm-suggested`, never
+  resolved), DCLGEN field dictionaries; on-demand `uci briefing` and `uci ask` (answer-location
+  routing: code vs data vs not-in-repo). Model capability benchmarked by `evals/llm_eval.py`. **Bounded agentic tool-loop** for the
+  candidates pass (`--agentic`: ≤3 read-only tool calls to pull a variable's cross-file
+  definition before proposing) — opt-in, gated by the LLM-eval agentic tasks (small local models
+  don't yet clear the bar; harness ready for stronger models).
+
 ## Cross-cutting adapter roadmap (behind interfaces, config-selectable)
 | Category | local-lite (now) | First upgrade | Later |
 | --- | --- | --- | --- |

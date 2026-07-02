@@ -106,6 +106,14 @@ class Config:
     # gap registry: name prefixes treated as external (not "missing") — e.g. mainframe system modules
     gap_external_prefixes: tuple[str, ...] = _DEFAULT_GAP_PREFIXES
 
+    # optional LLM enrichment (docs/llm-enrichment.md). Protocol: ollama | openai | anthropic.
+    # The API key lives in settings["llm_api_key"] (never in to_dict()/reports).
+    llm_protocol: str = "ollama"
+    llm_url: str = ""            # empty -> protocol default (localhost Ollama / api.openai.com / api.anthropic.com)
+    llm_model: str = ""          # empty -> protocol default
+    llm_timeout: int = 60
+    llm_max_tokens: int = 700
+
     # retrieval fusion weights (graph-first defaults)
     weight_symbol: float = 1.4
     weight_keyword: float = 1.0
@@ -194,6 +202,11 @@ class Config:
             weight_proximity=_num(env, "UCI_WEIGHT_PROXIMITY", 0.4),
             weight_churn=_num(env, "UCI_WEIGHT_CHURN", 0.3),
             rrf_k=int(_num(env, "UCI_RRF_K", 60)),
+            llm_protocol=env.get("UCI_LLM_PROTOCOL", "ollama").lower(),
+            llm_url=env.get("UCI_LLM_URL", ""),
+            llm_model=env.get("UCI_LLM_MODEL", ""),
+            llm_timeout=int(_num(env, "UCI_LLM_TIMEOUT", 60)),
+            llm_max_tokens=int(_num(env, "UCI_LLM_MAX_TOKENS", 700)),
             settings=_collect_settings(env),
         )
         if overrides:
@@ -233,7 +246,7 @@ def _collect_settings(env: dict[str, str]) -> dict[str, Any]:
     keys = [
         "UCI_OLLAMA_BASE_URL", "UCI_OPENAI_API_KEY", "UCI_OPENAI_BASE_URL",
         "UCI_QDRANT_URL", "UCI_MEMGRAPH_URL", "UCI_NEO4J_URL", "UCI_NEO4J_USER",
-        "UCI_NEO4J_PASSWORD", "UCI_POSTGRES_DSN",
+        "UCI_NEO4J_PASSWORD", "UCI_POSTGRES_DSN", "UCI_LLM_API_KEY",
     ]
     return {k[4:].lower(): v for k, v in env.items() if k in keys}
 

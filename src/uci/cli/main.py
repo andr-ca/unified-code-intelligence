@@ -229,6 +229,118 @@ def cmd_gaps(args) -> int:
     return 0
 
 
+def cmd_metrics(args) -> int:
+    with _engine(args) as engine:
+        _ensure_indexed(engine)
+        data = engine.metrics()
+        if args.json:
+            print(json.dumps(data, indent=2))
+            return 0
+        if not data.get("ok"):
+            print(data["error"]["message"])
+            return 1
+        m = data["metrics"]
+        lines = m["lines"]
+        print(f"{m['files']} files · {lines['total']} lines "
+              f"({lines['code']} code / {lines['comment']} comment / {lines['blank']} blank · "
+              f"comment ratio {lines['comment_ratio']:.0%})")
+        print("\nby language:")
+        for lang, b in m["by_language"].items():
+            print(f"  {lang:<12} {b['files']:>5} files  {b['code']:>8} code  "
+                  f"{b['comment']:>7} comment  {b['blank']:>6} blank")
+        ep = m["entry_points"]
+        print(f"\nentry points: {ep['total']}  (JCL jobs {ep['jcl_jobs']} · CICS transactions "
+              f"{ep['cics_transactions']} · uncalled programs {ep['uncalled_programs']} · "
+              f"python __main__ {ep['python_main_guards']})")
+        cd = m["cross_dependencies"]
+        print(f"cross dependencies: {cd['cross_file_edges']} cross-file edges "
+              f"({cd['cross_directory_edges']} cross-directory)")
+        if m["call_resolution_distribution"]:
+            dist = " ".join(f"{k}={v}" for k, v in m["call_resolution_distribution"].items())
+            print(f"call resolution: {dist}")
+        print(f"dynamic call sites: {m['dynamic_call_sites']} · unresolved: "
+              f"{m['unresolved_call_sites']} · external deps: {m['external_dependencies']} · "
+              f"missing artifacts: {m['missing_artifacts']}")
+        if m["top_fan_in"]:
+            print("\ntop fan-in:")
+            for hub in m["top_fan_in"]:
+                print(f"  {hub['name']} ({hub['kind']})  {hub['callers']} callers")
+    return 0
+
+
+def cmd_enrich(args) -> int:
+    with _engine(args) as engine:
+        _ensure_indexed(engine)
+        passes = args.passes or ["summaries", "capabilities", "candidates", "fields"]
+        if args.dry_run:
+            from uci.enrich import LlmClient, LlmError
+            try:
+                client = LlmClient(engine.config)
+            except LlmError as exc:
+                print(f"LLM config error: {exc}")
+                return 1
+            print(f"llm: {json.dumps(client.describe())}")
+            print(f"passes: {', '.join(passes)}  limit: {args.limit}  "
+                  f"reachable: {client.available}")
+            return 0
+        data = engine.enrich(passes, limit=args.limit, force=args.force, agentic=args.agentic)
+        if args.json:
+            print(json.dumps(data, indent=2))
+            return 0 if data.get("ok") else 1
+        if not data.get("ok"):
+            print(f"enrichment failed: {data['error']['message']}")
+            return 1
+        s = data["stats"]
+        mode = " (agentic)" if data.get("agentic") else ""
+        print(f"llm: {data['llm']['protocol']}/{data['llm']['model']} @ {data['llm']['url']}{mode}")
+        print(f"summaries: {s['summaries']}  capabilities: {s['capabilities']}  "
+              f"candidate edges: {s['candidate_edges']}  field dictionaries: "
+              f"{s['field_dictionaries']}  cached: {s['cached']}")
+        for err in s["errors"]:
+            print(f"  warn: {err}")
+    return 0
+
+
+def cmd_briefing(args) -> int:
+    with _engine(args) as engine:
+        _ensure_indexed(engine)
+        data = engine.briefing(args.symbol)
+        if args.json:
+            print(json.dumps(data, indent=2))
+            return 0 if data.get("ok") else 1
+        if not data.get("ok"):
+            print(f"error: {data['error']['message']}")
+            return 1
+        print(data["briefing"])
+    return 0
+
+
+def cmd_ask(args) -> int:
+    with _engine(args) as engine:
+        _ensure_indexed(engine)
+        data = engine.ask(args.question)
+        if args.json:
+            print(json.dumps(data, indent=2))
+            return 0 if data.get("ok") else 1
+        if not data.get("ok"):
+            print(f"error: {data['error']['message']}")
+            return 1
+        print(f"answer location: {data['answer_location']}")
+        if data["explanation"]:
+            print(f"{data['explanation']}")
+        for t in data["targets"]:
+            line = f"  -> {t['name']} ({t['kind']})"
+            if t.get("written_by") or t.get("read_by"):
+                line += f"  written by: {', '.join(t.get('written_by', [])) or '-'}" \
+                        f"  read by: {', '.join(t.get('read_by', [])) or '-'}"
+            print(line)
+            if t.get("why"):
+                print(f"     {t['why']}")
+        if data["next_step"]:
+            print(f"next step: {data['next_step']}")
+    return 0
+
+
 def cmd_serve(args) -> int:  # pragma: no cover - I/O
     from ..api.projects import ProjectManager
     from ..api.server import serve
@@ -296,6 +408,30 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name, help=f"{name} report")
         sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
         sp.set_defaults(func=func)
+
+    sp = sub.add_parser("metrics", help="codebase metrics (LOC, entry points, dependencies)")
+    sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.set_defaults(func=cmd_metrics)
+
+    sp = sub.add_parser("enrich", help="optional LLM enrichment (summaries, capabilities, candidates, fields)")
+    sp.add_argument("--pass", dest="passes", action="append",
+                    choices=["summaries", "capabilities", "candidates", "fields"],
+                    help="pass to run (repeatable; default: all)")
+    sp.add_argument("--limit", type=int, default=200, help="max items per pass")
+    sp.add_argument("--force", action="store_true", help="ignore the content-hash cache")
+    sp.add_argument("--agentic", action="store_true",
+                    help="candidates pass: bounded tool-loop (docs/agentic-enrichment.md)")
+    sp.add_argument("--dry-run", action="store_true", help="show LLM config and plan, call nothing")
+    sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.set_defaults(func=cmd_enrich)
+
+    sp = sub.add_parser("briefing", help="LLM migration-readiness briefing from the impact pack")
+    sp.add_argument("symbol"); sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.set_defaults(func=cmd_briefing)
+
+    sp = sub.add_parser("ask", help="route a question: answered by code, by data (which table), or not in repo")
+    sp.add_argument("question"); sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.set_defaults(func=cmd_ask)
 
     sp = sub.add_parser("gaps", help="list missing artifacts referenced but not indexed")
     sp.add_argument("--kind"); sp.add_argument("--json", action="store_true"); sp.add_argument("--path")

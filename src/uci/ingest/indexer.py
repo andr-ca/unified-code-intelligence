@@ -28,6 +28,7 @@ from . import git_meta
 from .graph_builder import FileParse, GraphBuilder
 from .hashing import hash_text, read_text
 from .langdetect import is_code, module_qname
+from .metrics import MetricsCollector
 from .scanner import scan
 
 
@@ -93,11 +94,13 @@ class Indexer:
         file_parses: list[FileParse] = []
         sources: dict[str, str] = {}
         changed: set[str] = set()
+        metrics = MetricsCollector()
 
         for sf in scanned:
             source = read_text(sf.abs_path, self.config.max_file_bytes)
             if source is None:
                 continue
+            metrics.add_file(sf.rel_path, sf.language, source)
             digest = hash_text(source)
             prev = stored.get(sf.rel_path)
             if prev is None or prev.get("content_hash") != digest:
@@ -199,6 +202,11 @@ class Indexer:
         for gap in gap_records:
             self.metadata.upsert_gap(rid, gap)
         stats.gaps = len(gap_records)
+
+        # -- codebase metrics: line stats (scan pass) + graph stats (source graph, pre-git) --
+        self.metadata.set_state(rid, "code_metrics", metrics.finalize(
+            entities, relationships, builder.unresolved_calls, stats.gaps,
+        ))
 
         self.metadata.set_state(rid, "last_index", {
             "at": now, "stats": stats.to_dict(),

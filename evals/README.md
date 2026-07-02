@@ -12,8 +12,12 @@ evals/
   datasets/        golden datasets (*.json) + mined/ reference facts
   tools/           mine_ground_truth.py — independent reference extractor (never imports uci.*)
   run_eval.py      runner + scorer (implements docs/scoring.md)
+  llm_eval.py      LLM model benchmark for enrichment tasks (docs/llm-eval.md; opt-in, needs a provider)
   reports/         run reports + baseline.json (the regression gate)
 ```
+
+**Findings synthesis:** `docs/observations.md` — what the evals actually taught us (structure is
+solved, restraint is the model capability line, and the benchmark that argued against its own feature).
 
 Datasets and scoring are **versioned + fingerprinted** (docs/versioning.md, datasets/CHANGELOG.md):
 the baseline gate only compares apples-to-apples; drifted datasets show informational deltas

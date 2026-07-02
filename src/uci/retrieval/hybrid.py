@@ -109,6 +109,10 @@ class HybridRetriever:
             doc = entity.attributes.get("docstring", "")
             if doc:
                 tokens |= set(tokenize(doc))
+            # LLM-enriched purpose summaries participate in keyword matching (llm-enrichment.md §3.1)
+            summary = entity.attributes.get("summary", "")
+            if summary:
+                tokens |= set(tokenize(summary))
             overlap = len(q_tokens & tokens)
             if overlap:
                 scored[entity.id] += overlap + (2.0 if entity.name.lower() in q_tokens else 0.0)

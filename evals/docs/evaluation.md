@@ -114,6 +114,12 @@ The runner:
 - **Never tune to the eval.** Fusion weights, fan-out caps, and stoplists may be adjusted *using* these numbers, but new heuristics must be justified on held-out examples (add new questions before relying on improved scores).
 - Category scores matter more than aggregates. "calls F1 = 0.9, completeness calibration = 0.4" means the graph is good and the honesty layer is broken — the aggregate would hide that.
 
+## 6.1 What we've learned
+
+Standing synthesis of findings across all runs — structural extraction is solved, `queries` is the
+only weak cell, restraint is the LLM capability line, and the agentic loop is (so far) a
+measure-said-no feature: **`observations.md`**.
+
 ## 7. Extending the suite
 
 - **New repo:** drop it under `evals/demo-repos/`, run the miner, curate a dataset JSON, assign a track.

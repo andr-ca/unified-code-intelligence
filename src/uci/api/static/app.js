@@ -12,6 +12,8 @@
         const canvas = document.getElementById("graph");
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
+        const escg = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+        const escAttr = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
         let nodes = [], edges = [], byId = {};
         let scale = 1, tx = 0, ty = 0, dragging = null, panning = false, last = null;
         let selected = null, ticks = 300, didFit = false, downAt = null;
@@ -26,8 +28,8 @@
         }
         window.addEventListener("resize", resize); resize();
 
-        async function load(id, merge) {
-            const res = await fetch("/api/graph?id=" + encodeURIComponent(id) + "&depth=1");
+        async function loadUrl(url, merge) {
+            const res = await fetch(url);
             const data = await res.json();
             if (!data.ok) return;
             if (!merge) { nodes = []; edges = []; byId = {}; didFit = false; }
@@ -42,6 +44,8 @@
             data.edges.forEach((e) => edges.push(e));
             ticks = 300;
         }
+        const loadNode = (id, merge) => loadUrl("/api/graph?id=" + encodeURIComponent(id) + "&depth=1", merge);
+        const loadView = (v) => { selected = null; loadUrl("/api/graph?view=" + encodeURIComponent(v) + "&depth=1", false); };
 
         function simulate() {
             if (ticks <= 0) return;
@@ -148,10 +152,36 @@
         }
         function showInfo(n) {
             const info = document.getElementById("node-info");
-            if (!info) return;
-            const openable = ["function", "method", "class", "interface", "test", "module", "config_key", "enum"].includes(n.kind);
-            const link = (openable && !n.missing) ? ' · <a href="/symbol?id=' + encodeURIComponent(n.id) + '">open ↗</a>' : "";
-            info.innerHTML = (n.qualified_name || n.name || "") + link;
+            if (info) info.innerHTML = (n.qualified_name || n.name || "");
+            showTile(n.id, n.name);
+        }
+        function nodeList(items) {
+            const shown = (items || []).slice(0, 8).map((c) =>
+                `<li><a href="#" data-focus="${escAttr(c.entity_id)}">${escg(c.name)}</a>` +
+                `<span class="mono muted gt-qn">${escg(c.qualified_name || "")}</span></li>`).join("");
+            const more = (items || []).length > 8 ? `<li class="muted">+${items.length - 8} more…</li>` : "";
+            return (shown || more) ? `<ul class="gt-list">${shown}${more}</ul>` : '<div class="muted small">none</div>';
+        }
+        function renderTile(d) {
+            const e = d.entity;
+            const loc = escg(e.path || "") + (e.start_line ? ":" + e.start_line : "");
+            const open = e.missing ? "" : ` · <a href="/symbol?id=${escAttr(e.entity_id)}">open ↗</a>`;
+            return `<div class="gt-h"><span class="pill k-${escAttr(e.kind)}">${escg(e.kind)}</span>` +
+                `<b>${escg(e.name)}</b><button type="button" class="gt-close" title="close">×</button></div>` +
+                `<div class="mono small muted gt-qn">${escg(e.qualified_name || "")}</div>` +
+                `<div class="mono small">${loc}${open}</div>` +
+                `<div class="gt-sec"><div class="gt-t">▲ called by (${(d.callers || []).length})</div>${nodeList(d.callers)}</div>` +
+                `<div class="gt-sec"><div class="gt-t">▼ calls (${(d.callees || []).length})</div>${nodeList(d.callees)}</div>` +
+                `<div class="gt-sec"><a href="#" class="gt-expand" data-expand="${escAttr(e.entity_id)}">expand neighborhood ⤢</a></div>`;
+        }
+        function showTile(id, name) {
+            const tile = document.getElementById("graph-tile");
+            if (!tile) return;
+            tile.hidden = false;
+            tile.innerHTML = `<div class="gt-h"><b>${escg(name || "")}</b><button type="button" class="gt-close">×</button></div><div class="muted small">loading…</div>`;
+            fetch("/api/entity?id=" + encodeURIComponent(id)).then((r) => r.json()).then((d) => {
+                tile.innerHTML = d.ok ? renderTile(d) : `<div class="gt-h"><b>${escg(name || "")}</b><button type="button" class="gt-close">×</button></div><div class="muted small">no details</div>`;
+            });
         }
 
         canvas.addEventListener("mousedown", (ev) => {
@@ -176,7 +206,7 @@
         canvas.addEventListener("dblclick", (ev) => {
             const r = canvas.getBoundingClientRect();
             const n = pick(ev.clientX - r.left, ev.clientY - r.top);
-            if (n) load(n.id, true);
+            if (n) loadNode(n.id, true);
         });
         canvas.addEventListener("wheel", (ev) => {
             ev.preventDefault();  // scroll or trackpad pinch -> zoom toward the cursor
@@ -189,9 +219,20 @@
             zoomAt(vw() / 2, vh() / 2, btn.dataset.graph === "in" ? 1.25 : 0.8);
         }));
 
-        load(rootId, false);
+        const viewSel = document.getElementById("graph-view");
+        if (viewSel) viewSel.addEventListener("change", () => loadView(viewSel.value));
+        const tileEl = document.getElementById("graph-tile");
+        if (tileEl) tileEl.addEventListener("click", (ev) => {
+            if (ev.target.closest(".gt-close")) { tileEl.hidden = true; selected = null; return; }
+            const foc = ev.target.closest("[data-focus]");
+            if (foc) { ev.preventDefault(); loadNode(foc.dataset.focus, false); showTile(foc.dataset.focus, foc.textContent); return; }
+            const exp = ev.target.closest("[data-expand]");
+            if (exp) { ev.preventDefault(); loadNode(exp.dataset.expand, true); }
+        });
+        if (rootId) loadNode(rootId, false);
+        else loadView((viewSel && viewSel.value) || canvas.dataset.view || "repository");
         frame();
-        window.__uciGraphLoad = (id) => load(id, false);
+        window.__uciGraphLoad = (id) => loadNode(id, false);
     }
 
     window.UCI = { initGraph, initBuild, initEvals, initProjects };
@@ -201,7 +242,7 @@
 
     async function pollJob(jobId, onUpdate, interval) {
         interval = interval || 900;
-        for (;;) {
+        for (; ;) {
             let data;
             try {
                 const res = await fetch("/api/jobs/" + encodeURIComponent(jobId));
@@ -357,6 +398,41 @@
         });
     }
 
+    function dsSection(title, inner) {
+        return `<div class="ds-section"><div class="card-h">${esc(title)}</div>${inner}</div>`;
+    }
+    function dsRows(items, cols) {
+        return `<table><thead><tr>${cols.map((c) => `<th>${esc(c[0])}</th>`).join("")}</tr></thead><tbody>` +
+            (items || []).map((it) => `<tr>${cols.map((c) => `<td class="mono small">${c[1](it)}</td>`).join("")}</tr>`).join("") +
+            "</tbody></table>";
+    }
+    function renderDatasetReadable(ds) {
+        const c = ds.categories || {}, parts = [];
+        parts.push(`<div class="ds-meta"><b>${esc(ds.name || "")}</b>` +
+            `<span class="pill score">${esc(ds.track || "custom")}</span>` +
+            `<span class="pill score">v${esc(ds.version || "?")}</span>` +
+            (ds.updated_at ? `<span class="muted small">${esc(ds.updated_at)}</span>` : "") +
+            `<span class="mono small muted">${esc(ds.repo || "")}</span></div>`);
+        if (ds.notes) parts.push(`<p class="muted small">${esc(ds.notes)}</p>`);
+        if (c.symbol_lookup) parts.push(dsSection("Symbol lookup (" + c.symbol_lookup.length + ")",
+            dsRows(c.symbol_lookup, [["name", (s) => esc(s.name)], ["path", (s) => esc(s.path)]])));
+        if (c.calls) parts.push(dsSection("Calls (" + c.calls.length + ")",
+            dsRows(c.calls, [["from", (x) => esc(x.from)], ["to", (x) => esc(x.to)],
+            ["resolved?", (x) => x.expect_resolved ? "yes" : "—"]])));
+        if (c.queries) parts.push(dsSection("Queries (" + c.queries.length + ")",
+            dsRows(c.queries, [["query", (x) => esc(x.q)], ["expected", (x) => (x.expected || []).map(esc).join("<br>")]])));
+        if (c.impact) parts.push(dsSection("Impact (" + c.impact.length + ")",
+            dsRows(c.impact, [["symbol", (x) => esc(x.symbol)],
+            ["callers", (x) => (x.callers || []).map(esc).join("<br>") || "—"],
+            ["tests", (x) => (x.tests || []).map(esc).join("<br>") || "—"],
+            ["config", (x) => (x.config || []).map(esc).join("<br>") || "—"]])));
+        ["completeness", "gaps", "copybook_impact", "jobs", "transactions", "data_access"].forEach((k) => {
+            if (c[k]) parts.push(dsSection(k + (Array.isArray(c[k]) ? " (" + c[k].length + ")" : ""),
+                `<pre class="mono small dsjson">${esc(JSON.stringify(c[k], null, 2))}</pre>`));
+        });
+        return parts.join("") || '<p class="muted small">Empty dataset.</p>';
+    }
+
     function initEvals() {
         const runBtn = document.getElementById("eval-run");
         const logEl = document.getElementById("job-log");
@@ -402,6 +478,19 @@
         const msg = document.getElementById("eval-edit-msg");
         const verLabel = document.getElementById("eval-edit-version");
         const hist = document.getElementById("eval-edit-history");
+        const readable = document.getElementById("eval-edit-readable");
+        const showView = (v) => {
+            if (text) text.hidden = v !== "json";
+            if (readable) readable.hidden = v !== "readable";
+            document.querySelectorAll(".viewtab").forEach((t) => t.classList.toggle("active", t.dataset.view === v));
+            if (v === "readable" && readable) {
+                let ds;
+                try { ds = JSON.parse(text.value); }
+                catch (e) { readable.innerHTML = '<p class="muted small">Fix the JSON to preview: ' + esc(e.message) + "</p>"; return; }
+                readable.innerHTML = renderDatasetReadable(ds);
+            }
+        };
+        document.querySelectorAll(".viewtab").forEach((t) => t.addEventListener("click", () => showView(t.dataset.view)));
         const fillHistory = (versions) => {
             if (!hist) return;
             hist.innerHTML = '<option value="">history…</option>' + (versions || []).map((v) =>
@@ -414,6 +503,7 @@
                 if (!d.ok) { if (msg) msg.textContent = "not found"; return; }
                 text.value = JSON.stringify(d.dataset, null, 2);
                 setVer(d.dataset);
+                if (readable && !readable.hidden) showView("readable");
                 if (msg) msg.textContent = "loaded " + name;
                 fetch("/api/evals/versions?name=" + encodeURIComponent(name)).then((r) => r.json())
                     .then((v) => { if (v.ok) fillHistory(v.versions); });
@@ -504,6 +594,57 @@
         if (document.querySelector("[data-build]")) initBuild();
         if (document.getElementById("eval-run") || document.getElementById("report-list")) initEvals();
         if (document.getElementById("project-table")) initProjects();
+        if (document.getElementById("cfg-save")) initConfig();
+        if (document.getElementById("enrich-run")) initEnrich();
+    }
+
+    function initEnrich() {
+        const runBtn = document.getElementById("enrich-run");
+        const logEl = document.getElementById("job-log");
+        const stateEl = document.getElementById("job-state");
+        runBtn.addEventListener("click", () => {
+            const passes = Array.prototype.slice.call(document.querySelectorAll(".enrich-pass:checked")).map((c) => c.value);
+            const limit = parseInt(document.getElementById("enrich-limit").value || "200", 10);
+            const force = document.getElementById("enrich-force").checked;
+            runBtn.disabled = true;
+            startJob("/api/enrich", { passes, limit, force }, logEl, stateEl, (job) => {
+                runBtn.disabled = false;
+                if (job && job.state === "done") setTimeout(() => location.reload(), 1200);  // refresh eval results
+            });
+        });
+        fetch("/api/jobs").then((r) => r.json()).then((d) => {
+            const job = (d.jobs || []).find((j) => j.kind === "enrich" && j.state === "running");
+            if (job) { setState(stateEl, "running"); pollJob(job.id, (j) => paintLog(logEl, j)).then((f) => { if (f) setState(stateEl, f.state); }); }
+        });
+    }
+
+    function initConfig() {
+        const saveBtn = document.getElementById("cfg-save");
+        const resetBtn = document.getElementById("cfg-reset");
+        const msg = document.getElementById("cfg-msg");
+        const fields = Array.prototype.slice.call(document.querySelectorAll("[data-cfg]"));
+        const readVal = (el) => el.type === "checkbox" ? el.checked : el.value;
+        const initial = {};
+        fields.forEach((el) => { initial[el.dataset.cfg] = String(readVal(el)); });
+        saveBtn.addEventListener("click", () => {
+            const values = {};
+            fields.forEach((el) => {
+                const v = readVal(el);
+                if (String(v) !== initial[el.dataset.cfg]) values[el.dataset.cfg] = v;
+            });
+            if (!Object.keys(values).length) { if (msg) msg.textContent = "no changes to save"; return; }
+            saveBtn.disabled = true;
+            post("/api/config", { values }).then((r) => r.json()).then((d) => {
+                saveBtn.disabled = false;
+                if (!d.ok) { if (msg) msg.textContent = (d.error && d.error.message) || "save failed"; return; }
+                if (msg) msg.textContent = "saved — reloading…";
+                setTimeout(() => location.reload(), 500);
+            });
+        });
+        if (resetBtn) resetBtn.addEventListener("click", () => {
+            if (!confirm("Clear all config overrides for this project (revert to defaults)?")) return;
+            post("/api/config", { reset: true }).then(() => location.reload());
+        });
     }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
     else boot();

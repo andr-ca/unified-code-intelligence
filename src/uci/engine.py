@@ -5,6 +5,7 @@ identical everywhere (the single-source-of-truth pattern from CodeRAG).
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .analysis.architecture import infer_architecture
@@ -211,6 +212,125 @@ class Engine:
             records = [g for g in records if g.get("artifact_kind") == kind]
         return {"ok": True, "tool": "list_index_gaps", "count": len(records), "gaps": records}
 
+    # -- optional LLM layer (docs/llm-enrichment.md) -------------------------
+    def enrich(self, passes: list[str] | None = None, limit: int = 200,
+               force: bool = False, client=None, agentic: bool = False) -> dict:
+        """Run the optional LLM enrichment passes. Requires a configured/reachable provider."""
+        from .enrich import Enricher, LlmError
+        passes = passes or ["summaries", "capabilities", "candidates", "fields"]
+        try:
+            enricher = Enricher(self.config, self.graph, self.metadata, self.vectors,
+                                self.embedder, self.repo_id, client=client)
+            stats = enricher.run(passes, limit=limit, force=force, agentic=agentic)
+        except LlmError as exc:
+            return {"ok": False, "tool": "enrich", "error": {"code": "llm", "message": str(exc)}}
+        return {"ok": True, "tool": "enrich", "passes": passes, "agentic": agentic,
+                "llm": enricher.client.describe(), "stats": stats.to_dict()}
+
+    def briefing(self, symbol: str, client=None) -> dict:
+        """Render the (already-proven) impact pack as a prose modernization briefing."""
+        imp = self.impact(symbol)
+        if not imp.get("ok"):
+            return imp
+        from .enrich import LlmClient, LlmError
+        try:
+            client = client or LlmClient(self.config)
+            facts = json.dumps({k: imp.get(k) for k in (
+                "target", "callers", "callees", "tests", "config", "data",
+                "overrides", "churn", "risk", "completeness")}, indent=1)[:7000]
+            prose = client.complete(
+                "You write concise migration-readiness briefings for engineers. Use ONLY the "
+                "facts in the provided JSON (they carry file/line provenance); cite paths. "
+                "Cover: purpose, blast radius, data touched, test safety net, dynamic-dispatch "
+                "risk, and a recommended change approach. Plain prose with short headers.",
+                f"Impact facts for {symbol}:\n{facts}",
+                max_tokens=900,
+            )
+        except LlmError as exc:
+            return {"ok": False, "tool": "briefing", "error": {"code": "llm", "message": str(exc)}}
+        return {"ok": True, "tool": "briefing", "symbol": symbol,
+                "briefing": prose, "impact": imp}
+
+    def ask(self, question: str, client=None) -> dict:
+        """Answer-location routing: is the answer in code, in data (which table/dataset), or
+        not in the repo at all? (docs/llm-enrichment.md 'ask')."""
+        from .enrich import LlmClient, LlmError
+        hits = self._retriever().search(question, top_k=8)
+        data_inventory = []
+        for kind in (EntityType.DATABASE_TABLE, EntityType.DATASET):
+            for ent in self.graph.entities(kind=kind, repo_id=self.repo_id):
+                readers = [self.graph.get_entity(r.src_id).name
+                           for r in self.graph.in_relationships(ent.id, [RelationType.READS])
+                           if self.graph.get_entity(r.src_id)]
+                writers = [self.graph.get_entity(r.src_id).name
+                           for r in self.graph.in_relationships(ent.id, [RelationType.WRITES])
+                           if self.graph.get_entity(r.src_id)]
+                dd = []
+                for rel in self.graph.in_relationships(ent.id, [RelationType.MAPS_TO]):
+                    cb = self.graph.get_entity(rel.src_id)
+                    if cb and cb.attributes.get("data_dictionary"):
+                        dd = list(cb.attributes["data_dictionary"])[:12]
+                data_inventory.append({
+                    "name": ent.qualified_name, "kind": ent.kind.value,
+                    "read_by": readers[:6], "written_by": writers[:6], "fields": dd,
+                })
+        code_context = "\n".join(
+            f"- {h.qualified_name} ({h.kind}): {h.reason}" for h in hits)
+        try:
+            client = client or LlmClient(self.config)
+            data = client.complete_json(
+                "You route a question about a codebase to where its answer lives. Reply with "
+                "STRICT JSON only: {\"answer_location\": \"code\"|\"data\"|\"not_in_repo\", "
+                "\"targets\": [{\"name\": str, \"kind\": str, \"why\": str}], "
+                "\"explanation\": str, \"next_step\": str}. Questions about configured/stored "
+                "values (product lists, rates, codes) are usually DATA-resident: name the "
+                "table/dataset to query. Use ONLY names from the provided context.",
+                f"Question: {question}\n\nCode matches:\n{code_context or '(none)'}\n\n"
+                f"Data inventory (tables/datasets with reader/writer programs):\n"
+                f"{json.dumps(data_inventory, indent=1)[:5000]}",
+                max_tokens=500,
+            )
+        except LlmError as exc:
+            return {"ok": False, "tool": "ask", "error": {"code": "llm", "message": str(exc)}}
+        # validate targets against the index; attach graph-proven context to data targets
+        valid_targets = []
+        for t in (data or {}).get("targets", []):
+            name = str(t.get("name", ""))
+            matches = resolve_symbol(self.graph, name, limit=1)
+            if not matches:
+                continue
+            ent = matches[0]
+            target = {"name": ent.qualified_name, "kind": ent.kind.value,
+                      "why": str(t.get("why", "")), "entity_id": ent.id}
+            if ent.kind in (EntityType.DATABASE_TABLE, EntityType.DATASET):
+                target["written_by"] = [
+                    self.graph.get_entity(r.src_id).name
+                    for r in self.graph.in_relationships(ent.id, [RelationType.WRITES])
+                    if self.graph.get_entity(r.src_id)][:6]
+                target["read_by"] = [
+                    self.graph.get_entity(r.src_id).name
+                    for r in self.graph.in_relationships(ent.id, [RelationType.READS])
+                    if self.graph.get_entity(r.src_id)][:6]
+            valid_targets.append(target)
+        location = (data or {}).get("answer_location", "not_in_repo")
+        if location != "not_in_repo" and not valid_targets:
+            location = "not_in_repo"  # model named things we can't verify — degrade honestly
+        return {"ok": True, "tool": "ask", "question": question,
+                "answer_location": location, "targets": valid_targets,
+                "explanation": str((data or {}).get("explanation", "")),
+                "next_step": str((data or {}).get("next_step", "")),
+                "code_matches": [h.to_dict() for h in hits[:5]]}
+
+    def metrics(self) -> dict:
+        """Codebase metrics collected at index time: LOC per language (code/comment/blank),
+        entry points, cross-file dependencies, call-resolution distribution, hubs."""
+        data = self.metadata.get_state(self.repo_id, "code_metrics")
+        if not data:
+            return {"ok": False, "tool": "get_code_metrics",
+                    "error": {"code": "not_indexed", "message": "run `uci index` first"}}
+        return {"ok": True, "tool": "get_code_metrics", "metrics": data,
+                "index": self._index_status()}
+
     # -- analysis -----------------------------------------------------------
     def overview(self) -> dict:
         return repo_overview(self.graph, self.metadata, self.repo_id)
@@ -283,7 +403,9 @@ class Engine:
             or next(self.graph.relationships(RelationType.WRITES), None) is not None
             or next(self.graph.relationships(RelationType.MAPS_TO), None) is not None
         )
-        return {"find_config_dependencies": has_config, "find_data_lineage": has_data}
+        has_metrics = self.metadata.get_state(self.repo_id, "code_metrics") is not None
+        return {"find_config_dependencies": has_config, "find_data_lineage": has_data,
+                "get_code_metrics": has_metrics}
 
 
 def _entity_hit(entity) -> dict:
@@ -293,6 +415,7 @@ def _entity_hit(entity) -> dict:
         "start_line": entity.provenance.start_line, "end_line": entity.provenance.end_line,
         "missing": bool(entity.attributes.get("missing")),
         "external": bool(entity.attributes.get("external")),
+        "summary": entity.attributes.get("summary", ""),
     }
 
 

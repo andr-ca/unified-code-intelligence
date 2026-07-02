@@ -10,10 +10,13 @@ _NAV = [
     ("/search", "Search"),
     ("/graph", "Graph"),
     ("/architecture", "Architecture"),
+    ("/metrics", "Metrics"),
     ("/gaps", "Gaps"),
     ("/onboarding", "Onboarding"),
     ("/build", "Build"),
     ("/projects", "Projects"),
+    ("/config", "Config"),
+    ("/enrich", "Enrich"),
 ]
 
 _SHOW_EVALS = False
@@ -126,7 +129,8 @@ def _track_cell(tracks: dict) -> str:
     )
 
 
-def evals_page(reports: list[dict], datasets: list[str], projects: list[dict] | None = None) -> str:
+def evals_page(reports: list[dict], datasets: list[str], projects: list[dict] | None = None,
+               enrich_eval: dict | None = None) -> str:
     opts = "".join(f"<option value='{_e(d)}'>{_e(d)}</option>" for d in datasets)
     proj_opts = "".join(f"<option value='{_e(p['name'])}'>{_e(p['name'])}</option>"
                         for p in (projects or []))
@@ -141,6 +145,7 @@ def evals_page(reports: list[dict], datasets: list[str], projects: list[dict] | 
   <h1>Evaluations</h1>
   <p class="sub">Run UCI's own eval suite and browse reports. The <b>supported</b> track is the
   regression gate; <b>mainframe</b> is a progress meter until the COBOL extractors land.</p>
+  {_enrich_eval_teaser(enrich_eval or {})}
   <div class="card">
     <div class="card-h">Run</div>
     <div class="btnrow">
@@ -176,7 +181,12 @@ def evals_page(reports: list[dict], datasets: list[str], projects: list[dict] | 
       <button class="btn ghost small" id="eval-edit-restore">Restore</button>
       <span id="eval-edit-msg" class="muted small"></span>
     </div>
+    <div class="viewtabs">
+      <button type="button" class="viewtab active" data-view="json">JSON</button>
+      <button type="button" class="viewtab" data-view="readable">Readable</button>
+    </div>
     <textarea id="eval-edit-text" class="jsonedit" spellcheck="false" placeholder="Load a dataset to edit its golden JSON…"></textarea>
+    <div id="eval-edit-readable" class="ds-readable" hidden></div>
   </div>
   <div class="eval-cols" style="margin-top:22px">
     <div class="card">
@@ -191,6 +201,31 @@ def evals_page(reports: list[dict], datasets: list[str], projects: list[dict] | 
   </div>
 </div>"""
     return layout("Evals", "/evals", body)
+
+
+def _enrich_eval_teaser(ev: dict) -> str:
+    """Compact LLM-enrichment coverage strip on the Evals page — makes the eval discoverable
+    from the tab people click when hunting for 'evals', and links to the full Enrich view."""
+    if not ev:
+        return ""
+    su, cap, fl = ev.get("summaries", {}), ev.get("capabilities", {}), ev.get("fields", {})
+    hon = ev.get("honesty", {})
+    pct = lambda x: f"{round((x or 0) * 100)}%"
+    honesty = ("<span class='pill score' style='color:var(--green);border-color:var(--green)'>honest</span>"
+               if hon.get("ok", True) else
+               "<span class='pill score' style='color:var(--red);border-color:var(--red)'>LEAK</span>")
+    return f"""<div class="card" style="margin-top:18px">
+    <div class="card-h">LLM enrichment eval {honesty}</div>
+    <p class="muted small">Separate from the retrieval suite below \u2014 coverage of the optional LLM
+      passes. Facts are labeled <span class="mono">llm:&lt;model&gt;</span> at confidence &lt; 1.0 and
+      never enter the resolution ladder, so this can never inflate the retrieval scores.</p>
+    <div class="btnrow">
+      <span class="pill">summaries {pct(su.get('coverage'))} <span class="muted">{su.get('covered', 0)}/{su.get('eligible', 0)}</span></span>
+      <span class="pill">capabilities {cap.get('count', 0)}</span>
+      <span class="pill">field dictionaries {pct(fl.get('coverage'))} <span class="muted">{fl.get('with_dictionary', 0)}/{fl.get('copybooks', 0)}</span></span>
+      <a class="btn ghost small" href="/enrich">Open Enrich \u2192</a>
+    </div>
+  </div>"""
 
 
 def evals_unavailable_page() -> str:
@@ -246,6 +281,301 @@ def no_projects_page() -> str:
     body = """<div class="container"><h1>No project selected</h1>
   <p class="muted">Add a repository on the <a href="/projects">Projects</a> page to start exploring.</p></div>"""
     return layout("Overview", "/", body)
+
+
+def _cfg_badge(field: str, ov: set) -> str:
+    return " <span class='pill score'>overridden</span>" if field in ov else ""
+
+
+def _cfg_text(cfg: dict, ov: set, field: str, label: str) -> str:
+    return (f"<label class='cfg-row'><span class='cfg-l'>{_e(label)}{_cfg_badge(field, ov)}</span>"
+            f"<input class='cfg-in' data-cfg='{field}' value=\"{_e(cfg.get(field, ''))}\"></label>")
+
+
+def _cfg_num(cfg: dict, ov: set, field: str, label: str, step: str = "any") -> str:
+    return (f"<label class='cfg-row'><span class='cfg-l'>{_e(label)}{_cfg_badge(field, ov)}</span>"
+            f"<input class='cfg-in' type='number' step='{step}' data-cfg='{field}' value='{_e(cfg.get(field, 0))}'></label>")
+
+
+def _cfg_select(cfg: dict, ov: set, field: str, label: str, options: tuple) -> str:
+    opts = "".join(
+        f"<option value='{_e(o)}'{' selected' if cfg.get(field) == o else ''}>{_e(o)}</option>"
+        for o in options)
+    return (f"<label class='cfg-row'><span class='cfg-l'>{_e(label)}{_cfg_badge(field, ov)}</span>"
+            f"<select class='cfg-in' data-cfg='{field}'>{opts}</select></label>")
+
+
+def _cfg_check(cfg: dict, ov: set, field: str, label: str) -> str:
+    checked = " checked" if cfg.get(field) else ""
+    return (f"<label class='cfg-row cfg-check'><span class='cfg-l'>{_e(label)}{_cfg_badge(field, ov)}</span>"
+            f"<input type='checkbox' data-cfg='{field}'{checked}></label>")
+
+
+def _cfg_csv(cfg: dict, ov: set, field: str, label: str) -> str:
+    val = ", ".join(cfg.get(field, []) or [])
+    return (f"<label class='cfg-row'><span class='cfg-l'>{_e(label)}{_cfg_badge(field, ov)}</span>"
+            f"<input class='cfg-in' data-cfg='{field}' value=\"{_e(val)}\"></label>")
+
+
+def config_page(cfg: dict, overrides: dict, reindex_fields=()) -> str:
+    ov = set(overrides or {})
+    backends = (
+        _cfg_select(cfg, ov, "profile", "Profile", ("local-lite", "local-pro", "cloud")) +
+        _cfg_select(cfg, ov, "graph_backend", "Graph backend", ("sqlite", "memgraph", "neo4j")) +
+        _cfg_select(cfg, ov, "vector_backend", "Vector backend", ("sqlite", "qdrant")) +
+        _cfg_select(cfg, ov, "metadata_backend", "Metadata backend", ("sqlite", "postgres"))
+    )
+    embeddings = (
+        _cfg_select(cfg, ov, "embedding_provider", "Provider", ("local", "noop", "ollama", "openai")) +
+        _cfg_text(cfg, ov, "embedding_model", "Model") +
+        _cfg_num(cfg, ov, "embedding_dim", "Dimensions", "1")
+    )
+    ingest = (
+        _cfg_check(cfg, ov, "use_gitignore", "Respect .gitignore") +
+        _cfg_check(cfg, ov, "index_all_text", "Index all text files") +
+        _cfg_num(cfg, ov, "max_file_bytes", "Max file bytes", "1000") +
+        _cfg_num(cfg, ov, "max_chunk_lines", "Max chunk lines", "1") +
+        _cfg_num(cfg, ov, "window_lines", "Window lines", "1") +
+        _cfg_num(cfg, ov, "window_overlap", "Window overlap", "1")
+    )
+    weights = "".join(_cfg_num(cfg, ov, f"weight_{w}", w.capitalize())
+                      for w in ("symbol", "keyword", "semantic", "graph", "proximity", "churn"))
+    weights += _cfg_num(cfg, ov, "rrf_k", "RRF k", "1")
+    llm = (
+        _cfg_select(cfg, ov, "llm_protocol", "Protocol", ("ollama", "openai", "anthropic")) +
+        _cfg_text(cfg, ov, "llm_url", "Base URL (blank = default)") +
+        _cfg_text(cfg, ov, "llm_model", "Model (blank = default)") +
+        _cfg_num(cfg, ov, "llm_timeout", "Timeout (s)", "1") +
+        _cfg_num(cfg, ov, "llm_max_tokens", "Max tokens", "1")
+    )
+    body = f"""<div class="container">
+  <h1>Configuration</h1>
+  <p class="sub">Settings for the active project, persisted to <span class="mono">.uci/overrides.json</span>.
+    Weights apply immediately; embedding &amp; ingest changes need a <a href="/build">re-index</a>.</p>
+  <div class="split">
+    <div>
+      <div class="card"><div class="card-h">Profile &amp; backends</div>{backends}</div>
+      <div class="card" style="margin-top:16px"><div class="card-h">Embeddings <span class="muted small">re-index</span></div>{embeddings}</div>
+      <div class="card" style="margin-top:16px"><div class="card-h">Ingest <span class="muted small">re-index</span></div>{ingest}</div>
+    </div>
+    <div>
+      <div class="card"><div class="card-h">Retrieval weights</div>{weights}</div>
+      <div class="card" style="margin-top:16px"><div class="card-h">Gaps</div>{_cfg_csv(cfg, ov, "gap_external_prefixes", "External prefixes (comma-separated)")}</div>
+      <div class="card" style="margin-top:16px"><div class="card-h">LLM enrichment</div>{llm}
+        <p class="muted small">API keys stay in the environment (<span class="mono">UCI_*</span>), never stored here. Run passes in the <a href="/enrich">Enrich</a> tab.</p></div>
+      <div class="card" style="margin-top:16px"><div class="card-h">Paths (read-only)</div>
+        <table class="kv"><tbody>
+          <tr><td>repo</td><td class="mono small">{_e(cfg.get('repo_path'))}</td></tr>
+          <tr><td>store</td><td class="mono small">{_e(cfg.get('store_dir'))}</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+  <div class="btnrow" style="margin-top:18px">
+    <button class="btn primary" id="cfg-save">Save configuration</button>
+    <button class="btn ghost" id="cfg-reset">Reset to defaults</button>
+    <span id="cfg-msg" class="muted small"></span>
+  </div>
+</div>"""
+    return layout("Config", "/config", body)
+
+
+def enrich_page(status: dict, passes, ev: dict | None = None) -> str:
+    available = status.get("available")
+    badge = ("<span class='pill score' style='color:var(--green);border-color:var(--green)'>reachable</span>"
+             if available else
+             "<span class='pill score' style='color:var(--amber);border-color:var(--amber)'>not reachable</span>")
+    status_rows = "".join(
+        f"<tr><td>{_e(k)}</td><td class='mono small'>{_e(v)}</td></tr>" for k, v in (
+            ("protocol", status.get("protocol") or "—"),
+            ("model", status.get("model") or "—"),
+            ("endpoint", status.get("base_url") or "—"),
+            ("existing summaries", status.get("summaries", 0)),
+        ))
+    checks = "".join(
+        f"<label class='lbl chk'><input type='checkbox' class='enrich-pass' value='{_e(p)}' checked> {_e(p)}</label>"
+        for p in passes)
+    warn = "" if available else (
+        "<p class='muted small'>No reachable LLM provider. Configure one in "
+        "<a href='/config'>Config → LLM enrichment</a> (protocol / model / URL) or set "
+        "<span class='mono'>UCI_LLM_*</span> — see <span class='mono'>docs/llm-enrichment.md</span>."
+        + (f" <span class='muted'>({_e(status.get('error'))})</span>" if status.get("error") else "") + "</p>")
+    body = f"""<div class="container">
+  <h1>LLM enrichment {badge}</h1>
+  <p class="sub">Optional passes add <b>purpose summaries</b>, <b>business capabilities</b>,
+    <b>dynamic-call candidates</b>, and <b>field dictionaries</b>. Every fact is labeled
+    <span class="mono">extractor="llm:&lt;model&gt;"</span> with confidence &lt; 1.0 (candidates use
+    <span class="mono">resolution="llm-suggested"</span>) — the resolution ladder and completeness stay honest.</p>
+  <div class="split">
+    <div>
+      <div class="card"><div class="card-h">Run enrichment</div>
+        {warn}
+        <div class="btnrow">{checks}</div>
+        <div class="btnrow">
+          <label class="lbl">Limit <input id="enrich-limit" class="cfg-in" type="number" step="1" value="200" style="min-width:90px"></label>
+          <label class="lbl chk"><input type="checkbox" id="enrich-force"> force (ignore cache)</label>
+          <button class="btn primary" id="enrich-run">Run enrichment</button>
+          <span id="job-state" class="jobstate">idle</span>
+        </div>
+        <pre id="job-log" class="joblog" data-kind="enrich"></pre>
+      </div>
+    </div>
+    <div>
+      <div class="card"><div class="card-h">Provider</div>
+        <table class="kv"><tbody>{status_rows}</tbody></table>
+      </div>
+    </div>
+  </div>
+  {_enrich_results(ev or {})}
+</div>"""
+    return layout("Enrich", "/enrich", body)
+
+
+def _enrich_results(ev: dict) -> str:
+    if not ev:
+        return ""
+    su, cap, cand, fl = ev.get("summaries", {}), ev.get("capabilities", {}), ev.get("candidates", {}), ev.get("fields", {})
+    hon = ev.get("honesty", {})
+    pct = lambda x: f"{round((x or 0) * 100)}%"
+    honesty = ("<span class='pill score' style='color:var(--green);border-color:var(--green)'>honest</span>"
+               if hon.get("ok", True) else
+               "<span class='pill score' style='color:var(--red);border-color:var(--red)'>LEAK</span>")
+    rows = (
+        f"<tr><td>summaries</td><td class='sc'>{pct(su.get('coverage'))}</td>"
+        f"<td class='muted small'>{su.get('covered', 0)}/{su.get('eligible', 0)} eligible · avg {su.get('avg_chars', 0)} chars</td></tr>"
+        f"<tr><td>capabilities</td><td class='sc'>{pct(cap.get('coverage'))}</td>"
+        f"<td class='muted small'>{cap.get('count', 0)} capabilities · {cap.get('mapped', 0)}/{cap.get('programs', 0)} programs mapped</td></tr>"
+        f"<tr><td>dynamic candidates</td><td class='sc'>{pct(cand.get('precision'))}</td>"
+        f"<td class='muted small'>{cand.get('valid_targets', 0)}/{cand.get('edges', 0)} llm-suggested edges hit indexed targets</td></tr>"
+        f"<tr><td>field dictionaries</td><td class='sc'>{pct(fl.get('coverage'))}</td>"
+        f"<td class='muted small'>{fl.get('with_dictionary', 0)}/{fl.get('copybooks', 0)} copybooks</td></tr>"
+    )
+    return f"""<div class="card" style="margin-top:18px">
+    <div class="card-h">Results — enrichment eval {honesty}</div>
+    <table><thead><tr><th>pass</th><th class="sc">coverage / precision</th><th>detail</th></tr></thead>
+    <tbody>{rows}</tbody></table>
+    <p class="muted small">Honesty invariant: {hon.get('llm_suggested_edges', 0)} llm-suggested edges,
+      {hon.get('leaked_into_ladder', 0)} leaked into the resolution ladder (must be 0). LLM facts stay
+      in the candidate stratum at confidence &lt; 1.0, so multi-hop traversal and completeness never trust them.</p>
+  </div>"""
+
+
+def _metrics_reindex_body(msg: str) -> str:
+    return f"""<div class="container">
+  <h1>Code metrics</h1>
+  <p class="sub">{_e(msg)}</p>
+  <div class="card">
+    <div class="card-h">Collect metrics</div>
+    <p class="muted small">Metrics are gathered during indexing. Re-index this project to collect them.</p>
+    <div class="btnrow">
+      <button class="btn primary" data-build="full">Re-index now</button>
+      <span id="job-state" class="jobstate">idle</span>
+    </div>
+    <pre id="job-log" class="joblog" data-kind="build"></pre>
+  </div>
+</div>"""
+
+
+def metrics_page(data: dict) -> str:
+    if not data.get("ok"):
+        msg = data.get("error", {}).get("message", "Metrics not collected yet.")
+        return layout("Metrics", "/metrics", _metrics_reindex_body(msg))
+
+    m = data["metrics"]
+    lines = m.get("lines", {})
+    cards = "".join(
+        f'<div class="card stat"><div class="n">{v}</div><div class="l">{_e(label)}</div></div>'
+        for label, v in (
+            ("files", m.get("files", 0)),
+            ("lines", lines.get("total", 0)),
+            ("code", lines.get("code", 0)),
+            ("comment", lines.get("comment", 0)),
+            ("blank", lines.get("blank", 0)),
+            ("comment ratio", f"{round(lines.get('comment_ratio', 0) * 100)}%"),
+        )
+    )
+    lang_rows = "".join(
+        f"<tr><td>{_e(lang)}</td><td class='sc'>{b.get('files', 0)}</td><td class='sc'>{b.get('code', 0)}</td>"
+        f"<td class='sc'>{b.get('comment', 0)}</td><td class='sc'>{b.get('blank', 0)}</td>"
+        f"<td class='sc'>{b.get('total', 0)}</td></tr>"
+        for lang, b in m.get("by_language", {}).items()
+    ) or "<tr><td colspan='6' class='muted'>—</td></tr>"
+
+    resolved_levels = {"syntactic", "import-traced", "inherited", "inferred"}
+    dist = m.get("call_resolution_distribution", {})
+    total_calls = sum(dist.values()) or 1
+    resolved_n = sum(v for k, v in dist.items() if k in resolved_levels)
+    res_rows = "".join(
+        f"<tr><td>{_e(k)}</td><td class='sc'>{v}</td><td class='sc'>{round(v / total_calls * 100)}%</td></tr>"
+        for k, v in dist.items()
+    ) or "<tr><td colspan='3' class='muted'>no call edges</td></tr>"
+
+    ep = m.get("entry_points", {})
+    cd = m.get("cross_dependencies", {})
+    kind_rows = "".join(f"<tr><td>{_e(k)}</td><td class='sc'>{v}</td></tr>"
+                        for k, v in m.get("entities_by_kind", {}).items())
+    rel_rows = "".join(f"<tr><td>{_e(k)}</td><td class='sc'>{v}</td></tr>"
+                       for k, v in m.get("relationships_by_type", {}).items())
+    hub_rows = "".join(
+        f"<tr><td class='mono small'>{_e(h['name'])}</td><td>{_kind_pill(h['kind'])}</td>"
+        f"<td class='sc'>{h['callers']}</td></tr>"
+        for h in m.get("top_fan_in", [])
+    ) or "<tr><td colspan='3' class='muted'>—</td></tr>"
+
+    body = f"""<div class="container">
+  <h1>Code metrics</h1>
+  <p class="sub">Collected at index time. “Resolved” = share of call edges the resolution ladder
+    attributed exactly (syntactic / import-traced / inherited / inferred).</p>
+  <div class="grid cards">{cards}</div>
+  <div class="split" style="margin-top:22px">
+    <div>
+      <div class="card">
+        <div class="card-h">Call resolution — {round(resolved_n / total_calls * 100)}% resolved</div>
+        <table><thead><tr><th>level</th><th class="sc">count</th><th class="sc">share</th></tr></thead>
+        <tbody>{res_rows}</tbody></table>
+        <p class="muted small">unresolved sites {m.get('unresolved_call_sites', 0)} ·
+          dynamic {m.get('dynamic_call_sites', 0)} · external deps {m.get('external_dependencies', 0)} ·
+          missing {m.get('missing_artifacts', 0)}</p>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-h">By language</div>
+        <table><thead><tr><th>language</th><th class="sc">files</th><th class="sc">code</th>
+        <th class="sc">comment</th><th class="sc">blank</th><th class="sc">total</th></tr></thead>
+        <tbody>{lang_rows}</tbody></table>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-h">Top fan-in</div>
+        <table><thead><tr><th>symbol</th><th>kind</th><th class="sc">callers</th></tr></thead>
+        <tbody>{hub_rows}</tbody></table>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-h">Entry points — {ep.get('total', 0)}</div>
+        <table class="kv"><tbody>
+          <tr><td>python main guards</td><td class='sc'>{ep.get('python_main_guards', 0)}</td></tr>
+          <tr><td>uncalled programs</td><td class='sc'>{ep.get('uncalled_programs', 0)}</td></tr>
+          <tr><td>JCL jobs</td><td class='sc'>{ep.get('jcl_jobs', 0)}</td></tr>
+          <tr><td>CICS transactions</td><td class='sc'>{ep.get('cics_transactions', 0)}</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-h">Coupling</div>
+        <table class="kv"><tbody>
+          <tr><td>cross-file edges</td><td class='sc'>{cd.get('cross_file_edges', 0)}</td></tr>
+          <tr><td>cross-directory edges</td><td class='sc'>{cd.get('cross_directory_edges', 0)}</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+  <div class="split" style="margin-top:22px">
+    <div><div class="card"><div class="card-h">Entities by kind</div>
+      <table><thead><tr><th>kind</th><th class="sc">count</th></tr></thead><tbody>{kind_rows}</tbody></table></div></div>
+    <div><div class="card"><div class="card-h">Relationships by type</div>
+      <table><thead><tr><th>type</th><th class="sc">count</th></tr></thead><tbody>{rel_rows}</tbody></table></div></div>
+  </div>
+</div>"""
+    return layout("Metrics", "/metrics", body)
 
 
 def unindexed_page(name: str) -> str:
@@ -357,15 +687,22 @@ def search_page(query: str, results: list[dict]) -> str:
     return layout("Search", "/search", body)
 
 
-def graph_page(root_id: str, root_label: str) -> str:
+def graph_page(root_id: str, root_label: str, view: str = "repository", view_options=()) -> str:
+    opts = "".join(
+        f'<option value="{_e(k)}"{" selected" if k == view else ""}>{_e(label)}</option>'
+        for k, label in view_options
+    )
+    view_select = f'<label class="lbl">angle <select id="graph-view">{opts}</select></label>' if opts else ""
+    seed = f'<b>{_e(root_label)}</b>' if root_label else "the selected angle"
     body = f"""<div class="container wide">
   <h1>Graph explorer</h1>
   <p class="sub">Scroll or pinch to zoom (toward the cursor), drag to pan, click a node to open it,
-    double-click to expand its neighborhood. Rooted at <b>{_e(root_label)}</b>.
+    double-click to expand its neighborhood. Rooted at {seed}.
     <span id="node-info" class="mono muted"></span></p>
   <div id="graph-wrap">
-    <canvas id="graph" data-root="{_e(root_id)}"></canvas>
+    <canvas id="graph" data-root="{_e(root_id)}" data-view="{_e(view)}"></canvas>
     <div class="graph-controls">
+      {view_select}
       <button type="button" data-graph="in" title="zoom in">+</button>
       <button type="button" data-graph="out" title="zoom out">−</button>
       <button type="button" data-graph="fit" title="fit to view">⤢</button>
@@ -377,6 +714,7 @@ def graph_page(root_id: str, root_label: str) -> str:
       <div class="row"><span class="dot" style="background:#6ea8fe"></span>module</div>
       <div class="row"><span class="dot" style="background:#d29922"></span>config/commit</div>
     </div>
+    <div id="graph-tile" class="graph-tile" hidden></div>
   </div>
 </div>"""
     return layout("Graph", "/graph", body)

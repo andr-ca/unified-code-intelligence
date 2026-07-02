@@ -15,7 +15,10 @@ from urllib.parse import parse_qs, urlparse
 from ..engine import Engine
 from ..mcp.tools import dispatch as mcp_dispatch
 from ..mcp.tools import list_tools
+from . import config_store
+from . import enrichment
 from . import evals as evals_mod
+from . import graphviews
 from . import views
 from .jobs import JobRunner
 from .projects import ProjectManager, from_engine
@@ -100,6 +103,19 @@ def make_handler(target, jobs: JobRunner | None = None):
                 return self._json(engine.overview())
             if path == "/api/architecture":
                 return self._json(engine.architecture())
+            if path == "/api/metrics":
+                return self._json(engine.metrics())
+            if path == "/api/config":
+                return self._json({
+                    "ok": True,
+                    "config": config_store.config_dict(engine.config),
+                    "overrides": config_store.load_overrides(manager.path_of(manager.active_name)),
+                    "reindex_fields": sorted(config_store.REINDEX_FIELDS),
+                })
+            if path == "/api/enrich":
+                return self._json({"ok": True, "status": enrichment.status(engine),
+                                   "eval": enrichment.evaluate(engine),
+                                   "passes": list(enrichment.PASSES)})
             if path == "/api/onboarding":
                 return self._json(engine.onboarding())
             if path == "/api/search":
@@ -117,6 +133,8 @@ def make_handler(target, jobs: JobRunner | None = None):
             if path == "/api/module":
                 return self._json(engine.explain_module(q.get("q", "")))
             if path == "/api/graph":
+                if q.get("view"):
+                    return self._json(graphviews.graph_view(engine, q["view"], depth=int(q.get("depth", 1))))
                 return self._json(engine.graph_neighborhood(q.get("id", ""), depth=int(q.get("depth", 1))))
             if path == "/api/entity":
                 return self._json(engine.entity_detail(q.get("id", "")))
@@ -129,8 +147,8 @@ def make_handler(target, jobs: JobRunner | None = None):
         def _page(self, path: str, q: dict) -> None:
             engine = manager.active()
             # a registered-but-unindexed project (e.g. its .uci was cleaned) gets a build prompt,
-            # not a broken/empty view — except /build itself, which does the indexing
-            if path != "/build" and not engine.is_indexed():
+            # not a broken/empty view — except /build and /config, which work pre-index
+            if path not in ("/build", "/config") and not engine.is_indexed():
                 return self._html(views.unindexed_page(manager.active_name))
             if path == "/":
                 return self._html(views.overview_page(engine.overview()))
@@ -143,15 +161,26 @@ def make_handler(target, jobs: JobRunner | None = None):
                 results = engine.search(query, top_k=int(q.get("k", 15)))["results"] if query else []
                 return self._html(views.search_page(query, results))
             if path == "/graph":
-                root_id = q.get("id")
-                if not root_id:
-                    root_id, label = engine.default_graph_root()
-                else:
+                root_id = q.get("id", "")
+                view = q.get("view") or ("" if root_id else "repository")
+                if root_id:
                     ent = engine.graph.get_entity(root_id)
                     label = ent.name if ent else root_id
-                return self._html(views.graph_page(root_id, label))
+                else:
+                    label = ""
+                return self._html(views.graph_page(root_id, label, view, graphviews.GRAPH_VIEWS))
             if path == "/architecture":
                 return self._html(views.architecture_page(engine.architecture()))
+            if path == "/metrics":
+                return self._html(views.metrics_page(engine.metrics()))
+            if path == "/config":
+                return self._html(views.config_page(
+                    config_store.config_dict(engine.config),
+                    config_store.load_overrides(manager.path_of(manager.active_name)),
+                    sorted(config_store.REINDEX_FIELDS)))
+            if path == "/enrich":
+                return self._html(views.enrich_page(enrichment.status(engine),
+                                                    list(enrichment.PASSES), enrichment.evaluate(engine)))
             if path == "/onboarding":
                 return self._html(views.onboarding_page(engine.onboarding()))
             if path == "/gaps":
@@ -198,6 +227,11 @@ def make_handler(target, jobs: JobRunner | None = None):
                 return self._save_dataset(payload.get("name", ""), payload.get("content"))
             if parsed.path == "/api/evals/restore":
                 return self._restore_dataset(payload.get("name", ""), payload.get("version"))
+            if parsed.path == "/api/config":
+                return self._save_config(payload)
+            if parsed.path == "/api/enrich":
+                return self._start_enrich(payload.get("passes"), int(payload.get("limit", 200)),
+                                          bool(payload.get("force", False)))
             if parsed.path == "/api/projects":
                 return self._add_project(payload.get("path", ""), payload.get("name") or None)
             if parsed.path == "/api/projects/activate":
@@ -267,6 +301,33 @@ def make_handler(target, jobs: JobRunner | None = None):
                 return self._json({"ok": False, "error": {"code": "busy", "message": err}}, 409)
             return self._json({"ok": True, "job": job.to_dict()})
 
+        def _start_enrich(self, passes, limit: int, force: bool) -> None:
+            proj = manager.active_name
+            if proj is None or proj not in {p["name"] for p in manager.summary()}:
+                return self._json({"ok": False, "error": {"code": "no_project"}}, 409)
+            eng = manager.engine_for(proj)
+            if not eng.is_indexed():
+                return self._json({"ok": False, "error": {
+                    "code": "not_indexed", "message": "index the project first"}}, 409)
+
+            def target(job):
+                chosen = [p for p in (passes or ()) if p in enrichment.PASSES] or list(enrichment.PASSES)
+                job.log.append(f"enriching '{proj}' passes={chosen} limit={limit} force={force} …")
+                with manager.lock_for(proj):
+                    stats = enrichment.run(eng, chosen, limit=limit, force=force)
+                job.log.append(
+                    f"done: summaries={stats.get('summaries', 0)} capabilities={stats.get('capabilities', 0)} "
+                    f"candidate_edges={stats.get('candidate_edges', 0)} fields={stats.get('field_dictionaries', 0)} "
+                    f"cached={stats.get('cached', 0)} errors={len(stats.get('errors', []))}")
+                for err in (stats.get("errors") or [])[:10]:
+                    job.log.append("  ! " + err)
+                return {"stats": stats}
+
+            job, err = jobs.start("enrich", target, label=f"Enrich {proj}")
+            if err:
+                return self._json({"ok": False, "error": {"code": "busy", "message": err}}, 409)
+            return self._json({"ok": True, "job": job.to_dict()})
+
         def _add_project(self, path: str, name) -> None:
             if not path:
                 return self._json({"ok": False, "error": {"code": "bad_request", "message": "path required"}}, 400)
@@ -303,8 +364,13 @@ def make_handler(target, jobs: JobRunner | None = None):
         def _evals_page(self) -> None:
             if evals_mod.evals_dir() is None:
                 return self._html(views.evals_unavailable_page())
+            enrich_eval = None
+            if manager.active_name is not None:
+                engine = manager.active()
+                if engine.is_indexed():
+                    enrich_eval = enrichment.evaluate(engine)
             return self._html(views.evals_page(
-                evals_mod.list_reports(), evals_mod.dataset_names(), manager.summary()))
+                evals_mod.list_reports(), evals_mod.dataset_names(), manager.summary(), enrich_eval))
 
         def _create_eval(self, project: str, name: str) -> None:
             if evals_mod.evals_dir() is None:
@@ -342,6 +408,26 @@ def make_handler(target, jobs: JobRunner | None = None):
             except (ValueError, TypeError) as exc:
                 return self._json({"ok": False, "error": {"code": "bad_request", "message": str(exc)}}, 400)
             return self._json({"ok": True, "name": stem, "versions": evals_mod.list_versions(stem)})
+
+        def _save_config(self, payload) -> None:
+            name = manager.active_name
+            if name is None:
+                return self._json({"ok": False, "error": {"code": "no_project"}}, 409)
+            path = manager.path_of(name)
+            try:
+                if payload.get("reset"):
+                    saved = config_store.save_overrides(path, {})
+                else:
+                    values = payload.get("values") if isinstance(payload.get("values"), dict) else {}
+                    saved = config_store.save_overrides(path, {**config_store.load_overrides(path), **values})
+            except ValueError as exc:
+                return self._json({"ok": False, "error": {"code": "bad_request", "message": str(exc)}}, 400)
+            lock = manager.lock_for(name)
+            with lock:
+                manager.reload(name)
+                engine = manager.engine_for(name)
+            return self._json({"ok": True, "overrides": saved,
+                               "config": config_store.config_dict(engine.config)})
 
     return Handler
 

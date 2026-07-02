@@ -437,3 +437,36 @@ def test_jcl_dd_dataset_edges_with_disp_heuristic(flow_engine):
     by = {(r["qualified_name"].upper(), r["reason"].split()[0]) for r in data}
     assert ("PROD.ACCT.MASTER", "reads") in by
     assert ("PROD.ACCT.REPORT", "writes") in by
+
+
+# ---------------------------------------------------------------- code metrics
+def test_code_metrics_collected(mf_engine):
+    data = mf_engine.metrics()
+    assert data["ok"]
+    m = data["metrics"]
+    assert m["files"] >= 5
+    assert m["lines"]["code"] > 0 and m["lines"]["comment"] >= 1  # MAINPGM has a comment line
+    assert m["by_language"]["cobol"]["files"] == 3  # 2 programs + 1 copybook
+    assert m["by_language"]["jcl"]["files"] == 1
+    ep = m["entry_points"]
+    assert ep["jcl_jobs"] == 1            # NIGHTJOB
+    assert ep["cics_transactions"] == 2   # MN01, SB01
+    assert ep["total"] >= 3
+    assert m["cross_dependencies"]["cross_file_edges"] > 0
+    assert m["call_resolution_distribution"].get("syntactic", 0) >= 1
+    assert m["dynamic_call_sites"] >= 1   # XCTL PROGRAM(WS-NEXT-PGM)
+    assert m["missing_artifacts"] >= 2    # NOWHERE, LOSTCOPY, GONEPGM
+    assert any(h["name"] == "MAINPGM" for h in m["top_fan_in"])
+
+
+def test_metrics_line_classification():
+    from uci.ingest.metrics import line_stats
+    cobol = "       MOVE A TO B.\n      * comment line\n\n       GOBACK.\n"
+    s = line_stats(cobol, "cobol")
+    assert (s["code"], s["comment"], s["blank"]) == (2, 1, 1)
+    py = "import os\n# comment\n\nx = 1\n"
+    s = line_stats(py, "python")
+    assert (s["code"], s["comment"], s["blank"]) == (2, 1, 1)
+    jcl = "//JOB1 JOB\n//* note\n//S1 EXEC PGM=X\n"
+    s = line_stats(jcl, "jcl")
+    assert (s["code"], s["comment"]) == (2, 1)

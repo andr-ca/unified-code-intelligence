@@ -1,0 +1,92 @@
+{
+  "run": "2026-07-02T21:41:04Z",
+  "tasks_version": 2,
+  "protocol": "openai",
+  "models": [
+    {
+      "model": "gemini-2.5-flash-lite",
+      "overall": 77.5,
+      "areas": {
+        "summaries": 0.65,
+        "capabilities": 1.0,
+        "candidates": 0.5,
+        "fields": 1.0,
+        "ask": 1.0,
+        "agentic": 0.5
+      },
+      "tasks": [
+        {
+          "task": "summary_prodinq",
+          "area": "summaries",
+          "score": 0.767,
+          "note": "PRODINQ is a COBOL program that retrieves product names from the SHOP.PRODUCT_CATALOG table based on a provided product ",
+          "seconds": 15.5
+        },
+        {
+          "task": "summary_router",
+          "area": "summaries",
+          "score": 0.533,
+          "note": "This is a COBOL program that acts as a router, dispatching control to other programs based on a table lookup. It exists ",
+          "seconds": 0.6
+        },
+        {
+          "task": "capability_grouping",
+          "area": "capabilities",
+          "score": 1.0,
+          "note": "3 caps, coverage 100%, hallucinated 0",
+          "seconds": 0.8
+        },
+        {
+          "task": "candidates_from_value_table",
+          "area": "candidates",
+          "score": 1.0,
+          "note": "got ['PGMA', 'PGMB'] vs golden ['PGMA', 'PGMB']",
+          "seconds": 0.6
+        },
+        {
+          "task": "candidates_restraint_when_opaque",
+          "area": "candidates",
+          "score": 0.0,
+          "note": "hallucinated ['PGMA', 'PGMB', 'PGMC']",
+          "seconds": 0.6
+        },
+        {
+          "task": "dclgen_dictionary",
+          "area": "fields",
+          "score": 1.0,
+          "note": "covered 3/3",
+          "seconds": 0.7
+        },
+        {
+          "task": "ask_data_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=data targets=['SHOP.PRODUCT_CATALOG']",
+          "seconds": 4.2
+        },
+        {
+          "task": "ask_code_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=code targets=['PRODFMT']",
+          "seconds": 7.2
+        },
+        {
+          "task": "agentic_cross_file_resolution",
+          "area": "agentic",
+          "score": 0.1,
+          "note": "got [] vs ['ACCTEDIT', 'ACCTVIEW'] (calls=1)",
+          "seconds": 44.7
+        },
+        {
+          "task": "agentic_restraint",
+          "area": "agentic",
+          "score": 0.9,
+          "note": "got [] (calls=1, want abstain)",
+          "seconds": 45.4
+        }
+      ],
+      "total_seconds": 120.3
+    }
+  ]
+}

@@ -1,0 +1,217 @@
+{
+  "run": "2026-07-02T16:14:40Z",
+  "tasks_version": 1,
+  "protocol": "ollama",
+  "models": [
+    {
+      "model": "qwen3.5:4b",
+      "overall": 85.3,
+      "areas": {
+        "summaries": 0.767,
+        "capabilities": 1.0,
+        "candidates": 0.5,
+        "fields": 1.0,
+        "ask": 1.0
+      },
+      "tasks": [
+        {
+          "task": "summary_prodinq",
+          "area": "summaries",
+          "score": 0.767,
+          "note": "This is a legacy COBOL program that retrieves product details from a database and formats them for display. It serves as",
+          "seconds": 1.1
+        },
+        {
+          "task": "summary_router",
+          "area": "summaries",
+          "score": 0.767,
+          "note": "This is a legacy COBOL program that acts as a simple menu dispatcher for CICS transactions. It exists to route user inpu",
+          "seconds": 1.2
+        },
+        {
+          "task": "capability_grouping",
+          "area": "capabilities",
+          "score": 1.0,
+          "note": "3 caps, coverage 100%, hallucinated 0",
+          "seconds": 3.4
+        },
+        {
+          "task": "candidates_from_value_table",
+          "area": "candidates",
+          "score": 1.0,
+          "note": "got ['PGMA', 'PGMB'] vs golden ['PGMA', 'PGMB']",
+          "seconds": 0.5
+        },
+        {
+          "task": "candidates_restraint_when_opaque",
+          "area": "candidates",
+          "score": 0.0,
+          "note": "hallucinated ['PGMA', 'PGMB', 'PGMC']",
+          "seconds": 0.5
+        },
+        {
+          "task": "dclgen_dictionary",
+          "area": "fields",
+          "score": 1.0,
+          "note": "covered 3/3",
+          "seconds": 2.8
+        },
+        {
+          "task": "ask_data_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=data targets=['SHOP.PRODUCT_CATALOG']",
+          "seconds": 2.8
+        },
+        {
+          "task": "ask_code_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=code targets=['PRODFMT']",
+          "seconds": 2.3
+        }
+      ],
+      "total_seconds": 14.6
+    },
+    {
+      "model": "qwen3.5:2b",
+      "overall": 83.3,
+      "areas": {
+        "summaries": 0.767,
+        "capabilities": 0.9,
+        "candidates": 0.5,
+        "fields": 1.0,
+        "ask": 1.0
+      },
+      "tasks": [
+        {
+          "task": "summary_prodinq",
+          "area": "summaries",
+          "score": 0.767,
+          "note": "PRODINQ is a legacy COBOL program designed to query a product catalog and format the results into a record, serving as t",
+          "seconds": 13.4
+        },
+        {
+          "task": "summary_router",
+          "area": "summaries",
+          "score": 0.767,
+          "note": "This is a legacy COBOL program that manages a CICS-based menu dispatch system by selecting a program from a table and ex",
+          "seconds": 0.7
+        },
+        {
+          "task": "capability_grouping",
+          "area": "capabilities",
+          "score": 0.9,
+          "note": "6 caps, coverage 100%, hallucinated 0",
+          "seconds": 2.4
+        },
+        {
+          "task": "candidates_from_value_table",
+          "area": "candidates",
+          "score": 1.0,
+          "note": "got ['PGMA', 'PGMB'] vs golden ['PGMA', 'PGMB']",
+          "seconds": 0.4
+        },
+        {
+          "task": "candidates_restraint_when_opaque",
+          "area": "candidates",
+          "score": 0.0,
+          "note": "hallucinated ['PGMA', 'PGMB', 'PGMC']",
+          "seconds": 0.4
+        },
+        {
+          "task": "dclgen_dictionary",
+          "area": "fields",
+          "score": 1.0,
+          "note": "covered 3/3",
+          "seconds": 1.0
+        },
+        {
+          "task": "ask_data_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=data targets=['SHOP.PRODUCT_CATALOG']",
+          "seconds": 2.1
+        },
+        {
+          "task": "ask_code_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=code targets=['PRODFMT']",
+          "seconds": 1.8
+        }
+      ],
+      "total_seconds": 22.3
+    },
+    {
+      "model": "gemma4:e4b",
+      "overall": 87.7,
+      "areas": {
+        "summaries": 0.883,
+        "capabilities": 1.0,
+        "candidates": 0.5,
+        "fields": 1.0,
+        "ask": 1.0
+      },
+      "tasks": [
+        {
+          "task": "summary_prodinq",
+          "area": "summaries",
+          "score": 1.0,
+          "note": "This is a legacy COBOL program that performs a product inquiry by querying the PRODUCT_CATALOG table and then calling a ",
+          "seconds": 10.9
+        },
+        {
+          "task": "summary_router",
+          "area": "summaries",
+          "score": 0.767,
+          "note": "This is a legacy COBOL router program that acts as a dispatcher, determining which program to execute next based on a va",
+          "seconds": 2.4
+        },
+        {
+          "task": "capability_grouping",
+          "area": "capabilities",
+          "score": 1.0,
+          "note": "3 caps, coverage 100%, hallucinated 0",
+          "seconds": 4.5
+        },
+        {
+          "task": "candidates_from_value_table",
+          "area": "candidates",
+          "score": 1.0,
+          "note": "got ['PGMA', 'PGMB'] vs golden ['PGMA', 'PGMB']",
+          "seconds": 0.8
+        },
+        {
+          "task": "candidates_restraint_when_opaque",
+          "area": "candidates",
+          "score": 0.0,
+          "note": "hallucinated ['OTHER', 'PGMA', 'PGMB', 'PGMC']",
+          "seconds": 1.0
+        },
+        {
+          "task": "dclgen_dictionary",
+          "area": "fields",
+          "score": 1.0,
+          "note": "covered 3/3",
+          "seconds": 3.1
+        },
+        {
+          "task": "ask_data_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=data targets=['SHOP.PRODUCT_CATALOG']",
+          "seconds": 4.1
+        },
+        {
+          "task": "ask_code_resident",
+          "area": "ask",
+          "score": 1.0,
+          "note": "location=code targets=['PRODFMT']",
+          "seconds": 3.6
+        }
+      ],
+      "total_seconds": 30.3
+    }
+  ]
+}

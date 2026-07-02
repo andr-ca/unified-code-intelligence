@@ -30,7 +30,7 @@ Conceptual modules (the `uci-*` names in the brief) are implemented as subpackag
 | `uci-graph` | `uci.graph` | `GraphStore` interface, `InMemoryGraphStore`, `SQLiteGraphStore`, traversal API |
 | `uci-store` | `uci.store` | `MetadataStore` (SQLite), `VectorStore` (SQLite/numpy), SQL schema |
 | `uci-retrieval` | `uci.retrieval` | Hybrid retrieval, RRF fusion, keyword/symbol search, graph expansion, impact analysis |
-| `uci-analysis` | `uci.analysis` | Repo overview, architecture/layer inference, onboarding, risk |
+| `uci-analysis` | `uci.analysis` + `uci.ingest.metrics` | Repo overview, architecture/layer inference, onboarding, risk; **index-time codebase metrics** (LOC/comments/blank per language, entry points, cross-file dependencies, resolution distribution, hubs) via `uci metrics` / `get_code_metrics` |
 | `uci-mcp` | `uci.mcp` | MCP server (stdio JSON-RPC) exposing agent tools |
 | `uci-api` | `uci.api` | FastAPI REST API + server-rendered dashboard routes |
 | `uci-web` | `uci.api` + `web/` | Dashboard (overview, modules, search, graph explorer, symbol detail, impact, architecture, onboarding) |

@@ -114,6 +114,13 @@ TOOL_SPECS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "get_code_metrics",
+        "description": "Codebase metrics from index time: LOC per language (code/comment/blank), "
+                       "files, entry points (jobs/transactions/uncalled programs/__main__ guards), "
+                       "cross-file dependency counts, call-resolution distribution, fan-in hubs.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "list_index_gaps",
         "description": "Known unknowns: artifacts referenced but not indexed (missing modules / "
                        "copybooks / programs), ranked by fan-in — the acquisition checklist for "
@@ -166,6 +173,8 @@ def dispatch(engine: Engine, name: str, arguments: dict[str, Any]) -> dict[str, 
         return engine.find_data_lineage(args["symbol_or_table"])
     if name == "find_config_dependencies":
         return engine.find_config_dependencies(args["component_or_path"])
+    if name == "get_code_metrics":
+        return engine.metrics()
     if name == "list_index_gaps":
         return engine.gaps(args.get("kind"))
     return {"ok": False, "error": {"code": "unknown_tool", "message": name}}
