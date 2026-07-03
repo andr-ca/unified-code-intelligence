@@ -136,7 +136,7 @@ def score_summary(client: LlmClient, name: str, source: str, keywords: list[str]
 def score_capabilities(client: LlmClient) -> tuple[float, str]:
     try:
         data = client.complete_json(_SYS_CAPABILITIES, f"Program inventory:\n{_CAP_INVENTORY}",
-                                    max_tokens=900)
+                                    max_tokens=1200)
     except LlmError as exc:
         return 0.0, f"invalid JSON: {exc}"
     if not isinstance(data, list) or not data:
