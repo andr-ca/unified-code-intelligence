@@ -331,6 +331,7 @@ class ModelSpec:
 #: short aliases → (protocol, model). Edit here to add a model to the menu.
 MODELS: dict[str, ModelSpec] = {
     # local Ollama (keyless)
+    "qwen3.6":     ModelSpec("qwen3.6", "ollama", "qwen3.6"),
     "qwen4b":      ModelSpec("qwen4b", "ollama", "qwen3.5:4b"),
     "qwen2b":      ModelSpec("qwen2b", "ollama", "qwen3.5:2b"),
     "gemma4b":     ModelSpec("gemma4b", "ollama", "gemma4:e4b"),
