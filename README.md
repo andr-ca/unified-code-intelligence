@@ -108,6 +108,61 @@ detail, impact view, architecture map, a **gaps** panel (known unknowns), a **fl
 (LLM-derived business capabilities → programs → triggers → data), and an onboarding guide — all
 clients of the same graph.
 
+## Optional enrichment (LLM + LSP/SCIP)
+
+Everything above runs with **zero** LLM and **zero** language server. Two optional layers upgrade the
+graph when you want them — both adapter-based, both gracefully absent, neither ever required.
+
+### LLM enrichment — semantic layer
+
+Adds purpose **summaries** (the measured retrieval win), business **capabilities**, dynamic-dispatch
+**candidates** (guardrailed), copybook **fields**, and a system **architecture** summary; plus
+on-demand `briefing` and `ask`. Every LLM fact carries `extractor="llm:<model>"`, confidence < 1.0,
+and is validated against the index (hallucinated names are dropped). Configure via `.uci/.env`:
+
+```ini
+UCI_LLM_PROTOCOL=ollama          # ollama | openai | anthropic | freellm
+UCI_LLM_URL=                     # blank → protocol default (e.g. http://localhost:11434 for ollama)
+UCI_LLM_MODEL=                   # e.g. qwen2.5-coder:7b; blank lets freellm auto-select
+UCI_LLM_API_KEY=                 # required for openai/anthropic/freellm; never logged or in reports
+```
+
+```bash
+uci enrich                       # all passes (summaries, capabilities, candidates, fields, architecture)
+uci enrich --pass summaries --pass capabilities   # a subset
+uci enrich --dry-run             # show config + one sample prompt, call nothing
+uci briefing PricingCalculator.calculate          # on-demand migration-readiness briefing
+uci ask "what products does the app support?"     # route: code vs data vs not-in-repo
+```
+
+Pick a model with confidence: `evals/llm_eval.py` benchmarks the production prompts against golden
+fixtures per task area. Details: [`docs/llm-enrichment.md`](docs/llm-enrichment.md),
+[`evals/docs/llm-eval.md`](evals/docs/llm-eval.md).
+
+### LSP / SCIP edge oracles — provable layer
+
+The opposite of the LLM passes: **provable** edges from a language server (LSP) or a batch
+cross-reference index (SCIP). **Verify mode** promotes a speculative call edge to
+`resolution="lsp-verified"` (or prunes it with a tombstone) by asking the server for the definition;
+**SCIP ingest** turns an `index.scip` into `resolution="scip"` edges. Both land inside
+`RESOLVED_LEVELS`. Servers are *detected, not bundled* — you provide the binary:
+
+```ini
+UCI_LSP_COBOL_CMD=cobol-language-support     # Eclipse Che4z COBOL LSP (Apache-2.0), headless
+UCI_LSP_COBOL_COPYBOOKS=cpy,copybooks        # copybook search dirs
+UCI_LSP_PYTHON_CMD=pyright-langserver --stdio
+```
+
+```bash
+uci enrich --lsp cobol                # verify/prune COBOL call edges via the language server
+uci enrich --scip index.scip          # ingest a SCIP index as provable edges
+uci enrich --lsp python --verify-only --budget 120 --json
+```
+
+A missing toolchain prints `unavailable — skipped`, never fails. Full design + per-ecosystem
+strategy + usage: [`docs/lsp-refactoring-recommendations.md`](docs/lsp-refactoring-recommendations.md)
+(§6 is the usage guide). All optional settings are in [`.env.sample`](.env.sample).
+
 ## Deployment profiles
 
 | Profile                  | Metadata | Graph            | Vector       | Embeddings              | External services              |
@@ -135,7 +190,7 @@ Module map and rationale: [`docs/architecture.md`](docs/architecture.md).
 ## Development & tests
 
 ```bash
-PYTHONPATH=src python3 -m pytest -q        # 129 tests, no Docker, no network
+PYTHONPATH=src python3 -m pytest -q        # 250+ tests, no Docker, no network
 ```
 
 Store interfaces have **contract tests** that run identically against the in-memory and SQLite

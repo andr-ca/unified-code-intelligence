@@ -163,3 +163,75 @@ Note items 1–3 need **no LSP at all** and deliver most of the modernization va
 | 6 | HLASM linkage extractor (CSECT/EXTRN/V-cons) (§3.4.2) | Assembler joins the graph at R0 | Small |
 
 The through-line: **LSP is one rung on the evidence ladder, not the ladder itself.** For Python and TypeScript it is the best available oracle and worth a first-class bridge. For the mainframe, the platform's own declarative artifacts out-determine any language server for cross-program facts — and a UCI that ingests JCL, CSD, IMS gen, and the DB2 catalog can make a *stronger* determinism claim about a 40-year-old COBOL estate than it can about a modern Python service. That inversion is worth building, and worth saying out loud in the positioning.
+
+---
+
+## 6. Implementation & usage (what ships today)
+
+The §2.2 adapter foundation is implemented in `uci.enrich`, with **Verify mode** (LSP) and a **SCIP
+ingester** working end-to-end. Everything is optional and gracefully absent: a repo always indexes
+without any of it, and a missing toolchain is reported (`available: false`), never fatal.
+
+### 6.1 What's built
+
+| Piece | File | Status |
+| --- | --- | --- |
+| `EdgeSource` / `EdgeDelta` / `Budget` interface | `enrich/base.py` | ✅ |
+| Minimal stdio LSP client (Content-Length JSON-RPC) | `enrich/lsp_client.py` | ✅ |
+| Generic LSP source — **Verify** (promote/prune) | `enrich/lsp_source.py` | ✅ |
+| SCIP ingester (stdlib protobuf reader) — **Discover** | `enrich/scip_source.py` | ✅ |
+| Server registry (Che4z COBOL · pyright · tsserver) | `enrich/servers.py` | ✅ |
+| Orchestration + graph apply | `Engine.enrich_edges` | ✅ |
+| CLI | `uci enrich --lsp/--scip` | ✅ |
+| LSP **Discover** (`unresolved_calls` → callHierarchy) · **Complete** (references/implements) | — | ⏳ |
+
+**Resolution & honesty.** A confirmed edge becomes `resolution="lsp-verified"` (confidence 0.95) or
+`resolution="scip"` (1.0) — both added to `RESOLVED_LEVELS`, so they count as provable and can drive
+multi-hop traversal. A disproven edge is **tombstoned, not deleted** (`attributes.pruned=True`,
+`pruned_by="lsp:<lang>@<ver>"`, `pruned_reason`) and skipped by callers/callees/impact, preserving
+the "prune-with-evidence, never silently" rule (§2). Verify never prunes on uncertainty — if the
+server returns no/unclear definition, the edge is left exactly as-is.
+
+### 6.2 Configure a server (detected, not bundled)
+
+Language servers are user-provided. Point UCI at a launch command via `.uci/.env` (or real env vars);
+copybook search paths and other options go through `UCI_LSP_<LANG>_*` keys (collected by prefix).
+
+```ini
+# .uci/.env  — COBOL via Eclipse Che4z COBOL Language Support (Broadcom, Apache-2.0), headless
+UCI_LSP_COBOL_CMD=cobol-language-support          # a wrapper/jar launcher on PATH (shell-split)
+UCI_LSP_COBOL_COPYBOOKS=cpy,copybooks             # comma/os-sep list of copybook dirs
+
+# Python via pyright, TypeScript via typescript-language-server (defaults already in the registry)
+UCI_LSP_PYTHON_CMD=pyright-langserver --stdio
+UCI_LSP_TYPESCRIPT_CMD=typescript-language-server --stdio
+```
+
+Add or override a language by editing `REGISTRY` in `enrich/servers.py` (`ServerSpec`: launch argv,
+`languageId`, file suffixes, copybook-paths setting). SCIP needs no env var — you pass the index path.
+
+### 6.3 Run it
+
+```bash
+# Verify/prune COBOL's speculative call edges with a language server (60s budget/source by default)
+uci enrich --lsp cobol
+
+# Ingest a batch SCIP index (scip-python / scip-typescript / scip-java output) as provable edges
+scip-python index --output index.scip .        # produce it with the ecosystem indexer
+uci enrich --scip index.scip
+
+# Combine sources; only confirm/prune existing edges (skip discovery); widen the budget; JSON out
+uci enrich --lsp cobol --lsp python --budget 120 --verify-only --json
+```
+
+Output per source: `promoted` (upgraded to verified), `pruned` (tombstoned), `discovered` (new),
+`queried`. A source with no toolchain prints `unavailable (toolchain not found) — skipped`.
+
+`Engine.enrich_edges(lsp=[...], scip=[...], budget_seconds=60, verify_only=False)` is the programmatic
+entry; it upserts the returned `EdgeDelta` into the graph.
+
+### 6.4 Anti-goals still in force
+
+Per §4: no language server is ever a hard dependency; live LSP never runs in the MCP/query path (it
+belongs to enrich time); LSP `rename`/`codeAction` stay out of scope (read-only posture); and when an
+oracle and static extraction disagree, provenance records both rather than silently overwriting.

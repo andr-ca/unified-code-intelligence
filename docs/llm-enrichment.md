@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-02
 **Status:** implemented (`uci.enrich`); optional in every profile — the platform is fully functional without it.
-**Origin:** `recommendations.md` §7(b) — "an LLM-enrichment adapter fits the provenance machinery"; the five passes below were selected in the analysis of where an LLM helps *understanding* most (summaries → retrieval being the only sub-0.9 eval cell).
+**Origin:** `recommendations.md` §7(b) — "an LLM-enrichment adapter fits the provenance machinery"; the passes below were selected in the analysis of where an LLM helps *understanding* most (summaries → retrieval being the only sub-0.9 eval cell).
 
 ---
 
@@ -53,7 +53,11 @@ capability, model, or run. This is what powers the with/without-tools analysis i
 (didn't pull the evidence → hallucinated) vs **4** (pulled, then abstained). The LLM-eval writes a
 per-run log to `evals/reports/llm-logs/llm-eval-<run>.jsonl`.
 
-## 3. The five passes
+## 3. The enrichment passes
+
+`uci enrich` runs (by default) `summaries`, `capabilities`, `candidates`, `fields`, `architecture`;
+`briefing` and `ask` are on-demand surfaces, not index passes. Pick a subset with repeated
+`--pass`, e.g. `uci enrich --pass summaries --pass capabilities`.
 
 ### Pass 1 — `summaries` (retrieval semantics; the measured win)
 - **For**: `LEGACY_PROGRAM`, `COPYBOOK`, `JCL_JOB`, `MODULE` (code files), `TRANSACTION_CODE`.
@@ -119,6 +123,20 @@ per-run log to `evals/reports/llm-logs/llm-eval-<run>.jsonl`.
   the dashboard/detail views and available to briefings. No edges in v1 (column-level `MAPS_TO`
   can build on this later).
 
+### Pass 6 — `architecture` (system-architecture summary)
+- **For**: the whole repo, one call, after `summaries`/`capabilities` (which sharpen its inputs).
+- **Prompt**: the *already-extracted* structural facts — layers + inter-layer dependency edges
+  (`infer_architecture`), entry points, highest-fan-in "key symbols", external deps, and per-module
+  summaries (`repo_overview`) — capped to ~7 KB. The model is told to ground every claim in those
+  facts and reference **only** the names present in them.
+- **Output**: strict JSON `{overview, key_points}` stored as repo state `architecture_summary`
+  with `llm:<model>` provenance; surfaced by `engine.architecture()` and the dashboard
+  **Architecture** page as a "System overview" card, clearly labeled LLM-generated (not a verified
+  fact). Cached by a content digest of the facts blob; `--force` re-runs.
+- **Guardrail**: it is narrative, never graph edges — it cannot affect `completeness`/`gaps`. In
+  practice it also stays honest about gaps ("no explicit entry points in the provided facts") rather
+  than inventing them.
+
 ## 4. Where the LLM is deliberately NOT used
 
 - Structural edges parsers prove deterministically (calls/imports/COPY/…) — the parsers are
@@ -131,6 +149,8 @@ per-run log to `evals/reports/llm-logs/llm-eval-<run>.jsonl`.
 - Entity attribute writes re-upsert the entity with `attributes.llm = {model, pass, source_hash}`.
 - Capability entities/edges: `extractor="llm:<model>"`, confidence 0.7.
 - Candidate edges: `extractor="llm:<model>"`, `resolution="llm-suggested"`, confidence ≤ 0.5.
+- Architecture summary: repo state `architecture_summary = {overview, key_points, llm:{model,pass}}`;
+  cached by `enrich:architecture` = digest of the facts blob (no edges written).
 - Cache: metadata state `enrich:<pass>` → `{entity_id: source_hash}`; `--force` ignores it.
 - A full re-index rebuilds the graph and *drops* LLM facts (full-rebuild semantics); `uci enrich`
   re-applies from cache cheaply (only the LLM calls for changed sources are re-paid).
@@ -146,3 +166,18 @@ per-run log to `evals/reports/llm-logs/llm-eval-<run>.jsonl`.
 - **Model selection is benchmarked separately** by `evals/llm_eval.py` (`evals/docs/llm-eval.md`):
   the production prompts against golden fixtures, scored per task area — run it against candidate
   models/providers before changing `UCI_LLM_MODEL`.
+
+## 7. Non-LLM edge oracles (LSP / SCIP)
+
+A second, **LLM-free** enrichment family lives in the same module: optional *edge oracles* that
+verify, prune, or discover graph edges from a language server (LSP) or a batch cross-reference index
+(SCIP). They are the opposite of the LLM passes — provable rather than probabilistic — and produce
+edges with `resolution="lsp-verified"` (confidence 0.95) or `resolution="scip"` (confidence 1.0),
+both inside `RESOLVED_LEVELS`. Verify mode never deletes: a disproven edge is **tombstoned**
+(`attributes.pruned=True`, `pruned_by`) and excluded from callers/callees/impact, but kept for
+completeness accounting.
+
+Surface: `uci enrich --lsp <lang>` / `--scip <index.scip>` (`Engine.enrich_edges`). Missing
+toolchains report `available: false` and are skipped — never a failed run. Full design, per-ecosystem
+strategy, configuration, and usage: **`docs/lsp-refactoring-recommendations.md`** (§6 is the
+implementation/usage guide).

@@ -31,7 +31,10 @@ prompt instead of a broken/empty view.
   controls, directed **arrows**. Click a node for an **info tile** — kind, location, **▲ called by**,
   **▼ calls**, with clickable entries to traverse; double-click a node to expand its neighborhood.
   Missing (stub) nodes are drawn dashed.
-- **Architecture**, **Gaps** (known unknowns), **Onboarding** (dependency-ordered reading path).
+- **Architecture** — layers inferred from structure + the graph, with cross-layer dependency
+  weights; when the optional `architecture` enrichment pass has run, a **System overview** card shows
+  the LLM's prose narrative (clearly labeled LLM-generated, grounded in the facts below).
+- **Gaps** (known unknowns), **Onboarding** (dependency-ordered reading path).
 - **Flows** — business-capability browser: each LLM-derived capability with the programs that
   implement it (+ their one-line summaries), the transaction codes / JCL jobs that **trigger** it,
   and the tables it **reads/writes**. Populated by the optional enrichment `capabilities` pass

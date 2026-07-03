@@ -1,6 +1,6 @@
 # LLM-Eval — Model Capability Benchmark for Enrichment Tasks
 
-**Date:** 2026-07-02 · **Tasks version:** 1 (bump on any task/golden change; `versioning.md` rules)
+**Date:** 2026-07-02 · **Tasks version:** 3 (v2 added agentic tasks; v3 added `architecture_overview`; bump on any task/golden change per `versioning.md`)
 **Runner:** `evals/llm_eval.py` · **Separate from the main eval by design:** `run_eval.py` scores
 the *system* (guardrails applied, deterministic, CI-safe); LLM-eval scores a *model's raw ability*
 on the production prompts, so you can choose a model per deployment and catch provider-specific
@@ -29,6 +29,7 @@ SCOPES) lives at the top of `llm_eval.py`. `openai`/`anthropic` still work via
 | `candidates` | dispatch table with literal VALUES (golden {PGMA, PGMB}); **opaque COMMAREA variable (golden: abstain)** | F1 vs golden; the abstention task is all-or-nothing |
 | `fields` | DCLGEN copybook | field coverage with non-trivial meanings |
 | `ask` | data-resident question (products → PRODUCT_CATALOG); code-resident question (→ PRODFMT) | routing accuracy (0.6) + correct target (0.4) |
+| `architecture` | layered system facts (API/Service/Data + edges, entry points, key symbols) | valid `{overview, key_points}` (0.4) + grounding: names the real layers (0.6) |
 
 Scores: per-area mean → overall (0–100). Reports land in `evals/reports/llm-eval-*.json` with
 per-task notes and latency. No repo indexing involved — pure prompt→response scoring, so a full
