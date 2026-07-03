@@ -211,6 +211,23 @@ def cmd_onboarding(args) -> int:
     return 0
 
 
+def cmd_cfg(args) -> int:
+    with _engine(args) as engine:
+        _ensure_indexed(engine)
+        data = engine.control_flow(args.symbol)
+        if args.json:
+            print(json.dumps(data, indent=2))
+            return 0 if data.get("ok") else 1
+        if not data.get("ok"):
+            print(f"control_flow failed: {data['error']['message']}")
+            return 1
+        st = data["stats"]
+        print(f"# {data['symbol']}  ({data['path']}, {data['language']}) — "
+              f"{st['decisions']} decision(s), {st['loops']} loop(s), {st['nodes']} blocks\n")
+        print(data["mermaid"])
+    return 0
+
+
 def cmd_gaps(args) -> int:
     with _engine(args) as engine:
         _ensure_indexed(engine)
@@ -419,6 +436,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("explain", help="explain a module/file")
     sp.add_argument("module"); sp.add_argument("--json", action="store_true")
     sp.add_argument("--path"); sp.set_defaults(func=cmd_explain)
+
+    sp = sub.add_parser("cfg", help="control-flow graph (block scheme) of a function — Mermaid")
+    sp.add_argument("symbol", help="function/method name to diagram")
+    sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.set_defaults(func=cmd_cfg)
 
     for name, func in (("overview", cmd_overview), ("architecture", cmd_architecture),
                        ("onboarding", cmd_onboarding)):

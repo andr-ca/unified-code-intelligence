@@ -439,6 +439,31 @@ class Engine:
     def onboarding(self) -> dict:
         return onboarding_guide(self.graph, self.metadata, self.repo_id)
 
+    def control_flow(self, symbol: str) -> dict:
+        """Block scheme of the logic *inside* a routine (docs/…): a deterministic control-flow graph
+        (decisions, loops, branches, calls) with a Mermaid rendering. Python today; COBOL next."""
+        from pathlib import Path
+        from .analysis.cfg import build_python_cfg
+        target = resolve_one(self.graph, symbol)
+        if target is None:
+            return {"ok": False, "tool": "control_flow",
+                    "error": {"code": "not_found", "message": symbol}}
+        if target.kind not in (EntityType.FUNCTION, EntityType.METHOD):
+            return {"ok": False, "tool": "control_flow", "error": {"code": "unsupported",
+                    "message": f"{target.qualified_name} is a {target.kind.value}; "
+                               "control_flow supports functions/methods"}}
+        path = target.provenance.path
+        if not path.endswith(".py"):
+            return {"ok": False, "tool": "control_flow", "error": {"code": "unsupported_language",
+                    "message": f"control_flow supports Python today; {path} is not Python"}}
+        try:
+            source = (Path(self.config.repo_path) / path).read_text(encoding="utf-8", errors="replace")
+            cfg = build_python_cfg(source, target.name, path, target.qualified_name)
+        except (OSError, ValueError, SyntaxError) as exc:
+            return {"ok": False, "tool": "control_flow",
+                    "error": {"code": "build_failed", "message": str(exc)}}
+        return {"ok": True, "tool": "control_flow", **cfg.to_dict()}
+
     def flows(self, trigger_depth: int = 4) -> dict:
         """Business-capability flows for the dashboard's Flows tab.
 

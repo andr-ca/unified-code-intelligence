@@ -77,6 +77,17 @@ TOOL_SPECS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "control_flow",
+        "description": "Control-flow graph (block scheme) of a function/method: decisions, loops, "
+                       "branches, calls, and returns as nodes with source lines, plus a Mermaid "
+                       "flowchart. Shows the logic *inside* a routine. Python today.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"symbol": {"type": "string"}},
+            "required": ["symbol"],
+        },
+    },
+    {
         "name": "retrieve_edit_context",
         "description": "Everything needed to safely edit a symbol: source, callers/callees with "
                        "source, tests, imports, and an edit checklist.",
@@ -165,6 +176,8 @@ def dispatch(engine: Engine, name: str, arguments: dict[str, Any]) -> dict[str, 
         return engine.impact(args["symbol_or_file"])
     if name == "explain_module":
         return engine.explain_module(args["module_or_path"])
+    if name == "control_flow":
+        return engine.control_flow(args["symbol"])
     if name == "retrieve_edit_context":
         return engine.edit_context(args["symbol"])
     if name == "find_tests_for_symbol":

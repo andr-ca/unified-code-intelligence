@@ -89,10 +89,16 @@ hit explains which signals fired and suggests next queries. Details:
 The flagship query, *impact analysis*, returns a structured pack (callers, callees, tests, config,
 data, churn, risk score) built by graph traversal — see it in action with `uci impact`.
 
+**Block schemes.** Two levels of "how it works" diagrams: the graph gives flow-level structure
+(which programs/paragraphs/data connect), and `uci cfg <function>` renders a **control-flow graph** —
+the logic *inside* a routine (decisions, loops, branches, returns) as a Mermaid flowchart, computed
+deterministically from source. Python today, COBOL next. Details:
+[`docs/control-flow.md`](docs/control-flow.md).
+
 ## For coding agents (MCP)
 
 `uci mcp` exposes structured-JSON tools: `search_code`, `find_symbol`, `get_callers`, `get_callees`,
-`impact_analysis`, `explain_module`, `retrieve_edit_context`, `find_tests_for_symbol`,
+`impact_analysis`, `explain_module`, `control_flow`, `retrieve_edit_context`, `find_tests_for_symbol`,
 `find_data_lineage`, `find_config_dependencies`, `list_index_gaps`. Register it with your agent:
 
 ```jsonc
