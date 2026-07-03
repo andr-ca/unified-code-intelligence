@@ -1058,15 +1058,19 @@ def _u_runs(ex: dict) -> str:
             f"explore entry points →</a></p>{main_list}{cap_flows}")
 
 
+def _u_part_row(h: dict) -> str:
+    n = h.get("callers", 0)
+    dep = f"{n} file{'' if n == 1 else 's'} depend on it"
+    summ = f"<br><span class='muted small'>{_e(h['summary'])}</span>" if h.get("summary") else ""
+    return (f"<li><a href='/impact?q={quote(h['qualified_name'])}'>{_e(h['name'])}</a> "
+            f"{_kind_pill(h['kind'])} <span class='muted small'>{dep}</span> "
+            f"<span class='mono muted small'>{_e(h['path'])}</span>{summ}</li>")
+
+
 def _u_parts(hubs: list) -> str:
     if not hubs:
-        inner = "<p class='muted small'>No call-graph hubs (nothing is called by many others).</p>"
-    else:
-        inner = "<ul class='clean'>" + "".join(
-            f"<li><a href='/impact?q={quote(h['qualified_name'])}'>{_e(h['name'])}</a> "
-            f"{_kind_pill(h['kind'])} <span class='muted small'>{h['callers']} callers</span> "
-            f"<span class='mono muted small'>{_e(h['path'])}</span></li>" for h in hubs[:12]) + "</ul>"
-    return inner
+        return "<p class='muted small'>No cross-file hubs (nothing is depended on across files).</p>"
+    return "<ul class='clean'>" + "".join(_u_part_row(h) for h in hubs[:12]) + "</ul>"
 
 
 def _u_start(rp: dict) -> str:
@@ -1134,9 +1138,19 @@ def architecture_page(data: dict) -> str:
         f"<tr><td>{_e(e['source'])}</td><td>→</td><td>{_e(e['target'])}</td><td>{e['weight']}</td></tr>"
         for e in data.get("edges", [])
     ) or "<tr><td colspan=4 class='muted'>No cross-layer imports.</td></tr>"
+    summary = data.get("summary") or {}
+    overview_card = ""
+    if summary.get("overview"):
+        pts = "".join(f"<li>{_e(p)}</li>" for p in summary.get("key_points", []))
+        model = (summary.get("llm") or {}).get("model", "llm")
+        overview_card = f"""<div class="card" style="margin-bottom:14px">
+      <h2 style="margin-top:0">System overview <span class='tag'>· {_e(model)}</span></h2>
+      <p>{_e(summary['overview'])}</p>{f'<ul class="clean">{pts}</ul>' if pts else ''}
+      <p class="muted small">LLM-generated narrative grounded in the graph facts below · not a verified fact.</p></div>"""
     body = f"""<div class="container">
   <h1>Architecture</h1>
   <p class="sub">Layers inferred from structure + the canonical graph.</p>
+  {overview_card}
   <div class="split"><div>{layers}</div>
   <div><div class="card"><h2 style="margin-top:0">Layer dependencies</h2>
   <table><thead><tr><th>From</th><th></th><th>To</th><th>Imports</th></tr></thead><tbody>{edges}</tbody></table>

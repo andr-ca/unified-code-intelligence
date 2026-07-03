@@ -52,6 +52,19 @@ _SYS_FIELDS = (
     "meaning. Reply with STRICT JSON only: {\"fields\": [{\"name\": str, \"meaning\": str}]}. "
     "No markdown."
 )
+_SYS_ARCHITECTURE = (
+    "You are a software architect writing a concise system-architecture overview for engineers "
+    "new to this codebase. You are given STRUCTURED FACTS about the system (layers with their "
+    "modules, cross-layer dependencies, entry points, most-depended-on symbols, and external "
+    "dependencies) already extracted from the code graph. Write a clear prose narrative that "
+    "explains: what the system appears to do, how it is layered, how the layers depend on each "
+    "other, where execution enters, and which components are most central. "
+    "Ground EVERY claim in the provided facts and refer ONLY to layer names, module names, and "
+    "symbols that appear in them — do NOT invent components, frameworks, or behavior not present. "
+    "Reply with STRICT JSON only: {\"overview\": str, \"key_points\": [str]}. The overview is 3-6 "
+    "sentences of plain prose (no markdown); key_points is 3-6 short bullet strings. If the facts "
+    "are too sparse to characterize the architecture, say so plainly in the overview."
+)
 
 
 @dataclass
@@ -60,6 +73,7 @@ class EnrichStats:
     capabilities: int = 0
     candidate_edges: int = 0
     field_dictionaries: int = 0
+    architecture: int = 0
     cached: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -67,6 +81,7 @@ class EnrichStats:
         return {"summaries": self.summaries, "capabilities": self.capabilities,
                 "candidate_edges": self.candidate_edges,
                 "field_dictionaries": self.field_dictionaries,
+                "architecture": self.architecture,
                 "cached": self.cached, "errors": self.errors[:20]}
 
 
@@ -108,6 +123,9 @@ class Enricher:
         if "fields" in passes:
             self.client.default_tag = "enrich:fields"
             self._pass_fields(limit, force)
+        if "architecture" in passes:
+            self.client.default_tag = "enrich:architecture"
+            self._pass_architecture(force)
         return self.stats
 
     # -- pass 1: summaries ---------------------------------------------------
@@ -337,6 +355,72 @@ class Enricher:
             cache[ent.id] = src_hash
             done += 1
         self.metadata.set_state(self.repo_id, "enrich:fields", cache)
+
+    # -- pass 6: system-architecture summary -----------------------------------
+    def _pass_architecture(self, force: bool) -> None:
+        """One repo-level LLM call that turns the already-extracted structural facts (layers,
+        cross-layer edges, entry points, key symbols) into a prose architecture overview. Prose
+        is narrative, not fact: stored as repo state with llm provenance, never as graph edges,
+        and only names present in the facts are shown to the model (docs/llm-enrichment.md)."""
+        facts, names = self._architecture_inputs()
+        if not names:  # nothing indexed to characterize
+            return
+        blob = json.dumps(facts, sort_keys=True)
+        digest = hashlib.sha256(blob.encode()).hexdigest()[:16]
+        if not force and self.metadata.get_state(self.repo_id, "enrich:architecture") == digest:
+            self.stats.cached += 1
+            return
+        try:
+            data = self.client.complete_json(
+                _SYS_ARCHITECTURE, f"STRUCTURED FACTS:\n{json.dumps(facts, indent=1)[:7000]}",
+                max_tokens=700)
+        except LlmError as exc:
+            self.stats.errors.append(f"architecture: {exc}")
+            return
+        overview = str((data or {}).get("overview", "")).strip() if isinstance(data, dict) else ""
+        if not overview:
+            return
+        key_points = [str(p).strip() for p in (data.get("key_points") or [])
+                      if isinstance(data, dict) and str(p).strip()][:6]
+        self.metadata.set_state(self.repo_id, "architecture_summary", {
+            "overview": overview, "key_points": key_points,
+            "llm": {"model": self.client.model, "pass": "architecture"},
+            "layers": [layer["name"] for layer in facts["layers"]],
+        })
+        self.metadata.set_state(self.repo_id, "enrich:architecture", digest)
+        self.stats.architecture += 1
+
+    def _architecture_inputs(self) -> tuple[dict, set[str]]:
+        """Assemble the compact structural facts the summary is grounded in, and the set of names
+        the model is allowed to reference (for the eval's no-hallucination check)."""
+        from ..analysis.architecture import infer_architecture
+        from ..analysis.overview import repo_overview
+        arch = infer_architecture(self.graph, self.repo_id)
+        ov = repo_overview(self.graph, self.metadata, self.repo_id)
+        names: set[str] = set()
+        layers = []
+        for layer in arch["layers"]:
+            mods = [{"name": m["qualified_name"], "summary": (m.get("summary") or "")[:160]}
+                    for m in layer["modules"][:8]]
+            names.update(m["name"] for m in mods)
+            names.add(layer["name"])
+            layers.append({"name": layer["name"], "description": layer["description"],
+                           "module_count": layer["module_count"], "modules": mods})
+        for s in ov["key_symbols"][:10]:
+            names.add(s["name"])
+        for e in ov["entry_points"][:10]:
+            names.add(e["name"])
+        facts = {
+            "name": ov.get("name", ""),
+            "languages": ov.get("languages", {}),
+            "totals": ov.get("totals", {}),
+            "layers": layers,
+            "layer_dependencies": arch["edges"][:20],
+            "entry_points": [{"name": e["name"], "path": e["path"]} for e in ov["entry_points"][:10]],
+            "key_symbols": [{"name": s["name"], "callers": s["callers"]} for s in ov["key_symbols"][:10]],
+            "external_dependencies": ov.get("external_dependencies", [])[:30],
+        }
+        return facts, names
 
     # ------------------------------------------------------------------ helpers
     _CALLER_KINDS = (EntityType.LEGACY_PROGRAM, EntityType.FUNCTION, EntityType.METHOD,

@@ -271,7 +271,7 @@ def cmd_metrics(args) -> int:
 def cmd_enrich(args) -> int:
     with _engine(args) as engine:
         _ensure_indexed(engine)
-        passes = args.passes or ["summaries", "capabilities", "candidates", "fields"]
+        passes = args.passes or ["summaries", "capabilities", "candidates", "fields", "architecture"]
         if args.dry_run:
             from uci.enrich import LlmClient, LlmError
             try:
@@ -413,9 +413,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
     sp.set_defaults(func=cmd_metrics)
 
-    sp = sub.add_parser("enrich", help="optional LLM enrichment (summaries, capabilities, candidates, fields)")
+    sp = sub.add_parser("enrich", help="optional LLM enrichment (summaries, capabilities, candidates, fields, architecture)")
     sp.add_argument("--pass", dest="passes", action="append",
-                    choices=["summaries", "capabilities", "candidates", "fields"],
+                    choices=["summaries", "capabilities", "candidates", "fields", "architecture"],
                     help="pass to run (repeatable; default: all)")
     sp.add_argument("--limit", type=int, default=200, help="max items per pass")
     sp.add_argument("--force", action="store_true", help="ignore the content-hash cache")

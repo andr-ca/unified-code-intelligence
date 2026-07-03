@@ -91,6 +91,9 @@ class FakeLlm:
                                 {"name": "HALLUCINATED.TBL", "kind": "database_table", "why": "x"}],
                     "explanation": "The product list is data, not code.",
                     "next_step": "Query the table."}
+        if "system-architecture overview" in system:
+            return {"overview": "A small COBOL product-inquiry system organized into a Core layer.",
+                    "key_points": ["Core layer holds the programs", "PRODINQ looks up products"]}
         return {}
 
 
@@ -142,6 +145,22 @@ def test_enrich_capabilities_validated_against_index(llm_repo):
     members = {n["name"] for n in nb["nodes"]} - {"Product Catalog"}
     assert "PRODINQ" in members and "PRODFMT" in members
     assert "NOTAREALPGM" not in members  # hallucinated member discarded
+
+
+def test_enrich_architecture_summary(llm_repo):
+    fake = FakeLlm()
+    out = llm_repo.enrich(["architecture"], client=fake)
+    assert out["stats"]["architecture"] == 1
+    # surfaced through engine.architecture() with llm provenance
+    arch = llm_repo.architecture()
+    summary = arch.get("summary")
+    assert summary and "Core layer" in summary["overview"]
+    assert summary["llm"]["pass"] == "architecture"
+    assert summary["key_points"]
+    # cached on second run — no new LLM call
+    calls = fake.calls
+    out2 = llm_repo.enrich(["architecture"], client=fake)
+    assert fake.calls == calls and out2["stats"]["cached"] >= 1
 
 
 def test_enrich_candidates_guardrails(llm_repo):

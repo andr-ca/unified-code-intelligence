@@ -38,12 +38,12 @@ sys.path.insert(0, str(EVALS.parent / "src"))
 
 from uci.config import Config  # noqa: E402
 from uci.enrich.enricher import (  # noqa: E402 - production prompts, by design
-    _SYS_CANDIDATES, _SYS_CAPABILITIES, _SYS_FIELDS, _SYS_SUMMARY,
+    _SYS_ARCHITECTURE, _SYS_CANDIDATES, _SYS_CAPABILITIES, _SYS_FIELDS, _SYS_SUMMARY,
 )
 from uci.enrich.llm_client import LlmClient, LlmError  # noqa: E402
 from uci.enrich.tool_loop import ToolLoop  # noqa: E402
 
-TASKS_VERSION = 2  # v2: hardened _SYS_CANDIDATES + agentic tasks (docs/agentic-enrichment.md §6)
+TASKS_VERSION = 3  # v3: + architecture_overview task (grounded system summary); v2 added agentic
 
 _ASK_SYS = (
     "You route a question about a codebase to where its answer lives. Reply with STRICT JSON "
@@ -152,6 +152,52 @@ def score_capabilities(client: LlmClient) -> tuple[float, str]:
     sane_count = 1.0 if 2 <= len(data) <= 5 else 0.5
     score = coverage * 0.4 + honesty * 0.4 + sane_count * 0.2
     return round(score, 3), f"{len(data)} caps, coverage {coverage:.0%}, hallucinated {hallucinated}"
+
+
+# structured facts an "architecture summary" pass would receive (already graph-extracted).
+_ARCH_FACTS = {
+    "name": "shop-backend",
+    "languages": {"cobol": 6, "jcl": 2},
+    "totals": {"files": 8, "functions": 14, "classes": 0},
+    "layers": [
+        {"name": "API", "description": "HTTP endpoints and handlers.", "module_count": 2,
+         "modules": [{"name": "PRODINQ", "summary": "Looks up products from the catalog."},
+                     {"name": "ORDERAPI", "summary": "Accepts order requests."}]},
+        {"name": "Service", "description": "Business logic.", "module_count": 2,
+         "modules": [{"name": "PRODSVC", "summary": "Product domain logic."},
+                     {"name": "ORDERSVC", "summary": "Order processing."}]},
+        {"name": "Data", "description": "Persistence and DB access.", "module_count": 2,
+         "modules": [{"name": "PRODDAO", "summary": "Reads the product catalog table."},
+                     {"name": "ORDERDAO", "summary": "Writes orders."}]},
+    ],
+    "layer_dependencies": [{"source": "API", "target": "Service", "weight": 4},
+                           {"source": "Service", "target": "Data", "weight": 3}],
+    "entry_points": [{"name": "PRODINQ", "path": "cbl/PRODINQ.cbl"}],
+    "key_symbols": [{"name": "PRODSVC", "callers": 5}, {"name": "PRODDAO", "callers": 4}],
+    "external_dependencies": ["DB2"],
+}
+_ARCH_LAYERS = {"API", "Service", "Data"}
+
+
+def score_architecture(client: LlmClient) -> tuple[float, str]:
+    """Grounded prose: valid {overview, key_points}, and the narrative must name the real layers
+    (grounding) without collapsing to an empty/degenerate answer."""
+    try:
+        data = client.complete_json(
+            _SYS_ARCHITECTURE, f"STRUCTURED FACTS:\n{json.dumps(_ARCH_FACTS, indent=1)}",
+            max_tokens=700)
+    except LlmError as exc:
+        return 0.0, f"invalid JSON: {exc}"
+    if not isinstance(data, dict):
+        return 0.0, "not a JSON object"
+    overview = str(data.get("overview", "")).strip()
+    points = [str(p) for p in (data.get("key_points") or []) if str(p).strip()]
+    structure = 1.0 if (len(overview) >= 40 and points) else (0.5 if overview else 0.0)
+    text = (overview + " " + " ".join(points)).lower()
+    named = sum(1 for layer in _ARCH_LAYERS if layer.lower() in text)
+    grounding = named / len(_ARCH_LAYERS)
+    score = structure * 0.4 + grounding * 0.6
+    return round(score, 3), f"named {named}/3 layers, {len(points)} points, {len(overview)} chars"
 
 
 def score_candidates(client: LlmClient, source: str, inventory: list[str],
@@ -303,6 +349,7 @@ TASKS = [
     ("summaries", "summary_router",
      lambda c: score_summary(c, "ROUTER", _ROUTER_SRC, ["dispatch", "menu", "transfer"])),
     ("capabilities", "capability_grouping", score_capabilities),
+    ("architecture", "architecture_overview", score_architecture),
     ("candidates", "candidates_from_value_table",
      lambda c: score_candidates(c, _ROUTER_SRC, ["PGMA", "PGMB", "PGMC", "OTHER"], {"PGMA", "PGMB"})),
     ("candidates", "candidates_restraint_when_opaque",
@@ -609,7 +656,8 @@ def main() -> int:
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
-    ran_areas = [a for a in ("summaries", "capabilities", "candidates", "fields", "ask", "agentic")
+    ran_areas = [a for a in ("summaries", "capabilities", "architecture", "candidates",
+                             "fields", "ask", "agentic")
                  if any(a in r["areas"] for r in results)]
     print(f"\n{'model':<24} {'proto':<8} {'overall':>7}  "
           + "  ".join(f"{a:>11}" for a in ran_areas))

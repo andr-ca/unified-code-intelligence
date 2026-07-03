@@ -217,7 +217,7 @@ class Engine:
                force: bool = False, client=None, agentic: bool = False) -> dict:
         """Run the optional LLM enrichment passes. Requires a configured/reachable provider."""
         from .enrich import Enricher, LlmError
-        passes = passes or ["summaries", "capabilities", "candidates", "fields"]
+        passes = passes or ["summaries", "capabilities", "candidates", "fields", "architecture"]
         try:
             enricher = Enricher(self.config, self.graph, self.metadata, self.vectors,
                                 self.embedder, self.repo_id, client=client)
@@ -367,7 +367,12 @@ class Engine:
         return explain_module(self.graph, self.metadata, self.repo_id, query)
 
     def architecture(self) -> dict:
-        return infer_architecture(self.graph, self.repo_id)
+        data = infer_architecture(self.graph, self.repo_id)
+        # merge the optional LLM prose overview (enrich 'architecture' pass), if present
+        summary = self.metadata.get_state(self.repo_id, "architecture_summary")
+        if summary:
+            data["summary"] = summary
+        return data
 
     def onboarding(self) -> dict:
         return onboarding_guide(self.graph, self.metadata, self.repo_id)
