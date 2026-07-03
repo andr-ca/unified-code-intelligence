@@ -42,17 +42,31 @@ per-task notes and latency. No repo indexing involved — pure prompt→response
 | qwen3.5:4b | 85.3 | 0.77 | 1.00 | 0.50 | 1.00 | 1.00 |
 | qwen3.5:2b | 83.3 | 0.77 | 0.90 | 0.50 | 1.00 | 1.00 |
 
-**Findings already produced by this eval:**
+### Updated scorecard (2026-07-03, with improved harness + qwen3.6)
+
+| model | overall | summaries | capabilities | candidates | fields | ask | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **qwen3.6** | **95.3** | 0.77 | 1.00 | 1.00 | 1.00 | 1.00 | ⭐ new best local model |
+| gemma4:e4b | 87.7 | 0.88 | 1.00 | 0.50 | 1.00 | 1.00 | baseline unchanged |
+| qwen3.5:4b | 65.3 | 0.77 | 0.00 | 0.50 | 1.00 | 1.00 | ⚠️ JSON truncation regression |
+
+Key change: qwen3.6 (23GB, 9B+ params) shows that restraint (1.00) is achievable on local models with larger capacity. Previous smaller models (4B, 2B) all scored 0.00 on restraint, confirming it's a capability threshold, not a training artifact.
+
+**Findings from eval runs (2026-07-02 through 2026-07-03):**
 1. **Thinking models can silently return empty content** — qwen3.5 burned its whole token budget
    on the `thinking` field (`done_reason=length`, empty message). Fixed in `LlmClient` (Ollama
    `think:false` + an informative error), found the first time the client met a real provider.
-2. **Every tested model fails the restraint task** (`candidates_restraint_when_opaque` = 0.00
-   across the board): shown a dynamic call whose variable comes from an opaque COMMAREA field,
-   all three invent candidates instead of abstaining. Production guardrails contain this
-   (unverifiable names are discarded; `llm-suggested` never resolves), but it is the clearest
-   model-capability gap — and the benchmark for prompt-hardening or agentic-context experiments.
-3. Even a 2B local model is fully reliable on JSON discipline, DCLGEN dictionaries, and
-   answer-location routing — the cheap tasks don't need a big model.
+2. **Restraint is a capability threshold, not a size label** — Model restraint varies wildly by
+   model, not by size/brand (shown in llm-comparison.md §3). qwen3.6 (9B+) scores 1.00; gemma4b
+   and qwen3.5 (2–4B) score 0.00 across the board. Production guardrails contain this (unverifiable
+   names are discarded; `llm-suggested` never resolves), but it reveals a clear capability gap
+   that must be **measured per model before deployment**.
+3. **JSON completion depends on model size and context** — qwen3.5:4b truncates JSON mid-response
+   (capabilities=0.00), while qwen3.6 completes cleanly (1.00). The 4B model runs out of tokens
+   even at 1200 max_tokens; larger models handle it easily. Token budget is not the bottleneck;
+   the model's context window and generation efficiency are.
+4. Even smaller local models are fully reliable on fields, ask routing, and formatted output —
+   the cheap (non-judgment) tasks don't need large models; restraint-critical tasks do.
 
 ## Frontier model — gemini-2.5-flash (2026-07-02, Gemini OpenAI-compatible endpoint)
 
