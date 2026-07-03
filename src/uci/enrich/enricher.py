@@ -293,7 +293,16 @@ class Enricher:
         # 0.20 and 1.00 on cross-file resolution (evals/docs/llm-comparison.md §4).
         loop = ToolLoop(self.client, self.graph, self.config.repo_path, self.repo_id,
                         retriever=self._retriever(), metadata=self.metadata, max_tool_calls=4)
-        result = loop.run(_SYS_CANDIDATES, user, answer_key="candidates", max_tokens=400)
+        # when using the tool-loop, the answer must use {"action": "answer", ...} format
+        # (tool-loop requires this wrapper; one-shot path doesn't)
+        sys_with_action = _SYS_CANDIDATES.replace(
+            'Reply with STRICT JSON only: ',
+            'Reply with STRICT JSON only with "action": "answer": '
+        ).replace(
+            '{"candidates"',
+            '{"action": "answer", "candidates"'
+        )
+        result = loop.run(sys_with_action, user, answer_key="candidates", max_tokens=400)
         evidence = {"digest": result.evidence_digest(), "tool_calls": result.tool_calls,
                     "protocol_errors": result.protocol_errors} if result.transcript else None
         return self._json_list(result.answer, "candidates"), evidence

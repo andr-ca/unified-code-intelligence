@@ -247,7 +247,15 @@ def _run_loop(client, eng, program, var, golden, source_hint):
     user = (f"Dynamic call through variable {var} in program {program} "
             f"(source file cbl/{program}.cbl).\nProgram inventory: {inventory}\n\n"
             f"Source context:\n{source_hint}")
-    result = loop.run(_SYS_CANDIDATES, user, answer_key="candidates", max_tokens=400)
+    # when using the tool-loop, the answer must use {"action": "answer", ...} format
+    sys_with_action = _SYS_CANDIDATES.replace(
+        'Reply with STRICT JSON only: ',
+        'Reply with STRICT JSON only with "action": "answer": '
+    ).replace(
+        '{"candidates"',
+        '{"action": "answer", "candidates"'
+    )
+    result = loop.run(sys_with_action, user, answer_key="candidates", max_tokens=400)
     got = {str(c).upper() for c in (result.answer or {}).get("candidates", [])}
     disc = 1.0 if (result.tool_calls <= 4 and result.protocol_errors == 0) else 0.5
     if not golden:
