@@ -22,11 +22,12 @@ def onboarding_guide(graph: GraphStore, metadata: MetadataStore, repo_id: str) -
             "path": ep["path"], "why": "Execution starts here — follow the flow outward.",
         })
         order += 1
-    # 2. most-depended-on symbols (high fan-in)
+    # 2. most-depended-on symbols (high cross-file fan-in)
     for sym in overview["key_symbols"][:5]:
+        why = sym.get("summary") or "Widely used — understanding it unlocks much of the codebase."
         steps.append({
             "order": order, "title": f"Core symbol: {sym['name']} ({sym['callers']} callers)",
-            "path": sym["path"], "why": "Widely used — understanding it unlocks much of the codebase.",
+            "path": sym["path"], "why": why,
         })
         order += 1
     # 3. one representative module per layer (largest)

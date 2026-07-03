@@ -1000,6 +1000,20 @@ def _u_what(summary: dict) -> str:
     return inner
 
 
+def _u_arch_summary(org: dict) -> str:
+    s = org.get("summary") or {}
+    overview = s.get("overview")
+    if not overview:
+        return ""
+    pts = "".join(f"<li>{_e(p)}</li>" for p in s.get("key_points", []))
+    model = (s.get("llm") or {}).get("model", "llm")
+    return (f"<div class='card u-arch'><div class='card-h'>The architect&rsquo;s read "
+            f"<span class='tag'>\u00b7 {_e(model)}</span></div><p>{_e(overview)}</p>"
+            + (f"<ul class='clean'>{pts}</ul>" if pts else "")
+            + "<p class='muted small'>LLM-generated narrative grounded in the graph facts below "
+            "\u00b7 not a verified fact.</p></div>")
+
+
 def _u_organized(org: dict) -> str:
     layers = org.get("layers", [])
     edges = org.get("edges", [])
@@ -1035,7 +1049,7 @@ def _u_organized(org: dict) -> str:
     else:
         strip = ("<p class='muted small' style='margin-top:14px'>Domain grouping (business "
                  "capabilities) appears here once <a href='/enrich'>enrichment</a> runs.</p>")
-    return f"{lead}<div class='u-cardrow'>{layer_cards}</div>{strip}"
+    return f"{_u_arch_summary(org)}{lead}<div class='u-cardrow'>{layer_cards}</div>{strip}"
 
 
 def _u_runs(ex: dict) -> str:

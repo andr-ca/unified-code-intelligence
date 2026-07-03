@@ -458,6 +458,7 @@ class Engine:
             },
             "organization": {"layers": architecture.get("layers", []),
                              "edges": architecture.get("edges", []),
+                             "summary": architecture.get("summary", {}),
                              "capabilities": capabilities},
             "execution": {"entry_points": m.get("entry_points", {}),
                           "mains": overview.get("entry_points", []),

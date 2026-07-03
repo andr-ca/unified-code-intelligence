@@ -10,15 +10,46 @@ from ..core.interfaces import GraphStore, MetadataStore
 from ..core.relationships import RelationType
 
 
+def _rank_key_symbols(graph: GraphStore, paths_by_id: dict[str, str]) -> list[dict]:
+    """Rank hubs by how many *other files* depend on them (a true system hub), not by raw
+    call volume, which in COBOL is dominated by intra-program paragraphs PERFORMed many
+    times within one file. Fall back to raw fan-in only when nothing crosses a file
+    boundary (tiny or single-file repos)."""
+    total_fan_in: Counter[str] = Counter()
+    cross_file_callers: defaultdict[str, set[str]] = defaultdict(set)
+    for rel in graph.relationships(RelationType.CALLS):
+        total_fan_in[rel.dst_id] += 1
+        src_path, dst_path = paths_by_id.get(rel.src_id), paths_by_id.get(rel.dst_id)
+        if src_path and dst_path and src_path != dst_path:
+            cross_file_callers[rel.dst_id].add(src_path)
+
+    ranked: list[tuple[str, int]] = sorted(
+        ((eid, len(files)) for eid, files in cross_file_callers.items()),
+        key=lambda kv: kv[1], reverse=True,
+    ) or total_fan_in.most_common(15)
+
+    key_symbols = []
+    for entity_id, count in ranked[:15]:
+        entity = graph.get_entity(entity_id)
+        if entity and entity.kind in SYMBOL_KINDS:
+            key_symbols.append({
+                "name": entity.name, "qualified_name": entity.qualified_name,
+                "path": entity.provenance.path, "callers": count, "kind": entity.kind.value,
+                "summary": entity.attributes.get("summary", ""),
+            })
+    return key_symbols
+
+
 def repo_overview(graph: GraphStore, metadata: MetadataStore, repo_id: str) -> dict:
     kind_counts: Counter[str] = Counter()
     languages: Counter[str] = Counter()
     modules: list[Entity] = []
     externals: list[Entity] = []
-    fan_in: Counter[str] = Counter()
+    paths_by_id: dict[str, str] = {}
 
     for entity in graph.entities(repo_id=repo_id):
         kind_counts[entity.kind.value] += 1
+        paths_by_id[entity.id] = entity.provenance.path
         if entity.kind == EntityType.FILE and entity.language:
             languages[entity.language] += 1
         elif entity.kind == EntityType.MODULE:
@@ -26,17 +57,7 @@ def repo_overview(graph: GraphStore, metadata: MetadataStore, repo_id: str) -> d
         elif entity.kind == EntityType.PACKAGE and entity.attributes.get("external"):
             externals.append(entity)
 
-    for rel in graph.relationships(RelationType.CALLS):
-        fan_in[rel.dst_id] += 1
-
-    key_symbols = []
-    for entity_id, count in fan_in.most_common(15):
-        entity = graph.get_entity(entity_id)
-        if entity and entity.kind in SYMBOL_KINDS:
-            key_symbols.append({
-                "name": entity.name, "qualified_name": entity.qualified_name,
-                "path": entity.provenance.path, "callers": count, "kind": entity.kind.value,
-            })
+    key_symbols = _rank_key_symbols(graph, paths_by_id)
 
     module_summaries = []
     for module in modules:

@@ -55,6 +55,23 @@ def test_understand_coverage_heuristics(seeded):
     assert "app.py" not in shallow     # recognized language
 
 
+def test_understand_surfaces_architecture_summary(seeded):
+    """The LLM architecture pass stores prose as repo state; architecture() and understand()
+    must surface it (the glue that feeds the Architecture card and Understand Chapter 2)."""
+    seeded.metadata.set_state(seeded.repo_id, "architecture_summary", {
+        "overview": "A tiny two-function demo.",
+        "key_points": ["entry is main", "used is the hub"],
+        "llm": {"model": "qwen3.6", "pass": "architecture"},
+    })
+    arch = seeded.architecture()
+    assert arch["summary"]["overview"] == "A tiny two-function demo."
+    org = seeded.understand()["organization"]
+    assert org["summary"]["overview"] == "A tiny two-function demo."
+    assert org["summary"]["key_points"] == ["entry is main", "used is the hub"]
+    assert org["summary"]["llm"]["model"] == "qwen3.6"
+
+
+
 def test_understand_reflects_enrichment(seeded):
     # add an LLM capability -> the domain layer lights up
     rid = seeded.repo_id

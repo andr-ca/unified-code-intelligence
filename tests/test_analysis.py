@@ -40,3 +40,39 @@ def test_layer_for_path():
     assert layer_for_path("tests/test_x.py")[0] == "Test"
     assert layer_for_path("models/user.py")[0] == "Data"
     assert layer_for_path("random/thing.py")[0] == "Core"
+
+
+def test_key_symbols_rank_cross_file_over_intra_file(tmp_path):
+    """A symbol depended on across files outranks one PERFORMed many times within one file
+    (the COBOL screen-paragraph noise the cross-file ranking is meant to suppress)."""
+    from uci import Config, Engine
+    from uci.core import Entity, EntityType, Provenance, Relationship, RelationType
+
+    repo = tmp_path / "k"
+    repo.mkdir()
+    eng = Engine(Config.from_env(repo))
+    rid = eng.repo_id
+
+    def ent(eid, name, path):
+        return Entity(eid, EntityType.FUNCTION, name, name, Provenance(rid, path, 1, 3), {})
+
+    # cross-file hub: one caller in each of three different files
+    eng.graph.add_entity(ent("fn:shared", "shared_fn", "shared.py"))
+    for i, f in enumerate("abc"):
+        eng.graph.add_entity(ent(f"fn:c{f}", f"caller_{f}", f"{f}.py"))
+        eng.graph.add_relationship(Relationship(
+            f"x{i}", RelationType.CALLS, f"fn:c{f}", "fn:shared", Provenance(rid, f"{f}.py", 2, 2)))
+    # intra-file hub: called five times, all within one file
+    eng.graph.add_entity(ent("fn:para", "paraX", "one.py"))
+    for i in range(5):
+        eng.graph.add_entity(ent(f"fn:p{i}", f"p{i}", "one.py"))
+        eng.graph.add_relationship(Relationship(
+            f"p{i}", RelationType.CALLS, f"fn:p{i}", "fn:para", Provenance(rid, "one.py", 3, 3)))
+
+    key_symbols = eng.overview()["key_symbols"]
+    names = [k["name"] for k in key_symbols]
+    assert names[0] == "shared_fn"        # 3 distinct files depend on it
+    assert key_symbols[0]["callers"] == 3
+    assert "paraX" not in names           # 0 cross-file callers -> suppressed
+    eng.close()
+
