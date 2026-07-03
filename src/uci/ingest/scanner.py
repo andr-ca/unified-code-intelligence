@@ -7,8 +7,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 from ..config import Config
+from .hashing import read_head
 from .ignore import IgnoreMatcher
-from .langdetect import detect_language, is_text
+from .langanalyze import analyze_language
+from .langdetect import is_text
 
 
 @dataclass
@@ -24,6 +26,40 @@ def _rel(base: str, path: str) -> str:
     return os.path.relpath(path, base).replace("\\", "/")
 
 
+def _prune_dirs(dirnames: list[str], rel_dir: str, matcher: IgnoreMatcher) -> None:
+    """Drop ignored subdirectories in place so ``os.walk`` never descends into them."""
+    kept = []
+    for d in dirnames:
+        rp = f"{rel_dir}/{d}" if rel_dir else d
+        if not matcher.is_ignored(rp):
+            kept.append(d)
+    dirnames[:] = kept
+
+
+def _classify(config: Config, rel_dir: str, dirpath: str, fn: str,
+              matcher: IgnoreMatcher) -> ScannedFile | None:
+    """Vet one file and, if indexable, return it with its content-first language."""
+    rp = f"{rel_dir}/{fn}" if rel_dir else fn
+    if matcher.is_ignored(rp):
+        return None
+    abs_path = os.path.join(dirpath, fn)
+    try:
+        st = os.stat(abs_path)
+    except OSError:
+        return None
+    if st.st_size > config.max_file_bytes:
+        return None
+    # content-first: classify by the file's head (the extension is only a tiebreaker), so
+    # extensionless or mislabeled members — esp. mainframe PDS members with no suffix — are
+    # still routed to the right parser.
+    language = analyze_language(rp, read_head(abs_path))
+    if language is None:
+        if not (config.index_all_text and is_text(rp)):
+            return None
+        language = "text"
+    return ScannedFile(rp, abs_path, st.st_size, st.st_mtime, language)
+
+
 def scan(config: Config) -> Iterator[ScannedFile]:
     root = str(config.repo_path)
     matcher = IgnoreMatcher(root, config.ignore_globs, config.use_gitignore)
@@ -31,31 +67,11 @@ def scan(config: Config) -> Iterator[ScannedFile]:
         rel_dir = _rel(root, dirpath)
         if rel_dir == ".":
             rel_dir = ""
-        # prune ignored directories in place so os.walk skips them entirely
-        kept = []
-        for d in dirnames:
-            rp = f"{rel_dir}/{d}" if rel_dir else d
-            if not matcher.is_ignored(rp):
-                kept.append(d)
-        dirnames[:] = kept
-
+        _prune_dirs(dirnames, rel_dir, matcher)
         for fn in filenames:
-            rp = f"{rel_dir}/{fn}" if rel_dir else fn
-            if matcher.is_ignored(rp):
-                continue
-            language = detect_language(rp)
-            if language is None:
-                if not (config.index_all_text and is_text(rp)):
-                    continue
-                language = "text"
-            abs_path = os.path.join(dirpath, fn)
-            try:
-                st = os.stat(abs_path)
-            except OSError:
-                continue
-            if st.st_size > config.max_file_bytes:
-                continue
-            yield ScannedFile(rp, abs_path, st.st_size, st.st_mtime, language)
+            scanned = _classify(config, rel_dir, dirpath, fn, matcher)
+            if scanned is not None:
+                yield scanned
 
 
 __all__ = ["ScannedFile", "scan"]

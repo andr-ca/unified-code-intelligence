@@ -160,13 +160,17 @@ class Config:
     ) -> Config:
         repo = Path(repo_path or os.environ.get("UCI_REPO_PATH") or Path.cwd()).resolve()
 
-        # merge .env: the invocation dir's .env is a default, then the repo's own .uci/.env
-        # overrides it (repo config is authoritative), then real UCI_* env vars win. Repo
-        # config lives under .uci/ so it never pollutes the processed repo's root.
+        # Load config env. The repo's own .uci/.env is the COMPLETE config unit — when it exists
+        # it is authoritative and the invocation dir's .env is ignored entirely, so a partial
+        # .uci/.env never inherits stray keys (protocol/model/url) from the developer's working-dir
+        # .env. cwd/.env applies only to a repo that has no .uci/.env of its own. Real UCI_* env
+        # vars always win. The processed repo's ROOT .env is never read — config belongs under .uci/.
         env: dict[str, str] = {}
-        for candidate in (Path.cwd() / ".env", repo / ".uci" / ".env"):
-            if candidate.exists():
-                env.update(_parse_env_file(candidate))
+        uci_env = repo / ".uci" / ".env"
+        if uci_env.exists():
+            env = _parse_env_file(uci_env)
+        elif (Path.cwd() / ".env").exists():
+            env = _parse_env_file(Path.cwd() / ".env")
         env.update({k: v for k, v in os.environ.items() if k.startswith("UCI_")})
 
         profile = (overrides or {}).get("profile") or env.get("UCI_PROFILE", "local-lite")

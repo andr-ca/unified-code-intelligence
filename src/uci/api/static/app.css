@@ -66,17 +66,107 @@ nav.main {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
-nav.main a {
+nav.main > a {
     color: var(--muted);
     padding: 6px 12px;
     border-radius: 7px;
     font-weight: 500;
 }
 
-nav.main a:hover,
-nav.main a.active {
+nav.main > a:hover,
+nav.main > a.active {
+    background: var(--panel2);
+    color: var(--text);
+    text-decoration: none;
+}
+
+/* grouped dropdown menus */
+.menu {
+    position: relative;
+}
+
+/* invisible bridge across the visual gap so the dropdown stays open while the pointer
+   travels from the button down to the items (no dead zone to close it). Only present while
+   the menu is open, so it never captures stray hovers/clicks when idle. */
+.menu::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 10px;
+    display: none;
+}
+
+.menu:hover::after,
+.menu:focus-within::after {
+    display: block;
+}
+
+.menu-btn {
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 7px;
+    font-weight: 500;
+    font: inherit;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.menu-btn:hover,
+.menu:focus-within .menu-btn,
+.menu.active .menu-btn {
+    background: var(--panel2);
+    color: var(--text);
+}
+
+.menu.active .menu-btn {
+    color: var(--accent);
+}
+
+.menu .caret {
+    font-size: 9px;
+    opacity: .55;
+}
+
+.menu-drop {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 176px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
+    display: none;
+    z-index: 20;
+}
+
+.menu:hover .menu-drop,
+.menu:focus-within .menu-drop {
+    display: flex;
+}
+
+.menu-drop a {
+    color: var(--muted);
+    padding: 7px 10px;
+    border-radius: 7px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.menu-drop a:hover,
+.menu-drop a.active {
     background: var(--panel2);
     color: var(--text);
     text-decoration: none;
@@ -1002,4 +1092,93 @@ table.reports tbody td {
     max-height: 240px;
     overflow: auto;
     white-space: pre-wrap;
+}
+
+/* database browser */
+.pillrow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.dbchip {
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.dbchip:hover {
+    color: var(--text);
+    text-decoration: none;
+    border-color: var(--muted);
+}
+
+.dbchip.active {
+    color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.dbchip.active .muted {
+    color: var(--bg);
+    opacity: .75;
+}
+
+.sqlbox {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 11px;
+    resize: vertical;
+}
+
+.sqlbox:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.tablewrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+table.dbtable {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12.5px;
+}
+
+table.dbtable th,
+table.dbtable td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+table.dbtable th {
+    color: var(--muted);
+    font-weight: 600;
+    background: var(--panel2);
+    position: sticky;
+    top: 0;
+}
+
+table.dbtable tbody tr:hover td {
+    background: var(--panel2);
 }

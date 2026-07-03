@@ -661,6 +661,77 @@ class Engine:
         return {"find_config_dependencies": has_config, "find_data_lineage": has_data,
                 "get_code_metrics": has_metrics}
 
+    # -- database browser (read-only inspection of the raw store) -----------
+    def db_tables(self) -> dict:
+        """Row counts per browsable table, scoped to this repo."""
+        out = []
+        for table in _DB_TABLES:
+            try:
+                _, rows = self.db.query_readonly(
+                    f"SELECT COUNT(*) FROM {table} WHERE repo_id = ?", (self.repo_id,), limit=1)
+                out.append({"table": table, "rows": rows[0][0] if rows else 0})
+            except Exception:
+                continue
+        return {"ok": True, "tool": "db_tables", "tables": out}
+
+    def db_rows(self, table: str, limit: int = 50, offset: int = 0) -> dict:
+        """Paginated rows of one allow-listed table, scoped to this repo (cells truncated)."""
+        if table not in _DB_TABLES:
+            return {"ok": False, "tool": "db_rows",
+                    "error": {"code": "bad_table", "message": f"unknown table: {table}"}}
+        limit = max(1, min(int(limit), 200))
+        offset = max(0, int(offset))
+        _, total_rows = self.db.query_readonly(
+            f"SELECT COUNT(*) FROM {table} WHERE repo_id = ?", (self.repo_id,), limit=1)
+        total = total_rows[0][0] if total_rows else 0
+        columns, rows = self.db.query_readonly(
+            f"SELECT * FROM {table} WHERE repo_id = ? LIMIT ? OFFSET ?",
+            (self.repo_id, limit, offset), limit=limit)
+        return {"ok": True, "tool": "db_rows", "table": table, "columns": columns,
+                "rows": [[_db_trunc(v) for v in r] for r in rows],
+                "total": total, "limit": limit, "offset": offset}
+
+    def db_query(self, sql: str, limit: int = 500) -> dict:
+        """Run a caller-supplied read-only SELECT/WITH query. Read-only is enforced at the SQLite
+        level (see ``SqliteDatabase.query_readonly``); cells are truncated for display."""
+        cleaned, err = _validate_select(sql)
+        if err:
+            return {"ok": False, "tool": "db_query", "error": {"code": "bad_sql", "message": err}}
+        limit = max(1, min(int(limit), 1000))
+        try:
+            columns, rows = self.db.query_readonly(cleaned, limit=limit)
+        except Exception as exc:
+            return {"ok": False, "tool": "db_query", "sql": cleaned,
+                    "error": {"code": "query_error", "message": str(exc)}}
+        return {"ok": True, "tool": "db_query", "sql": cleaned, "columns": columns,
+                "rows": [[_db_trunc(v) for v in r] for r in rows],
+                "row_count": len(rows), "capped": len(rows) >= limit}
+
+
+_DB_TABLES = ("repositories", "files", "entities", "relationships", "chunks",
+              "vectors", "state", "git_commits", "git_churn", "gaps")
+
+
+def _db_trunc(value, limit: int = 200):
+    if value is None:
+        return None
+    text = str(value)
+    return text if len(text) <= limit else text[:limit] + "\u2026"
+
+
+def _validate_select(sql: str) -> tuple[str, str]:
+    """Return ``(cleaned_sql, error)``. Only a single SELECT/WITH statement is allowed - a friendly
+    guard; the read-only connection in ``query_readonly`` is the real enforcement."""
+    cleaned = (sql or "").strip().rstrip(";").strip()
+    if not cleaned:
+        return "", "empty query"
+    if ";" in cleaned:
+        return "", "only a single statement is allowed"
+    head = cleaned.lstrip("(").lower()
+    if not (head.startswith("select") or head.startswith("with")):
+        return "", "only read-only SELECT / WITH queries are allowed"
+    return cleaned, ""
+
 
 def _entity_hit(entity) -> dict:
     return {

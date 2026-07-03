@@ -193,6 +193,18 @@ def make_handler(target, jobs: JobRunner | None = None):
                 return self._html(views.understand_page(engine.understand()))
             if path == "/gaps":
                 return self._html(views.gaps_page(engine.gaps(q.get("kind"))))
+            if path == "/db":
+                sql = q.get("sql", "")
+                tables = engine.db_tables().get("tables", [])
+                if sql:
+                    return self._html(views.db_page(tables, "", None, sql, engine.db_query(sql)))
+                table = q.get("table") or "entities"
+                try:
+                    page = max(0, int(q.get("page", 0)))
+                except (TypeError, ValueError):
+                    page = 0
+                data = engine.db_rows(table, limit=50, offset=page * 50)
+                return self._html(views.db_page(tables, table, data, "", None))
             if path == "/module":
                 data = engine.explain_module(q.get("q", ""))
                 if data.get("ok"):
@@ -207,8 +219,10 @@ def make_handler(target, jobs: JobRunner | None = None):
                 detail = engine.entity_detail(q.get("id", ""))
                 if not detail.get("ok"):
                     return self._html(views.layout("Symbol", "/", "<div class='container'><p class='muted'>Not found.</p></div>"), 404)
+                cfg = engine.control_flow(detail["entity"].get("qualified_name", ""))
                 return self._html(views.symbol_page(
-                    detail["entity"], detail["callers"], detail["callees"], detail["source"]))
+                    detail["entity"], detail["callers"], detail["callees"], detail["source"],
+                    cfg if cfg.get("ok") else None))
             return self._html(views.layout("Not found", "/", "<div class='container'><h1>404</h1></div>"), 404)
 
         # -- POST ------------------------------------------------------------

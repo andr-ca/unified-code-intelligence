@@ -131,6 +131,36 @@ class SqliteDatabase:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
+    def query_readonly(self, sql: str, params: Sequence[Any] = (),
+                       limit: int = 500) -> tuple[list[str], list[tuple]]:
+        """Execute a read-only query and return ``(columns, rows)``.
+
+        Read-only is enforced at the SQLite level (defence in depth beyond any caller-side text
+        check): a real database file is opened through a **fresh** ``mode=ro`` connection that
+        physically cannot write; an in-memory database (tests) uses ``PRAGMA query_only`` on the
+        shared connection under the lock. At most ``limit`` rows are materialised.
+        """
+        capped = max(1, int(limit))
+        if self.path != ":memory:":
+            ro = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
+            ro.row_factory = sqlite3.Row
+            try:
+                cur = ro.execute(sql, tuple(params))
+                columns = [d[0] for d in (cur.description or [])]
+                rows = [tuple(r) for r in cur.fetchmany(capped)]
+            finally:
+                ro.close()
+            return columns, rows
+        with self._lock:
+            self.conn.execute("PRAGMA query_only=ON")
+            try:
+                cur = self.conn.execute(sql, tuple(params))
+                columns = [d[0] for d in (cur.description or [])]
+                rows = [tuple(r) for r in cur.fetchmany(capped)]
+            finally:
+                self.conn.execute("PRAGMA query_only=OFF")
+        return columns, rows
+
 
 def _dumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))

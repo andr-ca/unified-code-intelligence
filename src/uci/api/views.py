@@ -5,20 +5,31 @@ from __future__ import annotations
 import html
 from urllib.parse import quote
 
-_NAV = [
-    ("/", "Overview"),
-    ("/understand", "Understand"),
-    ("/search", "Search"),
-    ("/graph", "Graph"),
-    ("/architecture", "Architecture"),
-    ("/flows", "Flows"),
-    ("/metrics", "Metrics"),
-    ("/gaps", "Gaps"),
-    ("/onboarding", "Onboarding"),
-    ("/build", "Build"),
-    ("/projects", "Projects"),
-    ("/config", "Config"),
-    ("/enrich", "Enrich"),
+_NAV_GROUPS: list[tuple[str, str | None, list[tuple[str, str]]]] = [
+    ("Overview", "/", []),
+    ("Understand", None, [
+        ("/understand", "Guided Tour"),
+        ("/architecture", "Architecture"),
+        ("/flows", "Flows"),
+        ("/onboarding", "Onboarding"),
+    ]),
+    ("Explore", None, [
+        ("/search", "Search"),
+        ("/graph", "Graph"),
+    ]),
+    ("Analyze", None, [
+        ("/metrics", "Metrics"),
+        ("/gaps", "Gaps"),
+    ]),
+    ("Data", None, [
+        ("/build", "Build"),
+        ("/enrich", "Enrich"),
+        ("/db", "Database"),
+    ]),
+    ("Settings", None, [
+        ("/projects", "Projects"),
+        ("/config", "Config"),
+    ]),
 ]
 
 _SHOW_EVALS = False
@@ -38,11 +49,33 @@ def set_project_context(projects: list[dict], active: str | None) -> None:
     _PROJECTS, _ACTIVE = projects, active
 
 
-def _nav_items() -> list[tuple[str, str]]:
-    items = list(_NAV)
+def _nav_groups() -> list[tuple[str, str | None, list[tuple[str, str]]]]:
+    """Nav groups for the top bar, injecting the Evals item into Data when the suite is present."""
+    groups = [(label, href, list(children)) for label, href, children in _NAV_GROUPS]
     if _SHOW_EVALS:
-        items.append(("/evals", "Evals"))
-    return items
+        for label, _href, children in groups:
+            if label == "Data":
+                children.append(("/evals", "Evals"))
+    return groups
+
+
+def _render_nav(active: str) -> str:
+    parts = []
+    for label, href, children in _nav_groups():
+        if not children and href is not None:
+            cls = "active" if href == active else ""
+            parts.append(f'<a href="{href}" class="{cls}">{_e(label)}</a>')
+            continue
+        group_active = any(h == active for h, _ in children)
+        drop = "".join(
+            f'<a href="{h}" class="{"active" if h == active else ""}">{_e(lbl)}</a>'
+            for h, lbl in children)
+        parts.append(
+            f'<div class="menu{" active" if group_active else ""}">'
+            f'<button type="button" class="menu-btn" aria-haspopup="true">'
+            f'{_e(label)}<span class="caret">\u25be</span></button>'
+            f'<div class="menu-drop">{drop}</div></div>')
+    return "".join(parts)
 
 
 def _e(text) -> str:
@@ -60,10 +93,6 @@ def _switcher() -> str:
 
 
 def layout(title: str, active: str, body: str) -> str:
-    nav = "".join(
-        f'<a href="{href}" class="{"active" if href == active else ""}">{_e(label)}</a>'
-        for href, label in _nav_items()
-    )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{_e(title)} · UCI</title>
@@ -71,7 +100,7 @@ def layout(title: str, active: str, body: str) -> str:
 <body>
 <header class="topbar">
   <span class="brand"><b>UCI</b> · Unified Code Intelligence</span>
-  <nav class="main">{nav}</nav>
+  <nav class="main">{_render_nav(active)}</nav>
   <span class="topbar-right">{_switcher()}</span>
 </header>
 {body}
@@ -405,7 +434,7 @@ def enrich_page(status: dict, passes, ev: dict | None = None) -> str:
     body = f"""<div class="container">
   <h1>LLM enrichment {badge}</h1>
   <p class="sub">Optional passes add <b>purpose summaries</b>, <b>business capabilities</b>,
-    <b>dynamic-call candidates</b>, and <b>field dictionaries</b>. Every fact is labeled
+    <b>dynamic-call candidates</b>, <b>field dictionaries</b>, and a <b>system-architecture overview</b>. Every fact is labeled
     <span class="mono">extractor="llm:&lt;model&gt;"</span> with confidence &lt; 1.0 (candidates use
     <span class="mono">resolution="llm-suggested"</span>) — the resolution ladder and completeness stay honest.</p>
   <div class="split">
@@ -437,6 +466,7 @@ def _enrich_results(ev: dict) -> str:
     if not ev:
         return ""
     su, cap, cand, fl = ev.get("summaries", {}), ev.get("capabilities", {}), ev.get("candidates", {}), ev.get("fields", {})
+    arch = ev.get("architecture", {})
     hon = ev.get("honesty", {})
     pct = lambda x: f"{round((x or 0) * 100)}%"
     honesty = ("<span class='pill score' style='color:var(--green);border-color:var(--green)'>honest</span>"
@@ -451,6 +481,9 @@ def _enrich_results(ev: dict) -> str:
         f"<td class='muted small'>{cand.get('valid_targets', 0)}/{cand.get('edges', 0)} llm-suggested edges hit indexed targets</td></tr>"
         f"<tr><td>field dictionaries</td><td class='sc'>{pct(fl.get('coverage'))}</td>"
         f"<td class='muted small'>{fl.get('with_dictionary', 0)}/{fl.get('copybooks', 0)} copybooks</td></tr>"
+        f"<tr><td>architecture overview</td><td class='sc'>{'yes' if arch.get('present') else 'no'}</td>"
+        f"<td class='muted small'>{('generated by ' + _e(arch.get('model', ''))) if arch.get('present') else 'not generated yet'}"
+        f" · {arch.get('key_points', 0)} key points</td></tr>"
     )
     return f"""<div class="card" style="margin-top:18px">
     <div class="card-h">Results — enrichment eval {honesty}</div>
@@ -460,6 +493,73 @@ def _enrich_results(ev: dict) -> str:
       {hon.get('leaked_into_ladder', 0)} leaked into the resolution ladder (must be 0). LLM facts stay
       in the candidate stratum at confidence &lt; 1.0, so multi-hop traversal and completeness never trust them.</p>
   </div>"""
+
+
+def _db_grid(columns: list, rows: list) -> str:
+    head = "".join(f"<th>{_e(c)}</th>" for c in columns)
+    body = "".join(
+        "<tr>" + "".join(f"<td>{_e('' if v is None else v)}</td>" for v in row) + "</tr>"
+        for row in rows
+    ) or f"<tr><td colspan='{max(1, len(columns))}' class='muted'>No rows.</td></tr>"
+    return (f"<div class='tablewrap'><table class='dbtable'><thead><tr>{head}</tr></thead>"
+            f"<tbody>{body}</tbody></table></div>")
+
+
+def _db_browse(data: dict | None) -> str:
+    if not data or not data.get("ok"):
+        msg = (data or {}).get("error", {}).get("message", "table not available")
+        return f"<div class='card'><p class='muted'>{_e(msg)}</p></div>"
+    limit, offset, total = data["limit"], data["offset"], data["total"]
+    page = offset // limit if limit else 0
+    table = data["table"]
+    prev = (f"<a class='btn ghost small' href='/db?table={quote(table)}&page={page - 1}'>&larr; prev</a>"
+            if page > 0 else "")
+    nxt = (f"<a class='btn ghost small' href='/db?table={quote(table)}&page={page + 1}'>next &rarr;</a>"
+           if offset + limit < total else "")
+    start = offset + 1 if total else 0
+    end = min(offset + limit, total)
+    return (f"<div class='card'><div class='card-h'>{_e(table)} "
+            f"<span class='muted small'>&middot; {start}&ndash;{end} of {total}</span></div>"
+            f"{_db_grid(data['columns'], data['rows'])}"
+            f"<div class='btnrow' style='margin-top:10px'>{prev}{nxt}</div></div>")
+
+
+def _db_result(result: dict | None) -> str:
+    if not result or not result.get("ok"):
+        msg = (result or {}).get("error", {}).get("message", "query failed")
+        return (f"<div class='card'><div class='card-h'>Query error</div>"
+                f"<p class='muted mono small'>{_e(msg)}</p></div>")
+    cap = " <span class='muted small'>(capped)</span>" if result.get("capped") else ""
+    return (f"<div class='card'><div class='card-h'>Result "
+            f"<span class='muted small'>&middot; {result['row_count']} rows{cap}</span></div>"
+            f"{_db_grid(result['columns'], result['rows'])}</div>")
+
+
+def db_page(tables: list, table: str, data: dict | None, sql: str, result: dict | None) -> str:
+    chips = "".join(
+        f'<a href="/db?table={quote(t["table"])}" '
+        f'class="dbchip{" active" if (t["table"] == table and not sql) else ""}">'
+        f'{_e(t["table"])} <span class="muted small">{t["rows"]}</span></a>'
+        for t in tables)
+    sqlbox = (
+        '<form method="get" action="/db" class="card" style="margin-bottom:16px">'
+        '<div class="card-h">Read-only SQL</div>'
+        '<textarea class="sqlbox" name="sql" rows="3" spellcheck="false" '
+        'placeholder="SELECT kind, COUNT(*) FROM entities GROUP BY kind ORDER BY 2 DESC">'
+        f'{_e(sql)}</textarea>'
+        '<div class="btnrow" style="margin-top:8px">'
+        '<button class="btn primary" type="submit">Run query</button>'
+        '<a class="btn ghost small" href="/db">clear</a>'
+        '<span class="muted small">SELECT / WITH only &middot; runs on a read-only connection '
+        '&middot; rows capped</span></div></form>')
+    panel = _db_result(result) if sql else _db_browse(data)
+    body = (
+        '<div class="container wide"><h1>Database</h1>'
+        '<p class="sub">Read-only view of the index store '
+        '(<span class="mono">.uci/uci.db</span>), scoped to this repository.</p>'
+        f'<div class="pillrow" style="margin-bottom:16px">{chips}</div>'
+        f'{sqlbox}{panel}</div>')
+    return layout("Database", "/db", body)
 
 
 def _metrics_reindex_body(msg: str) -> str:
@@ -1219,7 +1319,31 @@ def onboarding_page(data: dict) -> str:
     return layout("Onboarding", "/onboarding", body)
 
 
-def symbol_page(hit: dict, callers: list[dict], callees: list[dict], source: str) -> str:
+def _control_flow_section(cfg: dict | None) -> str:
+    """A 'Control flow' block scheme on the symbol page. Renders as a diagram when mermaid.js is
+    present (drop it into static/ for airgapped installs); otherwise shows the Mermaid source."""
+    if not cfg or not cfg.get("ok"):
+        return ""
+    st = cfg.get("stats", {})
+    tag = f"{st.get('decisions', 0)} decisions · {st.get('loops', 0)} loops · {st.get('nodes', 0)} blocks"
+    notes = [n for n in cfg.get("nodes", []) if n.get("note")]
+    notes_html = ""
+    if notes:
+        notes_html = "<ul class='clean small'>" + "".join(
+            f"<li><span class='mono muted'>{_e(n['kind'])}</span> {_e(n['note'])}</li>"
+            for n in notes) + "</ul>"
+    return f"""<div style="margin-top:18px">
+    <h2>Control flow <span class="tag">· {_e(tag)}</span></h2>
+    <pre class="code mermaid">{_e(cfg['mermaid'])}</pre>
+    {notes_html}
+    <p class="muted small">Deterministic block scheme from source. Renders as a flowchart when
+      <span class="mono">mermaid.js</span> is available; the Mermaid source is shown otherwise.</p>
+    <script>if(window.mermaid){{try{{window.mermaid.initialize({{startOnLoad:true}});}}catch(e){{}}}}</script>
+  </div>"""
+
+
+def symbol_page(hit: dict, callers: list[dict], callees: list[dict], source: str,
+                cfg: dict | None = None) -> str:
     def lst(items, empty):
         if not items:
             return f"<p class='muted'>{empty}</p>"
@@ -1237,6 +1361,7 @@ def symbol_page(hit: dict, callers: list[dict], callees: list[dict], source: str
     <div><h2>Source</h2><pre class="code">{_e(source) or '—'}</pre></div>
     <div><h2>Callers</h2>{lst(callers, 'None')}<h2>Callees</h2>{lst(callees, 'None')}</div>
   </div>
+  {_control_flow_section(cfg)}
 </div>"""
     return layout(hit["name"], "/", body)
 
