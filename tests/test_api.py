@@ -330,7 +330,7 @@ def test_api_enrich_status_and_page(project_server):
     base, _, _ = project_server
     data = json.loads(_get(base, "/api/enrich")[0])
     assert data["ok"] and "available" in data["status"] and data["passes"]
-    assert data["status"]["protocol"] in ("ollama", "openai", "anthropic")
+    assert data["status"]["protocol"] in ("ollama", "openai", "anthropic", "freellm")
     ev = data["eval"]
     assert set(ev) >= {"summaries", "capabilities", "candidates", "fields", "honesty"}
     assert ev["honesty"]["ok"] is True  # no llm-suggested fact may leak into the resolution ladder

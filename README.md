@@ -104,16 +104,17 @@ Contracts: [`docs/mcp-tools.md`](docs/mcp-tools.md).
 ## For humans (dashboard)
 
 `uci serve` renders repo overview, module list, symbol search, an offline **graph explorer**, symbol
-detail, impact view, architecture map, a **gaps** panel (known unknowns), and an onboarding guide — all
+detail, impact view, architecture map, a **gaps** panel (known unknowns), a **flows** panel
+(LLM-derived business capabilities → programs → triggers → data), and an onboarding guide — all
 clients of the same graph.
 
 ## Deployment profiles
 
-| Profile | Metadata | Graph | Vector | Embeddings | External services |
-| --- | --- | --- | --- | --- | --- |
-| **local-lite** (default) | SQLite | SQLite/in-memory | SQLite/numpy | hash (or none) | none |
-| **local-pro** | SQLite | Memgraph | Qdrant | Ollama | `docker-compose.local-pro.yml` |
-| **cloud** | Postgres | Neo4j/Memgraph | Qdrant | OpenAI/Anthropic/Gemini | orchestrated |
+| Profile                  | Metadata | Graph            | Vector       | Embeddings              | External services              |
+| ------------------------ | -------- | ---------------- | ------------ | ----------------------- | ------------------------------ |
+| **local-lite** (default) | SQLite   | SQLite/in-memory | SQLite/numpy | hash (or none)          | none                           |
+| **local-pro**            | SQLite   | Memgraph         | Qdrant       | Ollama                  | `docker-compose.local-pro.yml` |
+| **cloud**                | Postgres | Neo4j/Memgraph   | Qdrant       | OpenAI/Anthropic/Gemini | orchestrated                   |
 
 Backends are selected declaratively (env or `--flags`); no core code imports a vendor SDK. Optional
 adapters live behind interfaces (`GraphStore`, `VectorStore`, `MetadataStore`, `EmbeddingProvider`)

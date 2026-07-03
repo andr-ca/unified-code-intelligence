@@ -251,9 +251,14 @@ class Engine:
         return {"ok": True, "tool": "briefing", "symbol": symbol,
                 "briefing": prose, "impact": imp}
 
-    def ask(self, question: str, client=None) -> dict:
+    def ask(self, question: str, client=None, agentic: bool = False) -> dict:
         """Answer-location routing: is the answer in code, in data (which table/dataset), or
-        not in the repo at all? (docs/llm-enrichment.md 'ask')."""
+        not in the repo at all? (docs/llm-enrichment.md 'ask').
+
+        ``agentic=True`` runs the router inside the bounded tool-loop so the model can ask the
+        RAG follow-up questions, list files, and read specific sources before routing
+        (docs/agentic-enrichment.md §3.1). Guardrails are identical in both modes.
+        """
         from .enrich import LlmClient, LlmError
         hits = self._retriever().search(question, top_k=8)
         data_inventory = []
@@ -276,22 +281,42 @@ class Engine:
                 })
         code_context = "\n".join(
             f"- {h.qualified_name} ({h.kind}): {h.reason}" for h in hits)
+        system = (
+            "You route a question about a codebase to where its answer lives. Your final reply "
+            "must be STRICT JSON: {\"answer_location\": \"code\"|\"data\"|\"not_in_repo\", "
+            "\"targets\": [{\"name\": str, \"kind\": str, \"why\": str}], "
+            "\"explanation\": str, \"next_step\": str}. Questions about configured/stored "
+            "values (product lists, rates, codes) are usually DATA-resident: name the "
+            "table/dataset to query. Use ONLY names from the provided context or from tool "
+            "results."
+        )
+        user = (f"Question: {question}\n\nCode matches:\n{code_context or '(none)'}\n\n"
+                f"Data inventory (tables/datasets with reader/writer programs):\n"
+                f"{json.dumps(data_inventory, indent=1)[:5000]}")
+        evidence = None
         try:
             client = client or LlmClient(self.config)
-            data = client.complete_json(
-                "You route a question about a codebase to where its answer lives. Reply with "
-                "STRICT JSON only: {\"answer_location\": \"code\"|\"data\"|\"not_in_repo\", "
-                "\"targets\": [{\"name\": str, \"kind\": str, \"why\": str}], "
-                "\"explanation\": str, \"next_step\": str}. Questions about configured/stored "
-                "values (product lists, rates, codes) are usually DATA-resident: name the "
-                "table/dataset to query. Use ONLY names from the provided context.",
-                f"Question: {question}\n\nCode matches:\n{code_context or '(none)'}\n\n"
-                f"Data inventory (tables/datasets with reader/writer programs):\n"
-                f"{json.dumps(data_inventory, indent=1)[:5000]}",
-                max_tokens=500,
-            )
+            client.default_tag = "ask:agentic" if agentic else "ask"  # log attribution (§2.1)
+            if agentic:
+                from .enrich.tool_loop import ToolLoop
+                loop = ToolLoop(client, self.graph, self.config.repo_path, self.repo_id,
+                                retriever=self._retriever(), metadata=self.metadata,
+                                max_tool_calls=4)
+                loop_result = loop.run(system, user, answer_key="answer_location",
+                                       max_tokens=600)
+                data = loop_result.answer
+                evidence = {
+                    "tool_calls": loop_result.tool_calls,
+                    "protocol_errors": loop_result.protocol_errors,
+                    "tools_used": [t["request"].get("action") for t in loop_result.transcript],
+                    "digest": loop_result.evidence_digest(),
+                }
+            else:
+                data = client.complete_json(system, user, max_tokens=500)
         except LlmError as exc:
             return {"ok": False, "tool": "ask", "error": {"code": "llm", "message": str(exc)}}
+        if not isinstance(data, dict):
+            data = {}
         # validate targets against the index; attach graph-proven context to data targets
         valid_targets = []
         for t in (data or {}).get("targets", []):
@@ -315,11 +340,14 @@ class Engine:
         location = (data or {}).get("answer_location", "not_in_repo")
         if location != "not_in_repo" and not valid_targets:
             location = "not_in_repo"  # model named things we can't verify — degrade honestly
-        return {"ok": True, "tool": "ask", "question": question,
-                "answer_location": location, "targets": valid_targets,
-                "explanation": str((data or {}).get("explanation", "")),
-                "next_step": str((data or {}).get("next_step", "")),
-                "code_matches": [h.to_dict() for h in hits[:5]]}
+        out = {"ok": True, "tool": "ask", "question": question,
+               "answer_location": location, "targets": valid_targets,
+               "explanation": str((data or {}).get("explanation", "")),
+               "next_step": str((data or {}).get("next_step", "")),
+               "code_matches": [h.to_dict() for h in hits[:5]]}
+        if evidence is not None:
+            out["evidence"] = evidence
+        return out
 
     def metrics(self) -> dict:
         """Codebase metrics collected at index time: LOC per language (code/comment/blank),
@@ -343,6 +371,103 @@ class Engine:
 
     def onboarding(self) -> dict:
         return onboarding_guide(self.graph, self.metadata, self.repo_id)
+
+    def flows(self, trigger_depth: int = 4) -> dict:
+        """Business-capability flows for the dashboard's Flows tab.
+
+        Each ``BUSINESS_CAPABILITY`` is returned with the programs that implement it
+        (``IMPLEMENTS_CAPABILITY``), how it is triggered — the transaction codes / JCL jobs that
+        reach those programs via ``CALLS``/``RUNS``/``INVOKES`` (bounded reverse traversal) — and the
+        tables it touches (``READS``/``WRITES``).
+
+        Capabilities exist only when the optional LLM enrichment has run (docs/llm-enrichment.md), so
+        ``enriched`` is ``False`` when none are present — surfaces prompt for enrichment instead of
+        advertising an empty view (recommendations §8.4).
+        """
+        entry_edges = [RelationType.CALLS, RelationType.RUNS, RelationType.INVOKES]
+        trigger_kinds = {EntityType.TRANSACTION_CODE, EntityType.JCL_JOB}
+        caps: list[dict] = []
+        for cap in self.graph.entities(kind=EntityType.BUSINESS_CAPABILITY, repo_id=self.repo_id):
+            programs: list[dict] = []
+            triggers: dict[str, dict] = {}
+            data: dict[str, dict] = {}
+            for rel in self.graph.in_relationships(cap.id, [RelationType.IMPLEMENTS_CAPABILITY]):
+                prog = self.graph.get_entity(rel.src_id)
+                if prog is None or prog.attributes.get("missing") or prog.attributes.get("external"):
+                    continue
+                programs.append({**_entity_hit(prog), "summary": prog.attributes.get("summary", "")})
+                # triggers: entry points that reach this program (bounded reverse traversal)
+                for entity, _hop, _path in self.graph.bfs(
+                        prog.id, direction="in", rtypes=entry_edges,
+                        max_depth=trigger_depth, limit=60):
+                    if entity.kind in trigger_kinds and not entity.attributes.get("missing"):
+                        triggers.setdefault(entity.id, _entity_hit(entity))
+                # data: tables the program reads/writes directly
+                for edge in self.graph.out_relationships(
+                        prog.id, [RelationType.READS, RelationType.WRITES]):
+                    table = self.graph.get_entity(edge.dst_id)
+                    if table is None:
+                        continue
+                    slot = data.setdefault(table.id, {"hit": _entity_hit(table), "access": set()})
+                    slot["access"].add("read" if edge.type == RelationType.READS else "write")
+            caps.append({
+                "entity_id": cap.id, "name": cap.name,
+                "description": cap.attributes.get("description", ""),
+                "programs": sorted(programs, key=lambda p: p["name"]),
+                "triggers": sorted(triggers.values(), key=lambda t: t["name"]),
+                "data": sorted(
+                    ({**d["hit"], "access": "/".join(sorted(d["access"]))} for d in data.values()),
+                    key=lambda d: d["name"]),
+            })
+        caps.sort(key=lambda c: c["name"])
+        return {"ok": True, "tool": "flows", "enriched": bool(caps), "capabilities": caps}
+
+    def understand(self) -> dict:
+        """Composed "how this codebase is organized and how it runs" narrative for the Understand
+        tab: what/why, organization (layers + capabilities), execution (entry points → flows),
+        key parts (hubs), a reading path, and an honest coverage/blind-spots section.
+
+        Structural-first (no LLM) — every section works from the graph alone; the capability and
+        summary layers are added when ``uci enrich`` has run (reflected by ``enriched``).
+        """
+        from .analysis.coverage import coverage_report
+        from .analysis.walkthrough import walkthrough
+
+        overview = self.overview()
+        flows = self.flows()
+        metrics = self.metrics()
+        m = metrics.get("metrics", {}) if metrics.get("ok") else {}
+        capabilities = flows.get("capabilities", [])
+        enriched = bool(flows.get("enriched"))
+        onboarding = self.onboarding()
+        gaps = self.gaps()
+        return {
+            "ok": True, "tool": "understand", "enriched": enriched,
+            "summary": {
+                "name": overview.get("name", ""),
+                "totals": overview.get("totals", {}),
+                "languages": overview.get("languages", {}),
+                "purpose": [{"name": c["name"], "description": c["description"]}
+                            for c in capabilities if c.get("description")][:6],
+            },
+            "organization": {"layers": self.architecture().get("layers", []),
+                             "capabilities": capabilities},
+            "execution": {"entry_points": m.get("entry_points", {}),
+                          "mains": overview.get("entry_points", []),
+                          "capabilities": capabilities},
+            "walkthrough": walkthrough(self.graph, self.repo_id),
+            "key_parts": overview.get("key_symbols", []),
+            "reading_path": {"summary": onboarding.get("summary", ""),
+                             "steps": onboarding.get("steps", []),
+                             "key_concepts": onboarding.get("key_concepts", [])},
+            "coverage": {
+                "gaps": gaps.get("gaps", []), "gap_count": gaps.get("count", 0),
+                "dynamic_call_sites": m.get("dynamic_call_sites", 0),
+                "unresolved_call_sites": m.get("unresolved_call_sites", 0),
+                "resolution": m.get("call_resolution_distribution", {}),
+                **coverage_report(self.graph, self.repo_id),
+            },
+        }
 
     # -- graph access (for the dashboard graph explorer) -------------------
     def graph_neighborhood(self, entity_id: str, depth: int = 1, limit: int = 60) -> dict:

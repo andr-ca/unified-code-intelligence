@@ -21,6 +21,10 @@ htmlcov/
 
 # Eval run reports (generated artifacts, not tracked)
 evals/reports/run-*
+evals/reports/llm-eval-*
+# LLM call logs contain full prompts + source slices (may be proprietary) — never track
+evals/reports/llm-logs/
+.uci/llm-calls.jsonl
 
 # Editors / OS
 .idea/

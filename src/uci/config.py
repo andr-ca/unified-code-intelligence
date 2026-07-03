@@ -5,7 +5,7 @@ so no core code imports a vendor SDK. Values come from (in order of precedence):
 
 1. explicit ``overrides`` passed in code / CLI flags,
 2. ``UCI_*`` environment variables,
-3. a ``.env`` file in the repo or current directory,
+3. a ``.env`` file in the repo's ``.uci/`` store dir or the current directory,
 4. profile defaults (``local-lite`` / ``local-pro`` / ``cloud``).
 """
 
@@ -106,13 +106,14 @@ class Config:
     # gap registry: name prefixes treated as external (not "missing") — e.g. mainframe system modules
     gap_external_prefixes: tuple[str, ...] = _DEFAULT_GAP_PREFIXES
 
-    # optional LLM enrichment (docs/llm-enrichment.md). Protocol: ollama | openai | anthropic.
+    # optional LLM enrichment (docs/llm-enrichment.md). Protocol: ollama | openai | anthropic | freellm.
     # The API key lives in settings["llm_api_key"] (never in to_dict()/reports).
     llm_protocol: str = "ollama"
     llm_url: str = ""            # empty -> protocol default (localhost Ollama / api.openai.com / api.anthropic.com)
     llm_model: str = ""          # empty -> protocol default
     llm_timeout: int = 60
     llm_max_tokens: int = 700
+    llm_log: str = ""            # LLM call log: ""->.uci/llm-calls.jsonl, "off"->disabled, else a path
 
     # retrieval fusion weights (graph-first defaults)
     weight_symbol: float = 1.4
@@ -159,9 +160,10 @@ class Config:
     ) -> Config:
         repo = Path(repo_path or os.environ.get("UCI_REPO_PATH") or Path.cwd()).resolve()
 
-        # merge .env (repo first, then cwd) into a lookup dict, then real env wins
+        # merge .env (the repo's .uci/.env first, then cwd) into a lookup dict, then real env wins.
+        # Repo config lives under .uci/ so it never pollutes the processed repo's root.
         env: dict[str, str] = {}
-        for candidate in (repo / ".env", Path.cwd() / ".env"):
+        for candidate in (repo / ".uci" / ".env", Path.cwd() / ".env"):
             if candidate.exists():
                 env.update(_parse_env_file(candidate))
         env.update({k: v for k, v in os.environ.items() if k.startswith("UCI_")})
@@ -207,6 +209,7 @@ class Config:
             llm_model=env.get("UCI_LLM_MODEL", ""),
             llm_timeout=int(_num(env, "UCI_LLM_TIMEOUT", 60)),
             llm_max_tokens=int(_num(env, "UCI_LLM_MAX_TOKENS", 700)),
+            llm_log=env.get("UCI_LLM_LOG", ""),
             settings=_collect_settings(env),
         )
         if overrides:

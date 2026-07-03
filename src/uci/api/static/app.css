@@ -869,6 +869,113 @@ table.reports tbody td {
     margin-top: 10px;
 }
 
+/* Understand page */
+.understand-secnav {
+    position: sticky;
+    top: 8px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 6px 0;
+    background: var(--bg);
+}
+
+.u-progress {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.u-sec {
+    margin: 34px 0;
+    scroll-margin-top: 64px;
+}
+
+.u-chap {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.u-num {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.u-chap h2 {
+    margin: 2px 0 0;
+}
+
+.u-teach {
+    color: var(--muted);
+    font-style: italic;
+    margin: 4px 0 0;
+}
+
+.u-next {
+    display: inline-block;
+    margin-top: 14px;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.u-walk {
+    border-left: 3px solid var(--accent);
+    margin: 12px 0;
+}
+
+.u-steps {
+    margin: 6px 0 0;
+    padding-left: 22px;
+    line-height: 1.9;
+}
+
+.u-steps > li {
+    margin: 4px 0;
+}
+
+.u-enrich {
+    border-left: 3px solid var(--amber);
+}
+
+.u-note {
+    margin: 12px 0;
+    color: var(--muted);
+}
+
+.u-cardrow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.u-cardrow > .card {
+    flex: 1 1 260px;
+}
+
+.u-langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.u-caveat {
+    color: var(--amber);
+    font-size: 12px;
+}
+
 .ds-meta {
     display: flex;
     align-items: center;

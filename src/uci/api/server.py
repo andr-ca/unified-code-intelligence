@@ -118,6 +118,10 @@ def make_handler(target, jobs: JobRunner | None = None):
                                    "passes": list(enrichment.PASSES)})
             if path == "/api/onboarding":
                 return self._json(engine.onboarding())
+            if path == "/api/flows":
+                return self._json(engine.flows())
+            if path == "/api/understand":
+                return self._json(engine.understand())
             if path == "/api/search":
                 return self._json(engine.search(q.get("q", ""), top_k=int(q.get("k", 10))))
             if path == "/api/symbol":
@@ -183,6 +187,10 @@ def make_handler(target, jobs: JobRunner | None = None):
                                                     list(enrichment.PASSES), enrichment.evaluate(engine)))
             if path == "/onboarding":
                 return self._html(views.onboarding_page(engine.onboarding()))
+            if path == "/flows":
+                return self._html(views.flows_page(engine.flows()))
+            if path == "/understand":
+                return self._html(views.understand_page(engine.understand()))
             if path == "/gaps":
                 return self._html(views.gaps_page(engine.gaps(q.get("kind"))))
             if path == "/module":

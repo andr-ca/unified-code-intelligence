@@ -82,16 +82,22 @@ application because it targets the only sub-0.9 cell on the whole board.
 The `candidates_restraint_when_opaque` task (abstain when the dispatch variable is caller-supplied)
 splits models cleanly:
 
-| model | one-shot restraint |
-| --- | --- |
-| qwen3.5:2b / :4b (local) | 0.00 |
-| gemma4:e4b (local) | 0.00 |
-| **gemini-2.5-flash** | **1.00** |
+| model | tier | one-shot restraint |
+| --- | --- | --- |
+| qwen3.5:2b / :4b (local) | local | 0.00 |
+| gemma4:e4b (local) | local | 0.00 |
+| gemini-2.5-flash-**lite** | frontier-lite | **0.00** |
+| **gemini-2.5-flash** | frontier | **1.00** |
+| **gpt-4.1** | frontier | **1.00** |
+| **qwen3-coder-480b** | frontier | **1.00** |
 
-Every local model **hallucinates** call targets it cannot see; the frontier model, given the
-hardened prompt, **abstains**. Restraint — knowing what you don't know — is the capability that
-separates a safe enrichment model from an unsafe one, and it is invisible to accuracy-only
-metrics. This is the benchmark's most valuable single number.
+Restraint — knowing what you don't know — is the capability that separates a safe enrichment model
+from an unsafe one, and it is invisible to accuracy-only metrics. The 2026-07-03 run (six models,
+`llm-comparison.md`) added the sharper half of the finding: **restraint does not track the "frontier"
+label.** `gemini-2.5-flash-lite` hallucinates like a 2B local, while the full `gemini-2.5-flash`,
+`gpt-4.1`, and `qwen3-coder-480b` abstain — the capability flips *within one vendor's lineup* by
+tier. So it must be **measured per model** (`candidates_restraint_when_opaque` is that gate), never
+assumed from size or brand. This is the benchmark's most valuable single number.
 
 ### 2.3 The cheap tasks don't need a big model
 JSON discipline, DCLGEN field dictionaries, and answer-location routing (`ask`) score 1.00 on a 2B
@@ -120,6 +126,12 @@ So the loop neither restores what the prompt fixed nor delivers what it was mean
 **opt-in, off by default**, gated behind `agentic_cross_file_resolution ≥ 0.8` — a bar no model
 has cleared. A well-built, plausible feature that the evidence says not to enable is precisely what
 "measure before adopting" is for.
+
+**Reproduced 2026-07-03** on a second, larger frontier model (`qwen3-coder-480b` via the local
+freellm gateway): one-shot restraint 1.00, agentic cross-file 0.20 (pulled the copybook 3× then
+returned `[]`). The full local-vs-frontier and with-vs-without-tools breakdown — including how the
+per-call log turns "tools didn't help" into "gemma made 0 tool calls, the 480B model made 3 and
+still failed" — is in `llm-comparison.md`.
 
 ---
 

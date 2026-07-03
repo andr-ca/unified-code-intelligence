@@ -318,7 +318,7 @@ def cmd_briefing(args) -> int:
 def cmd_ask(args) -> int:
     with _engine(args) as engine:
         _ensure_indexed(engine)
-        data = engine.ask(args.question)
+        data = engine.ask(args.question, agentic=args.agentic)
         if args.json:
             print(json.dumps(data, indent=2))
             return 0 if data.get("ok") else 1
@@ -431,6 +431,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("ask", help="route a question: answered by code, by data (which table), or not in repo")
     sp.add_argument("question"); sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.add_argument("--agentic", action="store_true",
+                    help="let the LLM ask RAG follow-ups / list / read files before routing")
     sp.set_defaults(func=cmd_ask)
 
     sp = sub.add_parser("gaps", help="list missing artifacts referenced but not indexed")

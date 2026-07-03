@@ -180,6 +180,21 @@ cross-file resolution — is unproven on every model tested; until a model clear
 outcome "measure before adopting" exists to catch: a plausible, well-built feature that the
 evidence says not to turn on. The harness and gate remain ready for the next model.
 
+### Reproduced on a second frontier model (2026-07-03, freellm `qwen3-coder-480b`)
+
+| model | one-shot restraint | agentic_cross_file | agentic_restraint | tool calls on cross_file |
+| --- | --- | --- | --- | --- |
+| **qwen3-coder-480b** (freellm) | **1.00** | 0.20 | 1.00 | 3 → returned `[]` |
+| gemma4:e4b (local) | 0.00 | 0.63 (table + 2 noise) | 0.20 | **0** (never pulled) |
+| qwen3.5:4b (local) | 0.00 | 0.10 | 0.90 (pulled `LINKAGE`) | 2 → returned `[]` |
+
+A 480B code-specialist reproduces the exact pattern: it **solves one-shot restraint** (1.00, so the
+loop's motivating task needs no loop) and **fails cross-file** (pulls the copybook 3× then returns
+`[]`, 0.20). The bottleneck is confirmed as *reasoning over fetched evidence*, not fetching. The
+call log (docs/llm-enrichment.md §2.1) also exposes that gemma's agentic restraint failure is a
+**non-use** (0 tool calls), not a mis-reason — the full analysis is in
+`evals/docs/llm-comparison.md`.
+
 ## 7. Explicit non-goals
 
 - No agentic mode for `summaries`/`capabilities`/`fields` — the scorecard shows no context

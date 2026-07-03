@@ -7,9 +7,11 @@ from urllib.parse import quote
 
 _NAV = [
     ("/", "Overview"),
+    ("/understand", "Understand"),
     ("/search", "Search"),
     ("/graph", "Graph"),
     ("/architecture", "Architecture"),
+    ("/flows", "Flows"),
     ("/metrics", "Metrics"),
     ("/gaps", "Gaps"),
     ("/onboarding", "Onboarding"),
@@ -342,7 +344,7 @@ def config_page(cfg: dict, overrides: dict, reindex_fields=()) -> str:
                       for w in ("symbol", "keyword", "semantic", "graph", "proximity", "churn"))
     weights += _cfg_num(cfg, ov, "rrf_k", "RRF k", "1")
     llm = (
-        _cfg_select(cfg, ov, "llm_protocol", "Protocol", ("ollama", "openai", "anthropic")) +
+        _cfg_select(cfg, ov, "llm_protocol", "Protocol", ("ollama", "openai", "anthropic", "freellm")) +
         _cfg_text(cfg, ov, "llm_url", "Base URL (blank = default)") +
         _cfg_text(cfg, ov, "llm_model", "Model (blank = default)") +
         _cfg_num(cfg, ov, "llm_timeout", "Timeout (s)", "1") +
@@ -819,6 +821,287 @@ def module_page(data: dict) -> str:
     return layout("Module", "/", body)
 
 
+def flows_page(data: dict) -> str:
+    """Business-capability browser: each capability with its implementing programs, triggers, and
+    data. Capability-only — when enrichment hasn't produced any, show a CTA to the Enrich tab
+    rather than an empty view (docs/llm-enrichment.md)."""
+    caps = data.get("capabilities", [])
+    if not caps:
+        inner = """<div class="card">
+      <div class="card-h">No business capabilities yet</div>
+      <p class="muted">Flows groups programs by the <b>business capability</b> they implement. Those
+        are produced by the optional LLM enrichment pass — none exist for this project yet.</p>
+      <div class="btnrow"><a class="btn primary" href="/enrich">Run the capabilities pass →</a></div>
+      <p class="muted small">See <span class="mono">docs/llm-enrichment.md</span>. Capabilities are
+        labeled <span class="mono">llm:&lt;model&gt;</span> at confidence &lt; 1.0 and never enter the
+        resolution ladder.</p>
+    </div>"""
+    else:
+        inner = "".join(_flow_card(c) for c in caps)
+    plural = "y" if len(caps) == 1 else "ies"
+    body = f"""<div class="container">
+  <h1>Flows <span class="tag">· business capabilities</span></h1>
+  <p class="sub">Each capability with the programs that implement it, how it's triggered
+    (transaction codes / JCL jobs) and the data it touches. {len(caps)} capabilit{plural}.</p>
+  {inner}
+</div>"""
+    return layout("Flows", "/flows", body)
+
+
+def _flow_card(cap: dict) -> str:
+    progs = cap.get("programs", [])
+    programs = "".join(
+        f"<li>{_symbol_link(p['qualified_name'], p['entity_id'], p['name'])} {_kind_pill(p['kind'])}"
+        + (f"<br><span class='muted small'>{_e(p['summary'])}</span>" if p.get("summary") else "")
+        + "</li>"
+        for p in progs
+    ) or "<li class='muted'>No implementing programs.</li>"
+    triggers = " ".join(
+        f"{_kind_pill(t['kind'])} <span class='mono small'>{_e(t['name'])}</span>"
+        for t in cap.get("triggers", [])
+    )
+    tables = " ".join(
+        f"<span class='pill'>{_e(d['name'])} <span class='muted small'>{_e(d['access'])}</span></span>"
+        for d in cap.get("data", [])
+    )
+    desc = f"<p class='muted'>{_e(cap['description'])}</p>" if cap.get("description") else ""
+    trig_row = f"<p class='small'><b>Triggered by</b> · {triggers}</p>" if triggers else ""
+    data_row = f"<p class='small'><b>Data</b> · {tables}</p>" if tables else ""
+    return f"""<div class="card" style="margin-bottom:14px">
+    <div class="card-h">{_e(cap['name'])} <span class="tag">· {len(progs)} programs</span></div>
+    {desc}
+    <ul class="clean">{programs}</ul>
+    {trig_row}{data_row}
+  </div>"""
+
+
+def understand_page(data: dict) -> str:
+    """Tutorial-style walkthrough of how this codebase is organized and how it runs — numbered
+    chapters, a traced worked example, and an honest coverage section, all composed from the same
+    graph the tools use (docs/dashboard.md)."""
+    enriched = bool(data.get("enriched"))
+    summary = data.get("summary", {})
+    name = summary.get("name") or "this codebase"
+    chapters = [
+        ("what", "Orientation", "Start here — the 30-second picture of what you're looking at.",
+         _u_what(summary)),
+        ("organized", "The map", "Every codebase has a shape. These are the neighborhoods you'll navigate.",
+         _u_organized(data.get("organization", {}))),
+        ("runs", "Watch it run",
+         "Enough structure — let's follow one real entry point all the way through, then see every other way in.",
+         _u_walkthrough(data.get("walkthrough", {})) + _u_runs(data.get("execution", {}))),
+        ("parts", "Load-bearing parts",
+         "Some pieces carry more weight. Learn these first — a change here ripples everywhere.",
+         _u_parts(data.get("key_parts", []))),
+        ("start", "Your reading path", "Ready to read code? This order will make sense fastest.",
+         _u_start(data.get("reading_path", {}))),
+        ("coverage", "Blind spots",
+         "Finally, an honest map of the edges — what we couldn't fully see, so you know where to be careful.",
+         _u_coverage(data.get("coverage", {}))),
+    ]
+    total = len(chapters)
+    secnav = "".join(f'<a class="viewtab" href="#{a}">{i + 1}. {_e(t)}</a>'
+                     for i, (a, t, _tc, _in) in enumerate(chapters))
+    secs = "".join(
+        _u_chapter(i + 1, a, t, teach, inner,
+                   (chapters[i + 1][0], chapters[i + 1][1]) if i + 1 < total else None)
+        for i, (a, t, teach, inner) in enumerate(chapters))
+    scrollspy = ("<script>(function(){var nav=document.querySelector('.understand-secnav');"
+                 "if(!nav)return;var secs=[].slice.call(document.querySelectorAll('.u-sec'));"
+                 "var links=[].slice.call(nav.querySelectorAll('a'));"
+                 "var label=document.getElementById('u-progress');"
+                 "var io=new IntersectionObserver(function(es){es.forEach(function(e){"
+                 "if(e.isIntersecting){var i=secs.indexOf(e.target);"
+                 "links.forEach(function(l,j){l.classList.toggle('active',j===i);});"
+                 "if(label)label.textContent='Chapter '+(i+1)+' of '+secs.length;}});},"
+                 "{rootMargin:'-45% 0px -50% 0px'});secs.forEach(function(s){io.observe(s);});})();</script>")
+    body = f"""<div class="container">
+  <h1>Understand <span class="tag">· {_e(name)}</span></h1>
+  <p class="sub">A short guided lesson — how this codebase is organized and how it runs. Follow it top
+    to bottom; every claim links into the same graph the tools use.</p>
+  {_u_banner(enriched)}
+  <div class="understand-secnav"><div class="viewtabs">{secnav}</div>
+    <span id="u-progress" class="u-progress">Chapter 1 of {total}</span></div>
+  {secs}
+  {scrollspy}
+</div>"""
+    return layout("Understand", "/understand", body)
+
+
+def _u_banner(enriched: bool) -> str:
+    if enriched:
+        return ("<p class='u-note'><span class='pill score' style='color:var(--green);"
+                "border-color:var(--green)'>enriched</span> Purpose summaries &amp; business "
+                "capabilities are active — the domain layer below is populated.</p>")
+    return """<div class="card u-enrich">
+    <div class="card-h">This is the structural view</div>
+    <p class="muted">Everything below is derived from parsed structure alone — no LLM needed. Run the
+      optional enrichment to add <b>purpose summaries</b> and <b>business capabilities</b> (the
+      “what does this system do” layer), which light up <b>What&nbsp;&amp;&nbsp;why</b> and
+      <b>Organized</b> below and the <a href="/flows">Flows</a> tab.</p>
+    <div class="btnrow"><a class="btn primary" href="/enrich">Run enrichment →</a></div>
+  </div>"""
+
+
+def _u_chapter(n: int, anchor: str, title: str, teach: str, inner: str, nxt) -> str:
+    if nxt:
+        foot = f"<a class='u-next' href='#{nxt[0]}'>Next — {_e(nxt[1])} ↓</a>"
+    else:
+        foot = ("<p class='u-next'><b>That's the tour.</b> Go deeper: <a href='/graph'>Graph</a> · "
+                "<a href='/flows'>Flows</a> · <a href='/search'>Search</a>.</p>")
+    return (f"<section id='{anchor}' class='u-sec'><div class='u-chap'>"
+            f"<span class='u-num'>{n}</span><div><h2>{_e(title)}</h2>"
+            f"<p class='u-teach'>{_e(teach)}</p></div></div>{inner}{foot}</section>")
+
+
+def _u_walkthrough(w: dict) -> str:
+    if not w:
+        return "<p class='muted small'>Not enough call structure to trace a concrete flow yet.</p>"
+    entry, target = w["entry"], w["target"]
+    steps = [f"<li><b>Execution starts</b> at {_kind_pill(entry['kind'])} "
+             f"<a href='/graph?id={quote(entry['entity_id'])}'>{_e(entry['name'])}</a>.</li>"]
+    if not w.get("same"):
+        summ = f" <span class='muted small'>— {_e(target['summary'])}</span>" if target.get("summary") else ""
+        steps.append(f"<li>It <b>{_e(w['verb'])}</b> "
+                     f"{_symbol_link(target['qualified_name'], target['entity_id'], target['name'])}{summ}.</li>")
+    elif target.get("summary"):
+        steps.append(f"<li><span class='muted small'>{_e(target['summary'])}</span></li>")
+    if w.get("calls"):
+        links = ", ".join(_symbol_link(c['qualified_name'], c['entity_id'], c['name']) for c in w["calls"])
+        steps.append(f"<li>{_e(target['name'])} <b>calls</b> {links}.</li>")
+    if w.get("data"):
+        tbls = ", ".join(f"<span class='mono'>{_e(d['name'])}</span> "
+                         f"<span class='muted small'>({_e(d['access'])})</span>" for d in w["data"])
+        steps.append(f"<li>Along the way it touches <b>data</b>: {tbls}.</li>")
+    if w.get("capability"):
+        steps.append(f"<li>All of this implements the <b>{_e(w['capability']['name'])}</b> "
+                     f"capability — see it in <a href='/flows'>Flows</a>.</li>")
+    return ("<div class='card u-walk'><div class='card-h'>Follow a thread</div>"
+            "<p class='muted small'>One real path, traced end-to-end:</p>"
+            f"<ol class='u-steps'>{''.join(steps)}</ol></div>")
+
+
+def _u_what(summary: dict) -> str:
+    totals = summary.get("totals", {})
+    cards = "".join(
+        f'<div class="card stat"><div class="n">{totals.get(k, 0)}</div><div class="l">{_e(k)}</div></div>'
+        for k in ("files", "modules", "functions", "classes", "tests", "config_keys"))
+    langs = "".join(f"<span class='pill'>{_e(k)} <span class='muted small'>{v}</span></span>"
+                    for k, v in sorted(summary.get("languages", {}).items(), key=lambda kv: -kv[1]))
+    purpose = summary.get("purpose", [])
+    if purpose:
+        blurb = "<div class='u-cardrow'>" + "".join(
+            f"<div class='card'><div class='card-h'>{_e(p['name'])}</div>"
+            f"<p class='muted small'>{_e(p['description'])}</p></div>" for p in purpose) + "</div>"
+    else:
+        blurb = ("<p class='muted small'>Run <a href='/enrich'>enrichment</a> to summarize what this "
+                 "system does (business capabilities).</p>")
+    inner = f"<div class='grid cards'>{cards}</div><p class='u-langs'>{langs}</p>{blurb}"
+    return inner
+
+
+def _u_organized(org: dict) -> str:
+    layer_cards = "".join(
+        f"<div class='card'><div class='card-h'>{_e(lyr['name'])} "
+        f"<span class='tag'>· {lyr.get('module_count', len(lyr.get('modules', [])))} modules</span></div>"
+        f"<p class='muted small'>{_e(lyr.get('description', ''))}</p><ul class='clean'>" + "".join(
+            f"<li><a href='/module?q={quote(m['qualified_name'])}'>{_e(m['qualified_name'])}</a> "
+            f"<span class='muted small'>({m.get('symbols', 0)} symbols)</span></li>"
+            for m in lyr.get("modules", [])[:5]) + "</ul></div>"
+        for lyr in org.get("layers", [])) or "<p class='muted small'>No layered structure inferred.</p>"
+    caps = org.get("capabilities", [])
+    if caps:
+        strip = ("<p class='small' style='margin-top:14px'><b>Business capabilities</b> "
+                 "<span class='muted'>(domain view)</span> · " + " ".join(
+                     f"<span class='pill'>{_e(c['name'])} <span class='muted small'>{len(c['programs'])}</span></span>"
+                     for c in caps[:10]) + " &nbsp;<a href='/flows'>open Flows →</a></p>")
+    else:
+        strip = ("<p class='muted small' style='margin-top:14px'>Domain grouping (business "
+                 "capabilities) appears here once <a href='/enrich'>enrichment</a> runs.</p>")
+    return f"<div class='u-cardrow'>{layer_cards}</div>{strip}"
+
+
+def _u_runs(ex: dict) -> str:
+    ep = ex.get("entry_points", {}) or {}
+    counts = " ".join(
+        f"<span class='pill'>{_e(label)} <span class='muted small'>{ep.get(key, 0)}</span></span>"
+        for key, label in (("jcl_jobs", "JCL jobs"), ("cics_transactions", "CICS txns"),
+                           ("uncalled_programs", "uncalled programs"), ("python_main_guards", "__main__"))
+        if ep.get(key)) or "<span class='muted small'>no distinct entry points detected</span>"
+    mains = ex.get("mains", [])
+    main_list = ("<ul class='clean'>" + "".join(
+        f"<li><a href='/impact?q={quote(mn['qualified_name'])}'>{_e(mn['name'])}</a> "
+        f"<span class='mono muted small'>{_e(mn['path'])}</span></li>" for mn in mains[:8]) + "</ul>") if mains else ""
+    rows = "".join(
+        f"<li><b>{_e(c['name'])}</b> <span class='muted small'>· triggered by "
+        f"{', '.join(_e(t['name']) for t in c['triggers'][:4])}</span></li>"
+        for c in ex.get("capabilities", [])[:8] if c.get("triggers"))
+    cap_flows = f"<p class='small' style='margin-top:10px'><b>By capability</b></p><ul class='clean'>{rows}</ul>" if rows else ""
+    return (f"<p>{counts} &nbsp; <a class='btn ghost small' href='/graph?view=entry_points'>"
+            f"explore entry points →</a></p>{main_list}{cap_flows}")
+
+
+def _u_parts(hubs: list) -> str:
+    if not hubs:
+        inner = "<p class='muted small'>No call-graph hubs (nothing is called by many others).</p>"
+    else:
+        inner = "<ul class='clean'>" + "".join(
+            f"<li><a href='/impact?q={quote(h['qualified_name'])}'>{_e(h['name'])}</a> "
+            f"{_kind_pill(h['kind'])} <span class='muted small'>{h['callers']} callers</span> "
+            f"<span class='mono muted small'>{_e(h['path'])}</span></li>" for h in hubs[:12]) + "</ul>"
+    return inner
+
+
+def _u_start(rp: dict) -> str:
+    steps = "".join(
+        f"<li><span class='step-n'>{s.get('order', '')}</span><b>{_e(s.get('title', ''))}</b> "
+        f"<span class='mono muted small'>{_e(s.get('path', ''))}</span><br>"
+        f"<span class='muted small'>{_e(s.get('why', ''))}</span></li>" for s in rp.get("steps", [])
+    ) or "<li class='muted'>No reading path available.</li>"
+    concepts = "".join(
+        f"<li><b>{_e(c.get('layer', ''))}</b> — {_e(c.get('description', ''))}</li>"
+        for c in rp.get("key_concepts", []))
+    concepts_block = f"<h3>Key concepts</h3><ul class='clean'>{concepts}</ul>" if concepts else ""
+    summary = f"<p class='muted small'>{_e(rp.get('summary', ''))}</p>" if rp.get("summary") else ""
+    return f"{summary}<ul class='clean'>{steps}</ul>{concepts_block}"
+
+
+def _u_coverage(cov: dict) -> str:
+    gaps = cov.get("gaps", [])
+    gap_block = (
+        f"<div class='card'><div class='card-h'>Known unknowns <span class='tag'>· {cov.get('gap_count', 0)}</span></div>"
+        "<p class='muted small'>Artifacts referenced in code but not indexed — the acquisition checklist.</p>"
+        + ("<ul class='clean'>" + "".join(
+            f"<li><span class='mono'>{_e(g['name'])}</span> {_kind_pill(g.get('artifact_kind', ''))} "
+            f"<span class='muted small'>{g.get('ref_count', 0)} refs</span></li>" for g in gaps[:6]) + "</ul>"
+           if gaps else "<p class='muted small'>None — every referenced artifact is indexed.</p>")
+        + "<a class='btn ghost small' href='/gaps'>open Gaps →</a></div>")
+    resolve_block = (
+        "<div class='card'><div class='card-h'>Not fully resolved</div>"
+        "<p class='muted small'>Call sites we could not statically pin down.</p><div class='btnrow'>"
+        f"<span class='pill'>unresolved <span class='muted small'>{cov.get('unresolved_call_sites', 0)}</span></span>"
+        f"<span class='pill'>dynamic dispatch <span class='muted small'>{cov.get('dynamic_call_sites', 0)}</span></span>"
+        "<a class='btn ghost small' href='/metrics'>resolution scoreboard →</a></div></div>")
+    shallow = cov.get("shallow_files", [])
+    shallow_block = (
+        f"<div class='card'><div class='card-h'>Parsed shallowly <span class='tag'>· {cov.get('shallow_files_total', 0)}</span></div>"
+        "<p class='muted small'>Scanned but not parsed into structure (unknown language / no symbols).</p>"
+        + ("<ul class='clean'>" + "".join(
+            f"<li><span class='mono'>{_e(s['path'])}</span> <span class='muted small'>{_e(s['reason'])}</span></li>"
+            for s in shallow[:8]) + "</ul>" if shallow else "<p class='muted small'>None.</p>") + "</div>")
+    unused = cov.get("possibly_unused", [])
+    unused_block = (
+        f"<div class='card'><div class='card-h'>Possibly unused <span class='tag'>· {cov.get('possibly_unused_total', 0)}</span></div>"
+        "<p class='u-caveat'>Heuristic — nothing in the repo references these. May include public API, "
+        "dynamically-invoked, or framework code.</p>"
+        + ("<ul class='clean'>" + "".join(
+            f"<li>{_symbol_link(u['qualified_name'], u['entity_id'], u['name'])} {_kind_pill(u['kind'])} "
+            f"<span class='mono muted small'>{_e(u['path'])}</span></li>" for u in unused[:10]) + "</ul>"
+           if unused else "<p class='muted small'>None found.</p>") + "</div>")
+    inner = f"<div class='u-cardrow'>{gap_block}{resolve_block}{shallow_block}{unused_block}</div>"
+    return inner
+
+
 def architecture_page(data: dict) -> str:
     layers = ""
     for layer in data.get("layers", []):
@@ -915,5 +1198,5 @@ def symbol_page(hit: dict, callers: list[dict], callees: list[dict], source: str
 
 __all__ = [
     "layout", "overview_page", "search_page", "graph_page", "impact_page",
-    "module_page", "architecture_page", "onboarding_page", "gaps_page", "symbol_page",
+    "module_page", "architecture_page", "flows_page", "understand_page", "onboarding_page", "gaps_page", "symbol_page",
 ]

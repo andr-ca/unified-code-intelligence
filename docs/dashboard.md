@@ -17,6 +17,11 @@ prompt instead of a broken/empty view.
 ## Tabs
 
 ### Explore
+- **Understand** — a guided, top-down tour that composes the other views into one narrative:
+  *what & why → how it's organized → how it runs → key parts → a reading path → **coverage & blind
+  spots*** (index gaps, shallow-parsed files, likely-unused symbols). Structural-first (no LLM
+  needed); it invites enrichment for the capability/summary layer, and every claim deep-links into
+  Graph / Flows / Symbol.
 - **Overview** — totals, key symbols, modules, entry points.
 - **Search** — graph-first hybrid search (symbol · keyword · semantic · graph · proximity · churn).
 - **Graph** — offline canvas explorer. Pick an **angle** to seed the view from different starting
@@ -27,6 +32,11 @@ prompt instead of a broken/empty view.
   **▼ calls**, with clickable entries to traverse; double-click a node to expand its neighborhood.
   Missing (stub) nodes are drawn dashed.
 - **Architecture**, **Gaps** (known unknowns), **Onboarding** (dependency-ordered reading path).
+- **Flows** — business-capability browser: each LLM-derived capability with the programs that
+  implement it (+ their one-line summaries), the transaction codes / JCL jobs that **trigger** it,
+  and the tables it **reads/writes**. Populated by the optional enrichment `capabilities` pass
+  (`uci enrich`); when no capabilities exist yet it shows a call-to-action to the **Enrich** tab
+  instead of an empty view.
 
 ### Metrics
 Collected at index time: line stats per language (code / comment / blank / ratio), the

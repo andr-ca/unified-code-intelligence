@@ -88,12 +88,16 @@ class Enricher:
             agentic: bool = False) -> EnrichStats:
         self.agentic = agentic
         if "summaries" in passes:
+            self.client.default_tag = "enrich:summaries"  # attribute logged calls to the pass (§2.1)
             self._pass_summaries(limit, force)
         if "capabilities" in passes:
+            self.client.default_tag = "enrich:capabilities"
             self._pass_capabilities(force)
         if "candidates" in passes:
+            self.client.default_tag = "enrich:candidates"
             self._pass_candidates(limit, force)
         if "fields" in passes:
+            self.client.default_tag = "enrich:fields"
             self._pass_fields(limit, force)
         return self.stats
 

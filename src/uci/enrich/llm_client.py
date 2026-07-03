@@ -7,6 +7,8 @@ local-lite philosophy:
   - ``openai``    — ``/chat/completions`` (OpenAI itself and every compatible server:
                     vLLM, LM Studio, LiteLLM, gateways)
   - ``anthropic`` — ``/v1/messages``
+  - ``freellm``   — ``/chat/completions`` at a local OpenAI-compatible gateway
+                    (default ``localhost:3001/v1``; empty model → the gateway auto-selects)
 
 Configuration comes from :class:`uci.config.Config`: ``llm_protocol``, ``llm_url``,
 ``llm_model``, ``llm_timeout``, ``llm_max_tokens``, and the optional API key in
@@ -23,6 +25,7 @@ import urllib.request
 from typing import Any
 
 from ..config import Config
+from .llm_logger import LlmCallLogger
 
 #: HTTP statuses worth retrying: rate limit + transient server errors (cloud free tiers hit these).
 _RETRY_STATUSES = frozenset({429, 500, 502, 503, 529})
@@ -32,6 +35,8 @@ _DEFAULTS = {
     "ollama": {"url": "http://localhost:11434", "model": "qwen2.5-coder:7b"},
     "openai": {"url": "https://api.openai.com/v1", "model": "gpt-4o-mini"},
     "anthropic": {"url": "https://api.anthropic.com", "model": "claude-haiku-4-5-20251001"},
+    # local OpenAI-compatible gateway; empty model lets the gateway pick the best available model
+    "freellm": {"url": "http://localhost:3001/v1", "model": ""},
 }
 
 _JSON_BLOCK = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
@@ -45,13 +50,18 @@ class LlmClient:
     def __init__(self, config: Config) -> None:
         protocol = (config.llm_protocol or "ollama").lower()
         if protocol not in _DEFAULTS:
-            raise LlmError(f"unknown llm protocol {protocol!r} (ollama | openai | anthropic)")
+            raise LlmError(
+                f"unknown llm protocol {protocol!r} (ollama | openai | anthropic | freellm)")
         self.protocol = protocol
         self.base_url = (config.llm_url or _DEFAULTS[protocol]["url"]).rstrip("/")
         self.model = config.llm_model or _DEFAULTS[protocol]["model"]
         self.timeout = config.llm_timeout
         self.max_tokens = config.llm_max_tokens
         self._api_key = config.settings.get("llm_api_key", "")
+        self._logger = LlmCallLogger.from_config(config)
+        #: attribution for the call log when a caller doesn't pass an explicit ``tag``
+        #: (e.g. the enricher sets it per pass, the LLM-eval per task).
+        self.default_tag = ""
 
     # -- transport -----------------------------------------------------------
     def _post(self, path: str, payload: dict, headers: dict[str, str]) -> dict:
@@ -104,9 +114,33 @@ class LlmClient:
         except (urllib.error.URLError, OSError):
             return False
 
-    def complete(self, system: str, user: str, max_tokens: int | None = None) -> str:
-        """One chat completion, deterministic settings (temperature 0)."""
+    def complete(self, system: str, user: str, max_tokens: int | None = None,
+                 tag: str = "") -> str:
+        """One chat completion, deterministic settings (temperature 0). Every call is logged
+        (prompt, response, latency, model — never the key) when logging is enabled; ``tag``
+        attributes the call to a pass/task for offline analysis (docs/llm-enrichment.md §2.1)."""
         tokens = max_tokens or self.max_tokens
+        tag = tag or self.default_tag
+        started = time.perf_counter()
+        try:
+            response = self._complete_raw(system, user, tokens)
+        except Exception as exc:  # noqa: BLE001 - log then re-raise, logging must not swallow
+            self._log(tag, tokens, started, ok=False, system=system, user=user,
+                      response="", error=str(exc))
+            raise
+        self._log(tag, tokens, started, ok=True, system=system, user=user, response=response)
+        return response
+
+    def _log(self, tag: str, tokens: int, started: float, *, ok: bool, system: str,
+             user: str, response: str, error: str | None = None) -> None:
+        if self._logger is None:
+            return
+        self._logger.log(
+            protocol=self.protocol, model=self.model, tag=tag, max_tokens=tokens,
+            latency_ms=int((time.perf_counter() - started) * 1000), ok=ok,
+            system=system, user=user, response=response, error=error)
+
+    def _complete_raw(self, system: str, user: str, tokens: int) -> str:
         if self.protocol == "ollama":
             data = self._post("/api/chat", {
                 "model": self.model, "stream": False,
@@ -124,13 +158,16 @@ class LlmClient:
                     f"model {self.model} spent its token budget thinking and returned no "
                     f"content — raise UCI_LLM_MAX_TOKENS or use a non-thinking model")
             return content
-        if self.protocol == "openai":
+        if self.protocol in ("openai", "freellm"):
             headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-            data = self._post("/chat/completions", {
-                "model": self.model, "temperature": 0, "max_tokens": tokens,
+            payload: dict = {
+                "temperature": 0, "max_tokens": tokens,
                 "messages": [{"role": "system", "content": system},
                              {"role": "user", "content": user}],
-            }, headers)
+            }
+            if self.model:  # freellm may leave the model empty to auto-select the best one
+                payload["model"] = self.model
+            data = self._post("/chat/completions", payload, headers)
             choices = data.get("choices") or []
             return choices[0].get("message", {}).get("content", "") if choices else ""
         # anthropic
@@ -142,9 +179,10 @@ class LlmClient:
         blocks = data.get("content") or []
         return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
 
-    def complete_json(self, system: str, user: str, max_tokens: int | None = None) -> Any:
+    def complete_json(self, system: str, user: str, max_tokens: int | None = None,
+                      tag: str = "") -> Any:
         """Completion parsed as JSON (tolerates code fences and surrounding prose)."""
-        text = self.complete(system, user, max_tokens).strip()
+        text = self.complete(system, user, max_tokens, tag=tag).strip()
         for candidate in self._json_candidates(text):
             try:
                 return json.loads(candidate)

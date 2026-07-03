@@ -18,6 +18,9 @@ evals/
 
 **Findings synthesis:** `docs/observations.md` — what the evals actually taught us (structure is
 solved, restraint is the model capability line, and the benchmark that argued against its own feature).
+**Model procurement:** `docs/llm-comparison.md` — local vs free-frontier and with vs without tools,
+with the recommendation table (cheap tasks stay local; tools stay off by default). Every LLM-eval
+run writes a per-call JSONL log to `reports/llm-logs/` for offline analysis.
 
 Datasets and scoring are **versioned + fingerprinted** (docs/versioning.md, datasets/CHANGELOG.md):
 the baseline gate only compares apples-to-apples; drifted datasets show informational deltas

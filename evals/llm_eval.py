@@ -229,14 +229,17 @@ def _agentic_repo(tmp: Path):
 
 
 def _run_loop(client, eng, program, var, golden, source_hint):
-    loop = ToolLoop(client, eng.graph, eng.config.repo_path, eng.repo_id)
+    # give the loop the same discovery surfaces production `ask` gets: rag_search + list_files let
+    # the model locate the copybook that holds the dispatch table (docs/agentic-enrichment.md §3).
+    loop = ToolLoop(client, eng.graph, eng.config.repo_path, eng.repo_id,
+                    retriever=eng._retriever(), metadata=eng.metadata, max_tool_calls=4)
     inventory = "ACCTVIEW, ACCTEDIT, PRODINQ, PAYRUN"
     user = (f"Dynamic call through variable {var} in program {program} "
             f"(source file cbl/{program}.cbl).\nProgram inventory: {inventory}\n\n"
             f"Source context:\n{source_hint}")
     result = loop.run(_SYS_CANDIDATES, user, answer_key="candidates", max_tokens=400)
     got = {str(c).upper() for c in (result.answer or {}).get("candidates", [])}
-    disc = 1.0 if (result.tool_calls <= 3 and result.protocol_errors == 0) else 0.5
+    disc = 1.0 if (result.tool_calls <= 4 and result.protocol_errors == 0) else 0.5
     if not golden:
         base = 1.0 if not got else 0.0
         note = f"got {sorted(got)} (calls={result.tool_calls}, want abstain)"
@@ -301,9 +304,10 @@ AGENTIC_TASKS = [
 
 
 def evaluate_model(protocol: str, url: str, model: str, timeout: int,
-                   agentic: bool, agentic_engine=None) -> dict:
+                   agentic: bool, agentic_engine=None, log_path: str = "") -> dict:
     cfg = Config.from_env(overrides={
         "llm_protocol": protocol, "llm_url": url, "llm_model": model, "llm_timeout": timeout,
+        "llm_log": log_path,
     })
     client = LlmClient(cfg)
     areas: dict[str, list[float]] = {}
@@ -313,6 +317,7 @@ def evaluate_model(protocol: str, url: str, model: str, timeout: int,
     if agentic and agentic_engine is not None:
         tasks += [(a, tid, lambda c, fn=fn: fn(c, agentic_engine)) for a, tid, fn in AGENTIC_TASKS]
     for area, task_id, fn in tasks:
+        client.default_tag = f"{model}:{task_id}"  # attribute every logged call to this task
         started = time.perf_counter()
         try:
             score, note = fn(client)
@@ -332,7 +337,8 @@ def evaluate_model(protocol: str, url: str, model: str, timeout: int,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--models", required=True, help="comma-separated model names")
-    ap.add_argument("--protocol", default="ollama", choices=["ollama", "openai", "anthropic"])
+    ap.add_argument("--protocol", default="ollama",
+                    choices=["ollama", "openai", "anthropic", "freellm"])
     ap.add_argument("--url", default="", help="base URL (default per protocol)")
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--agentic", action="store_true",
@@ -346,12 +352,15 @@ def main() -> int:
         tmp = tempfile.mkdtemp(prefix="uci-llm-eval-")
         agentic_engine = _agentic_repo(Path(tmp))
 
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    log_path = str(EVALS / "reports" / "llm-logs" / f"llm-eval-{run_id}.jsonl")
+
     results = []
     try:
         for model in [m.strip() for m in args.models.split(",") if m.strip()]:
             print(f"[llm-eval] {args.protocol}/{model}{' +agentic' if args.agentic else ''}")
             results.append(evaluate_model(args.protocol, args.url, model, args.timeout,
-                                          args.agentic, agentic_engine))
+                                          args.agentic, agentic_engine, log_path=log_path))
     finally:
         if agentic_engine is not None:
             agentic_engine.close()
@@ -377,6 +386,8 @@ def main() -> int:
         print(f"{r['model']:<26} {r['overall']:>7.1f}  " + "  ".join(
             f"{r['areas'].get(a, 0):>12.2f}" for a in cols))
     print(f"\nreport: {out.relative_to(EVALS.parent)}")
+    if Path(log_path).exists():
+        print(f"call log: {Path(log_path).relative_to(EVALS.parent)}")
     return 0
 
 

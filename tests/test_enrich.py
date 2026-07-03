@@ -11,6 +11,7 @@ import pytest
 from uci import Config, Engine
 from uci.core.relationships import RESOLVED_LEVELS
 from uci.enrich.llm_client import LlmClient, LlmError
+from uci.enrich.llm_logger import LlmCallLogger
 
 PROG_CBL = """\
        IDENTIFICATION DIVISION.
@@ -225,10 +226,65 @@ def test_llm_client_protocol_payloads(monkeypatch):
         LlmClient(Config(llm_protocol="nope"))
 
 
+def test_llm_logger_default_on_and_records_call(tmp_path):
+    cfg = Config.from_env(str(tmp_path))
+    lg = LlmCallLogger.from_config(cfg)
+    assert lg is not None and lg.path == cfg.store_dir / "llm-calls.jsonl"
+    lg.log(protocol="ollama", model="m", tag="summaries", max_tokens=100, latency_ms=42,
+           ok=True, system="sys", user="u", response="r")
+    rec = json.loads(lg.path.read_text().strip())
+    assert rec["tag"] == "summaries" and rec["ok"] and rec["latency_ms"] == 42
+    assert rec["response_chars"] == 1 and "error" in rec
+
+
+def test_llm_logger_disabled_by_sentinel(tmp_path):
+    assert LlmCallLogger.from_config(Config.from_env(str(tmp_path)).with_overrides(llm_log="off")) is None
+    assert LlmCallLogger.from_config(Config.from_env(str(tmp_path)).with_overrides(llm_log="0")) is None
+
+
+def test_llm_client_logs_every_completion_with_tag(tmp_path):
+    log = tmp_path / "calls.jsonl"
+
+    class C(LlmClient):
+        def __init__(self, logfile):
+            self.protocol, self.model = "fake", "m"
+            self._logger = LlmCallLogger(logfile)
+            self.default_tag = ""
+            self.max_tokens = 100
+        def _complete_raw(self, system, user, tokens):
+            return "hello"
+
+    c = C(log)
+    c.default_tag = "capabilities"
+    assert c.complete("s", "u") == "hello"          # uses default_tag
+    assert c.complete("s", "u", tag="explicit") == "hello"  # explicit wins
+    rows = [json.loads(l) for l in log.read_text().splitlines()]
+    assert [r["tag"] for r in rows] == ["capabilities", "explicit"]
+    assert all(r["ok"] and r["response"] == "hello" for r in rows)
+
+
+def test_llm_client_logs_failures_then_reraises(tmp_path):
+    log = tmp_path / "calls.jsonl"
+
+    class C(LlmClient):
+        def __init__(self, logfile):
+            self.protocol, self.model = "fake", "m"
+            self._logger = LlmCallLogger(logfile)
+            self.default_tag = "candidates"
+            self.max_tokens = 100
+        def _complete_raw(self, system, user, tokens):
+            raise LlmError("boom")
+
+    with pytest.raises(LlmError):
+        C(log).complete("s", "u")
+    rec = json.loads(log.read_text().strip())
+    assert rec["ok"] is False and rec["error"] == "boom" and rec["tag"] == "candidates"
+
+
 def test_llm_client_json_tolerates_fences():
     class C(LlmClient):
         def __init__(self): pass
-        def complete(self, s, u, max_tokens=None):
+        def complete(self, s, u, max_tokens=None, tag=""):
             return 'Here you go:\n```json\n{"a": 1}\n```\nthanks'
     assert C().complete_json("s", "u") == {"a": 1}
 
@@ -341,3 +397,66 @@ def test_agentic_candidates_resolves_cross_file(tl_repo):
     assert edge["resolution"] == "llm-suggested"
     # honesty invariant holds even with agentic evidence
     assert tl_repo.impact("TLROUTER")["completeness"]["level"] != "exact"
+
+
+# ---------------------------------------------------------------- agentic ask (RAG follow-ups)
+def test_tool_loop_rag_search_and_list_files(llm_repo):
+    from uci.enrich.tool_loop import ToolLoop
+    client = ScriptedLlm([
+        {"action": "rag_search", "query": "supported products catalog"},
+        {"action": "list_files", "prefix": "cpy/"},
+        {"action": "get_source", "path": "cpy/DCLPROD.cpy", "start": 1, "end": 10},
+        {"action": "answer", "done": True},
+    ])
+    loop = ToolLoop(client, llm_repo.graph, llm_repo.config.repo_path, llm_repo.repo_id,
+                    retriever=llm_repo._retriever(), metadata=llm_repo.metadata,
+                    max_tool_calls=4)
+    res = loop.run("system", "find the product data", "done")
+    assert res.tool_calls == 3 and res.answer.get("done") is True
+    joined = " ".join(u for u in client.seen)
+    assert "PRODINQ" in joined            # rag_search served hybrid hits
+    assert "DCLPROD.cpy (cobol)" in joined  # list_files served the inventory
+    assert "DECLARE SHOP.PRODUCT_CATALOG" in joined  # get_source served the copybook
+    # tool list advertised in the protocol includes the optional tools
+    assert "rag_search" in client.seen[0] and "list_files" in client.seen[0]
+
+
+def test_tool_loop_optional_tools_absent_without_collaborators(llm_repo):
+    from uci.enrich.tool_loop import ToolLoop
+    client = ScriptedLlm([{"action": "answer", "done": True}])
+    loop = ToolLoop(client, llm_repo.graph, llm_repo.config.repo_path, llm_repo.repo_id)
+    loop.run("system", "go", "done")
+    assert "rag_search" not in client.seen[0] and "list_files" not in client.seen[0]
+
+
+def test_ask_agentic_routes_with_evidence(llm_repo):
+    class AgenticAskLlm(ScriptedLlm):
+        def complete_json(self, system, user, max_tokens=None):
+            self.seen.append(user)
+            if "TOOL RESULT" not in user:
+                return {"action": "rag_search", "query": "product catalog table"}
+            return {"action": "answer", "answer_location": "data",
+                    "targets": [{"name": "SHOP.PRODUCT_CATALOG", "kind": "database_table",
+                                 "why": "products are rows here"}],
+                    "explanation": "Verified via follow-up search.",
+                    "next_step": "Query the table."}
+
+    data = llm_repo.ask("what products are supported?", client=AgenticAskLlm([]), agentic=True)
+    assert data["ok"] and data["answer_location"] == "data"
+    assert data["targets"][0]["name"] == "SHOP.PRODUCT_CATALOG"
+    assert "PRODINQ" in data["targets"][0]["read_by"]   # graph-proven reader still attached
+    assert data["evidence"]["tool_calls"] == 1
+    assert data["evidence"]["tools_used"] == ["rag_search"]
+
+
+def test_ask_agentic_degrades_honestly_on_unverifiable_targets(llm_repo):
+    class HallucinatingLlm(ScriptedLlm):
+        def complete_json(self, system, user, max_tokens=None):
+            return {"action": "answer", "answer_location": "data",
+                    "targets": [{"name": "TOTALLY.FAKE_TABLE", "kind": "database_table",
+                                 "why": "made up"}],
+                    "explanation": "x", "next_step": "y"}
+
+    data = llm_repo.ask("what products are supported?", client=HallucinatingLlm([]), agentic=True)
+    assert data["ok"] and data["answer_location"] == "not_in_repo"
+    assert data["targets"] == []

@@ -25,17 +25,33 @@
 
 ## 2. Configuration
 
-All via `Config` / environment / `.env` (see `.env.example`):
+All via `Config` / environment / the repo's `.uci/.env` (see `.env.example`):
 
-| Setting | Env var | Default | Notes |
-| --- | --- | --- | --- |
-| Protocol | `UCI_LLM_PROTOCOL` | `ollama` | `ollama` (native API) · `openai` (OpenAI-compatible: OpenAI, vLLM, LM Studio, LiteLLM, gateways) · `anthropic` (Messages API) |
-| Base URL | `UCI_LLM_URL` | per protocol: `http://localhost:11434` / `https://api.openai.com/v1` / `https://api.anthropic.com` | any OpenAI-compatible server works with `protocol=openai` |
-| API key | `UCI_LLM_API_KEY` | *(empty — optional)* | required by cloud providers; unused by local Ollama. Never written to reports or `Config.to_dict()` |
-| Model | `UCI_LLM_MODEL` | `qwen2.5-coder:7b` (ollama) / `gpt-4o-mini` (openai) / `claude-haiku-4-5-20251001` (anthropic) | pick per protocol |
-| Timeout / max tokens | `UCI_LLM_TIMEOUT` / `UCI_LLM_MAX_TOKENS` | `60` s / `700` | per request |
+| Setting              | Env var                                  | Default                                                                                                                         | Notes                                                                                                                                                                                                                                         |
+| -------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Protocol             | `UCI_LLM_PROTOCOL`                       | `ollama`                                                                                                                        | `ollama` (native API) · `openai` (OpenAI-compatible: OpenAI, vLLM, LM Studio, LiteLLM, gateways) · `anthropic` (Messages API) · `freellm` (local OpenAI-compatible gateway, default `localhost:3001`; empty model → the gateway auto-selects) |
+| Base URL             | `UCI_LLM_URL`                            | per protocol: `http://localhost:11434` / `https://api.openai.com/v1` / `https://api.anthropic.com` / `http://localhost:3001/v1` | any OpenAI-compatible server works with `protocol=openai` or `freellm`                                                                                                                                                                        |
+| API key              | `UCI_LLM_API_KEY`                        | *(empty — optional)*                                                                                                            | required by cloud providers and `freellm`; unused by local Ollama. Never written to reports or `Config.to_dict()`                                                                                                                             |
+| Model                | `UCI_LLM_MODEL`                          | `qwen2.5-coder:7b` (ollama) / `gpt-4o-mini` (openai) / `claude-haiku-4-5-20251001` (anthropic) / *empty* (freellm)              | pick per protocol; leave empty so `freellm` auto-selects the best model                                                                                                                                                                       |
+| Timeout / max tokens | `UCI_LLM_TIMEOUT` / `UCI_LLM_MAX_TOKENS` | `60` s / `700`                                                                                                                  | per request                                                                                                                                                                                                                                   |
+| Call log             | `UCI_LLM_LOG`                            | *(empty → `<repo>/.uci/llm-calls.jsonl`)*                                                                                       | append every call as JSONL for offline analysis; `off`/`0`/`false` disables; a path redirects. See §2.1                                                                                                                                       |
 
 `uci enrich --dry-run` shows what would be sent (counts + one sample prompt) without calling anything.
+
+### 2.1 Call logging (for offline analysis)
+
+Every completion is appended to a JSONL log **by default** (`.uci/llm-calls.jsonl`) — one line per
+call: `ts, protocol, model, tag, max_tokens, latency_ms, ok, error, {system,user,response}` and
+their char counts. The **API key is never logged** (records are built from call arguments, not the
+client secret). Logging is **best-effort**: a write failure never breaks the LLM call. Disable with
+`UCI_LLM_LOG=off`, or redirect with a path.
+
+The `tag` attributes each call to a pass or eval task (`summaries`, `candidates:MROUTER`,
+`qwen3-coder-480b:agentic_restraint`, …) via `LlmClient.default_tag`, so a log can be grouped by
+capability, model, or run. This is what powers the with/without-tools analysis in
+`evals/docs/llm-comparison.md` — e.g. counting that a model made **1** tool call on a restraint task
+(didn't pull the evidence → hallucinated) vs **4** (pulled, then abstained). The LLM-eval writes a
+per-run log to `evals/reports/llm-logs/llm-eval-<run>.jsonl`.
 
 ## 3. The five passes
 
