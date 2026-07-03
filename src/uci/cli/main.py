@@ -273,8 +273,8 @@ def cmd_enrich(args) -> int:
         _ensure_indexed(engine)
         # edge oracles (LSP/SCIP) are a separate, LLM-free enrichment path
         if args.lsp or args.scip:
-            data = engine.enrich_edges(lsp=args.lsp, scip=args.scip,
-                                       budget_seconds=args.budget, verify_only=args.verify_only)
+            data = engine.enrich_edges(lsp=args.lsp, scip=args.scip, budget_seconds=args.budget,
+                                       verify_only=args.verify_only, complete=args.complete)
             if args.json:
                 print(json.dumps(data, indent=2))
                 return 0 if data.get("ok") else 1
@@ -447,6 +447,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="edge-oracle time budget in seconds per source (default 60)")
     sp.add_argument("--verify-only", action="store_true",
                     help="edge oracles: only verify/prune existing edges, skip discovery")
+    sp.add_argument("--complete", action="store_true",
+                    help="edge oracles (LSP): also add type-aware references for high-fan-in symbols")
     sp.add_argument("--dry-run", action="store_true", help="show LLM config and plan, call nothing")
     sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
     sp.set_defaults(func=cmd_enrich)

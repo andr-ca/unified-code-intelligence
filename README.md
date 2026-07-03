@@ -142,10 +142,12 @@ fixtures per task area. Details: [`docs/llm-enrichment.md`](docs/llm-enrichment.
 ### LSP / SCIP edge oracles — provable layer
 
 The opposite of the LLM passes: **provable** edges from a language server (LSP) or a batch
-cross-reference index (SCIP). **Verify mode** promotes a speculative call edge to
-`resolution="lsp-verified"` (or prunes it with a tombstone) by asking the server for the definition;
-**SCIP ingest** turns an `index.scip` into `resolution="scip"` edges. Both land inside
-`RESOLVED_LEVELS`. Servers are *detected, not bundled* — you provide the binary:
+cross-reference index (SCIP). Three LSP modes — **Verify** (promote a speculative call edge to
+`resolution="lsp-verified"` or prune it with a tombstone), **Discover** (resolve an unresolved call
+site into a new edge), **Complete** (type-aware `REFERENCES` for high-fan-in symbols) — plus **SCIP
+ingest** (`index.scip` → `resolution="scip"` edges). All land inside `RESOLVED_LEVELS`, and the whole
+bridge is precision/recall-tested in CI against a scripted LSP server (`evals/lsp_eval.py`). Servers
+are *detected, not bundled* — you provide the binary:
 
 ```ini
 UCI_LSP_COBOL_CMD=cobol-language-support     # Eclipse Che4z COBOL LSP (Apache-2.0), headless
@@ -154,7 +156,8 @@ UCI_LSP_PYTHON_CMD=pyright-langserver --stdio
 ```
 
 ```bash
-uci enrich --lsp cobol                # verify/prune COBOL call edges via the language server
+uci enrich --lsp cobol                # verify/prune + discover COBOL call edges via the server
+uci enrich --lsp cobol --complete     # also add type-aware reference edges
 uci enrich --scip index.scip          # ingest a SCIP index as provable edges
 uci enrich --lsp python --verify-only --budget 120 --json
 ```

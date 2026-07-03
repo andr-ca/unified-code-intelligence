@@ -231,10 +231,12 @@ class Engine:
 
     # -- optional edge oracles: LSP / SCIP (docs/lsp-refactoring-recommendations.md) ----------
     def enrich_edges(self, lsp: list[str] | None = None, scip: list[str] | None = None,
-                     budget_seconds: float = 60.0, verify_only: bool = False) -> dict:
-        """Run optional LSP/SCIP edge sources: verify (promote/prune speculative call edges) and,
-        unless ``verify_only``, discover missed edges. No LLM involved; missing toolchains are
-        skipped with ``available: false`` rather than failing the run."""
+                     budget_seconds: float = 60.0, verify_only: bool = False,
+                     complete: bool = False) -> dict:
+        """Run optional LSP/SCIP edge sources: **verify** (promote/prune speculative call edges),
+        **discover** (unresolved worklist → new edges), and optionally **complete** (type-aware
+        references for high-fan-in symbols). No LLM involved; missing toolchains are skipped with
+        ``available: false`` rather than failing the run."""
         from .enrich.base import Budget
         from .enrich.lsp_source import LspEdgeSource
         from .enrich.scip_source import ScipSource
@@ -249,6 +251,7 @@ class Engine:
                     "error": {"code": "no_sources", "message": "pass at least one --lsp or --scip"}}
 
         worklist = self.metadata.get_state(self.repo_id, "unresolved_calls", []) or []
+        symbols = self._high_value_symbols() if complete else []
         reports = []
         for source in sources:
             entry: dict = {"source": source.name, "available": source.available,
@@ -259,13 +262,32 @@ class Engine:
                     if not verify_only:
                         delta.extend(source.discover(self.graph, self.repo_id, worklist,
                                                      Budget.for_seconds(budget_seconds)))
+                        if complete:
+                            delta.extend(source.complete(self.graph, self.repo_id, symbols,
+                                                         Budget.for_seconds(budget_seconds)))
                     for rel in (*delta.promoted, *delta.pruned, *delta.discovered):
                         self.graph.add_relationship(rel)  # upsert by id
                     entry.update(delta.counts())
                 finally:
                     source.close()
             reports.append(entry)
-        return {"ok": True, "tool": "enrich_edges", "verify_only": verify_only, "sources": reports}
+        return {"ok": True, "tool": "enrich_edges", "verify_only": verify_only,
+                "complete": complete, "sources": reports}
+
+    def _high_value_symbols(self, limit: int = 50) -> list:
+        """Highest-fan-in code symbols — the worthwhile targets for LSP ``complete`` (references)."""
+        from collections import Counter
+        from .core.entities import SYMBOL_KINDS
+        from .core.relationships import RelationType
+        fan_in: Counter[str] = Counter()
+        for rel in self.graph.relationships(RelationType.CALLS):
+            fan_in[rel.dst_id] += 1
+        out = []
+        for eid, _ in fan_in.most_common(limit):
+            ent = self.graph.get_entity(eid)
+            if ent and ent.kind in SYMBOL_KINDS:
+                out.append(ent)
+        return out
 
     def briefing(self, symbol: str, client=None) -> dict:
         """Render the (already-proven) impact pack as a prose modernization briefing."""

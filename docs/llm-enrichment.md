@@ -177,7 +177,9 @@ both inside `RESOLVED_LEVELS`. Verify mode never deletes: a disproven edge is **
 (`attributes.pruned=True`, `pruned_by`) and excluded from callers/callees/impact, but kept for
 completeness accounting.
 
-Surface: `uci enrich --lsp <lang>` / `--scip <index.scip>` (`Engine.enrich_edges`). Missing
-toolchains report `available: false` and are skipped — never a failed run. Full design, per-ecosystem
-strategy, configuration, and usage: **`docs/lsp-refactoring-recommendations.md`** (§6 is the
-implementation/usage guide).
+Three LSP modes — **Verify** (promote/prune), **Discover** (`unresolved_calls` → new edges), and
+**Complete** (`--complete`; references) — plus SCIP ingest. Surface: `uci enrich --lsp <lang>` /
+`--scip <index.scip>` (`Engine.enrich_edges`). Missing toolchains report `available: false` and are
+skipped — never a failed run. The bridge is precision/recall-gated in CI by `evals/lsp_eval.py`
+against a scripted LSP server. Full design, per-ecosystem strategy, configuration, and usage:
+**`docs/lsp-refactoring-recommendations.md`** (§6 is the implementation/usage guide).

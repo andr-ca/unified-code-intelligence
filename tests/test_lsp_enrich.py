@@ -39,11 +39,13 @@ def test_lsp_read_message_truncated_body_raises():
 
 # ---------------------------------------------------------------- fake LSP
 class FakeLspClient:
-    """Duck-typed LspClient returning a canned definition Location."""
+    """Duck-typed LspClient returning canned definition / references Locations."""
 
-    def __init__(self, definition_uri: str | None, def_line0: int = 0):
+    def __init__(self, definition_uri: str | None, def_line0: int = 0,
+                 references: list[dict] | None = None):
         self._uri = definition_uri
         self._line = def_line0
+        self._refs = references or []
         self.opened: list[str] = []
         self.queries = 0
 
@@ -55,6 +57,14 @@ class FakeLspClient:
         if self._uri is None:
             return None
         return {"uri": self._uri, "range": {"start": {"line": self._line, "character": 0}}}
+
+    def references(self, path, line, character):
+        self.queries += 1
+        return list(self._refs)
+
+
+def _loc(uri: str, line0: int) -> dict:
+    return {"uri": uri, "range": {"start": {"line": line0, "character": 0}}}
 
 
 def _prog(eid, name, path, line=1):
@@ -170,6 +180,76 @@ def test_lsp_source_unavailable_without_toolchain(tmp_path):
     src = LspEdgeSource("cobol", str(tmp_path), settings={})
     assert src.available is False
     assert not src.verify(InMemoryGraphStore(), "r")
+
+
+def test_lsp_discover_creates_edge_from_worklist(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "cbl").mkdir(parents=True)
+    (repo / "cbl" / "MAIN.cbl").write_text(
+        "       PROGRAM-ID. MAIN.\n"
+        "       PROCEDURE DIVISION.\n"
+        "           CALL WS-PGM.\n", encoding="utf-8")           # dynamic, line 3
+    (repo / "cbl" / "POSTER.cbl").write_text("       PROGRAM-ID. POSTER.\n", encoding="utf-8")
+    graph = InMemoryGraphStore()
+    main = _prog("p:main", "MAIN", "cbl/MAIN.cbl")
+    poster = _prog("p:poster", "POSTER", "cbl/POSTER.cbl")
+    graph.add_entities([main, poster])
+    worklist = [{"path": "cbl/MAIN.cbl", "line": 3, "name": "WS-PGM", "caller": "MAIN",
+                 "reason": "dynamic-target"}]
+
+    client = FakeLspClient(path_to_uri(repo / "cbl" / "POSTER.cbl"), def_line0=0)
+    src = LspEdgeSource("cobol", str(repo), client=client)
+    delta = src.discover(graph, "r", worklist)
+
+    assert len(delta.discovered) == 1
+    edge = delta.discovered[0]
+    assert edge.type == RelationType.CALLS
+    assert edge.src_id == "p:main" and edge.dst_id == "p:poster"
+    assert edge.attributes["resolution"] == "lsp-verified"
+    assert edge.attributes["mode"] == "discover" and edge.attributes["via"] == "WS-PGM"
+
+
+def test_lsp_discover_skips_unresolvable_site(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "cbl").mkdir(parents=True)
+    (repo / "cbl" / "MAIN.cbl").write_text(
+        "       PROGRAM-ID. MAIN.\n       PROCEDURE DIVISION.\n           CALL WS-PGM.\n",
+        encoding="utf-8")
+    graph = InMemoryGraphStore()
+    graph.add_entities([_prog("p:main", "MAIN", "cbl/MAIN.cbl")])
+    worklist = [{"path": "cbl/MAIN.cbl", "line": 3, "name": "WS-PGM", "caller": "MAIN"}]
+
+    client = FakeLspClient(None)  # server can't resolve the dynamic target
+    src = LspEdgeSource("cobol", str(repo), client=client)
+    delta = src.discover(graph, "r", worklist)
+    assert not delta.discovered and delta.queried == 1
+
+
+def test_lsp_complete_adds_reference_edges(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "cbl").mkdir(parents=True)
+    (repo / "cbl" / "HELPER.cbl").write_text("       PROGRAM-ID. HELPER.\n", encoding="utf-8")
+    (repo / "cbl" / "A.cbl").write_text(
+        "       PROGRAM-ID. A.\n       PROCEDURE DIVISION.\n           CALL 'HELPER'.\n", "utf-8")
+    (repo / "cbl" / "B.cbl").write_text(
+        "       PROGRAM-ID. B.\n           CALL 'HELPER'.\n", "utf-8")
+    graph = InMemoryGraphStore()
+    helper = _prog("p:helper", "HELPER", "cbl/HELPER.cbl")
+    a = _prog("p:a", "A", "cbl/A.cbl")
+    b = _prog("p:b", "B", "cbl/B.cbl")
+    graph.add_entities([helper, a, b])
+
+    refs = [_loc(path_to_uri(repo / "cbl" / "A.cbl"), 2),   # A.cbl line 3
+            _loc(path_to_uri(repo / "cbl" / "B.cbl"), 1)]   # B.cbl line 2
+    client = FakeLspClient(None, references=refs)
+    src = LspEdgeSource("cobol", str(repo), client=client)
+    delta = src.complete(graph, "r", [helper])
+
+    assert len(delta.discovered) == 2
+    edges = {(e.src_id, e.dst_id) for e in delta.discovered}
+    assert edges == {("p:a", "p:helper"), ("p:b", "p:helper")}
+    assert all(e.type == RelationType.REFERENCES for e in delta.discovered)
+    assert all(e.attributes["mode"] == "complete" for e in delta.discovered)
 
 
 # ---------------------------------------------------------------- SCIP

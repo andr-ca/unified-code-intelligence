@@ -19,6 +19,9 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from ..core.entities import SYMBOL_KINDS
+from ..core.ids import relationship_id
+from ..core.provenance import Provenance
 from ..core.relationships import RelationType, Relationship, RESOLVED_LEVELS
 from .base import Budget, EdgeDelta, EdgeSource
 from .lsp_client import LspClient, LspError
@@ -116,7 +119,146 @@ class LspEdgeSource(EdgeSource):
                     delta.pruned.append(self._prune(rel))
         return delta
 
+    # -- discover ----------------------------------------------------------
+    def discover(self, graph, repo_id: str, worklist, budget: Budget | None = None) -> EdgeDelta:
+        """Turn ``unresolved_calls`` worklist sites into edges the static extractor missed: resolve
+        the call target with the server and, if it lands on a known entity, emit a new provable
+        ``CALLS`` edge (resolution ``lsp-verified``)."""
+        delta = EdgeDelta()
+        client = self._ensure_client()
+        if client is None:
+            return delta
+        budget = budget or Budget()
+        opened: set[str] = set()
+        for site in worklist or []:
+            path = str(site.get("path", ""))
+            if not path or not self._handles(path):
+                continue
+            name = str(site.get("name", ""))
+            line = int(site.get("line", 0) or 0)
+            if line <= 0:
+                continue
+            caller = self._caller_entity(graph, site)
+            if caller is None:
+                continue
+            char = self._call_site_column(path, line, name) if name else 0
+            if char is None:
+                continue
+            if not budget.spend():
+                return delta
+            try:
+                result = self._definition(client, path, line - 1, char, opened)
+            except LspError:
+                break
+            delta.queried += 1
+            target = self._location_entity(graph, result)
+            if target is None or target.id == caller.id:
+                continue
+            rid = relationship_id(RelationType.CALLS, caller.id, target.id, ordinal=line)
+            prov = Provenance(repo_id, path, line, line, self.extractor, 0.95)
+            delta.discovered.append(Relationship(
+                id=rid, type=RelationType.CALLS, src_id=caller.id, dst_id=target.id,
+                provenance=prov,
+                attributes={"resolution": "lsp-verified", "discovered_by": self.extractor,
+                            "mode": "discover", "via": name}))
+        return delta
+
+    # -- complete ----------------------------------------------------------
+    def complete(self, graph, repo_id: str, symbols, budget: Budget | None = None) -> EdgeDelta:
+        """Fill type-aware ``REFERENCES`` edges for high-value symbols: ask the server for every
+        reference to each symbol and connect the *enclosing* entity of each reference to it."""
+        delta = EdgeDelta()
+        client = self._ensure_client()
+        if client is None:
+            return delta
+        budget = budget or Budget()
+        opened: set[str] = set()
+        for sym in symbols or []:
+            if sym is None or not sym.provenance.path or not self._handles(sym.provenance.path):
+                continue
+            char = self._call_site_column(sym.provenance.path, sym.provenance.start_line, sym.name)
+            if char is None:
+                continue
+            if not budget.spend():
+                return delta
+            try:
+                refs = self._references(client, sym.provenance.path,
+                                        sym.provenance.start_line - 1, char, opened)
+            except LspError:
+                break
+            delta.queried += 1
+            seen: set[str] = set()
+            for loc in _locations(refs):
+                loc_path = _uri_to_relpath(loc.get("uri", ""), self.repo_path)
+                loc_line = int(loc.get("range", {}).get("start", {}).get("line", -1)) + 1
+                if not loc_path:
+                    continue
+                enclosing = self._enclosing_entity(graph, loc_path, loc_line)
+                if enclosing is None or enclosing.id == sym.id:
+                    continue
+                rid = relationship_id(RelationType.REFERENCES, enclosing.id, sym.id, ordinal=loc_line)
+                if rid in seen:
+                    continue
+                seen.add(rid)
+                prov = Provenance(repo_id, loc_path, loc_line, loc_line, self.extractor, 0.95)
+                delta.discovered.append(Relationship(
+                    id=rid, type=RelationType.REFERENCES, src_id=enclosing.id, dst_id=sym.id,
+                    provenance=prov,
+                    attributes={"resolution": "lsp-verified", "discovered_by": self.extractor,
+                                "mode": "complete"}))
+        return delta
+
     # -- helpers -----------------------------------------------------------
+    def _definition(self, client, path: str, line0: int, char: int, opened: set[str]) -> Any:
+        abs_path = str(Path(self.repo_path) / path)
+        if path not in opened:
+            client.did_open(abs_path, self.spec.language_id, "\n".join(self._lines(path)))
+            opened.add(path)
+        return client.definition(abs_path, line0, char)
+
+    def _references(self, client, path: str, line0: int, char: int, opened: set[str]) -> Any:
+        abs_path = str(Path(self.repo_path) / path)
+        if path not in opened:
+            client.did_open(abs_path, self.spec.language_id, "\n".join(self._lines(path)))
+            opened.add(path)
+        return client.references(abs_path, line0, char)
+
+    def _caller_entity(self, graph, site: dict):
+        qname = str(site.get("caller", ""))
+        if not qname:
+            return None
+        for ent in graph.find_by_name(qname.split(".")[-1]):
+            if ent.qualified_name == qname:
+                return ent
+        return None
+
+    def _location_entity(self, graph, result: Any):
+        loc = _first_location(result)
+        if loc is None:
+            return None
+        loc_path = _uri_to_relpath(loc.get("uri", ""), self.repo_path)
+        loc_line = int(loc.get("range", {}).get("start", {}).get("line", -1)) + 1
+        if not loc_path:
+            return None
+        return self._entity_at(graph, loc_path, loc_line)
+
+    def _enclosing_entity(self, graph, path: str, line: int):
+        """The narrowest symbol whose definition starts at or before ``line`` (its container)."""
+        if path not in self._loc_index:
+            self._loc_index[path] = sorted(
+                (e.provenance.start_line, e.id)
+                for e in graph.entities() if e.provenance.path == path and e.provenance.start_line)
+        best = None
+        for start_line, eid in self._loc_index[path]:
+            if start_line <= line:
+                ent = graph.get_entity(eid)
+                if ent and ent.kind in SYMBOL_KINDS:
+                    best = ent
+            else:
+                break
+        return best
+
+    # -- verify helpers ----------------------------------------------------
     def _is_speculative(self, rel: Relationship) -> bool:
         res = rel.attributes.get("resolution", "")
         return bool(res) and res not in RESOLVED_LEVELS and not rel.attributes.get("pruned")
@@ -198,6 +340,21 @@ def _first_location(result: Any) -> dict[str, Any] | None:
     if isinstance(result, list) and result:
         return _first_location(result[0])
     return None
+
+
+def _locations(result: Any) -> list[dict[str, Any]]:
+    """Normalize a ``references``/definition result into a flat list of Location dicts."""
+    if not result:
+        return []
+    if isinstance(result, dict):
+        loc = _first_location(result)
+        return [loc] if loc else []
+    out: list[dict[str, Any]] = []
+    for item in result:
+        loc = _first_location(item)
+        if loc:
+            out.append(loc)
+    return out
 
 
 def _uri_to_relpath(uri: str, repo_path: str) -> str:

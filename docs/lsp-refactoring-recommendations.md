@@ -168,9 +168,10 @@ The through-line: **LSP is one rung on the evidence ladder, not the ladder itsel
 
 ## 6. Implementation & usage (what ships today)
 
-The §2.2 adapter foundation is implemented in `uci.enrich`, with **Verify mode** (LSP) and a **SCIP
-ingester** working end-to-end. Everything is optional and gracefully absent: a repo always indexes
-without any of it, and a missing toolchain is reported (`available: false`), never fatal.
+The §2.2 adapter foundation is implemented in `uci.enrich`, with **all three LSP modes** (Verify,
+Discover, Complete) and a **SCIP ingester** working end-to-end, plus a golden-fixture eval. Everything
+is optional and gracefully absent: a repo always indexes without any of it, and a missing toolchain is
+reported (`available: false`), never fatal.
 
 ### 6.1 What's built
 
@@ -178,12 +179,14 @@ without any of it, and a missing toolchain is reported (`available: false`), nev
 | --- | --- | --- |
 | `EdgeSource` / `EdgeDelta` / `Budget` interface | `enrich/base.py` | ✅ |
 | Minimal stdio LSP client (Content-Length JSON-RPC) | `enrich/lsp_client.py` | ✅ |
-| Generic LSP source — **Verify** (promote/prune) | `enrich/lsp_source.py` | ✅ |
-| SCIP ingester (stdlib protobuf reader) — **Discover** | `enrich/scip_source.py` | ✅ |
+| LSP **Verify** — promote (`lsp-verified`) / prune-with-tombstone | `enrich/lsp_source.py` | ✅ |
+| LSP **Discover** — `unresolved_calls` → definition → new `CALLS` edges | `enrich/lsp_source.py` | ✅ |
+| LSP **Complete** — references → `REFERENCES` edges for high-fan-in symbols | `enrich/lsp_source.py` | ✅ |
+| SCIP ingester (stdlib protobuf reader) — Discover → `resolution="scip"` | `enrich/scip_source.py` | ✅ |
 | Server registry (Che4z COBOL · pyright · tsserver) | `enrich/servers.py` | ✅ |
 | Orchestration + graph apply | `Engine.enrich_edges` | ✅ |
-| CLI | `uci enrich --lsp/--scip` | ✅ |
-| LSP **Discover** (`unresolved_calls` → callHierarchy) · **Complete** (references/implements) | — | ⏳ |
+| CLI | `uci enrich --lsp/--scip [--verify-only\|--complete]` | ✅ |
+| **Eval** — precision/recall vs a scripted LSP server over real stdio | `evals/lsp_eval.py` | ✅ |
 
 **Resolution & honesty.** A confirmed edge becomes `resolution="lsp-verified"` (confidence 0.95) or
 `resolution="scip"` (1.0) — both added to `RESOLVED_LEVELS`, so they count as provable and can drive
@@ -213,22 +216,49 @@ Add or override a language by editing `REGISTRY` in `enrich/servers.py` (`Server
 ### 6.3 Run it
 
 ```bash
-# Verify/prune COBOL's speculative call edges with a language server (60s budget/source by default)
+# Verify+Discover COBOL edges (default): confirm/prune speculative calls AND resolve unresolved sites
 uci enrich --lsp cobol
 
-# Ingest a batch SCIP index (scip-python / scip-typescript / scip-java output) as provable edges
-scip-python index --output index.scip .        # produce it with the ecosystem indexer
-uci enrich --scip index.scip
+# Add Complete: type-aware REFERENCES edges for the highest-fan-in symbols
+uci enrich --lsp cobol --complete
 
-# Combine sources; only confirm/prune existing edges (skip discovery); widen the budget; JSON out
+# Only confirm/prune existing edges (skip discovery); combine sources; widen budget; JSON out
 uci enrich --lsp cobol --lsp python --budget 120 --verify-only --json
+
+# Ingest a batch SCIP index (scip-python / scip-typescript / scip-java) as provable edges
+scip-python index --output index.scip .
+uci enrich --scip index.scip
 ```
 
-Output per source: `promoted` (upgraded to verified), `pruned` (tombstoned), `discovered` (new),
-`queried`. A source with no toolchain prints `unavailable (toolchain not found) — skipped`.
+Modes: **Verify** (existing speculative edges → promote/prune) and **Discover** (`unresolved_calls`
+worklist → new edges) run by default; `--verify-only` skips Discover; `--complete` adds **Complete**
+(references). Output per source: `promoted`, `pruned`, `discovered`, `queried`. A source with no
+toolchain prints `unavailable (toolchain not found) — skipped`.
 
-`Engine.enrich_edges(lsp=[...], scip=[...], budget_seconds=60, verify_only=False)` is the programmatic
-entry; it upserts the returned `EdgeDelta` into the graph.
+`Engine.enrich_edges(lsp=[...], scip=[...], budget_seconds=60, verify_only=False, complete=False)` is
+the programmatic entry; it upserts the returned `EdgeDelta` into the graph.
+
+### 6.3a Eval — proving the bridge is correct
+
+`evals/lsp_eval.py` scores the harness itself against a **golden fixture + scripted LSP server**
+(`evals/tools/scripted_lsp.py`). The scripted server speaks real LSP over stdio, so the eval drives
+the *entire* stack — `LspClient.spawn` → subprocess → Content-Length framing → definition/references →
+apply — deterministically and **with no language server installed** (CI-safe). It measures
+precision/recall for each mode against a hand-built ground truth:
+
+```
+$ python evals/lsp_eval.py
+  promote   P 1.00  R 1.00  F1 1.00   # confirmed the true edge
+  prune     P 1.00  R 1.00  F1 1.00   # tombstoned the edge that resolved elsewhere
+  discover  P 1.00  R 1.00  F1 1.00   # built the edge for the unresolved dynamic call
+  complete  P 1.00  R 1.00  F1 1.00   # added the reference edges
+  leave     ok                        # left the edge the server was unsure about untouched
+  overall 100.0
+```
+
+`tests/test_lsp_eval.py` runs it in CI and asserts the perfect score — a regression gate on the whole
+bridge. Extending the eval to a *real* Che4z/pyright run is a matter of pointing `UCI_LSP_<LANG>_CMD`
+at the actual server instead of the scripted one.
 
 ### 6.4 Anti-goals still in force
 
