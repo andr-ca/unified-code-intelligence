@@ -440,25 +440,26 @@ class Engine:
         return onboarding_guide(self.graph, self.metadata, self.repo_id)
 
     def control_flow(self, symbol: str) -> dict:
-        """Block scheme of the logic *inside* a routine (docs/…): a deterministic control-flow graph
-        (decisions, loops, branches, calls) with a Mermaid rendering. Python today; COBOL next."""
+        """Block scheme of the logic *inside* a routine: a deterministic control-flow graph
+        (decisions, loops, branches, calls) with a Mermaid rendering (docs/control-flow.md).
+        Python functions/methods and COBOL programs today."""
         from pathlib import Path
-        from .analysis.cfg import build_python_cfg
+        from .analysis.cfg import build_cobol_cfg, build_python_cfg
         target = resolve_one(self.graph, symbol)
         if target is None:
             return {"ok": False, "tool": "control_flow",
                     "error": {"code": "not_found", "message": symbol}}
-        if target.kind not in (EntityType.FUNCTION, EntityType.METHOD):
-            return {"ok": False, "tool": "control_flow", "error": {"code": "unsupported",
-                    "message": f"{target.qualified_name} is a {target.kind.value}; "
-                               "control_flow supports functions/methods"}}
         path = target.provenance.path
-        if not path.endswith(".py"):
-            return {"ok": False, "tool": "control_flow", "error": {"code": "unsupported_language",
-                    "message": f"control_flow supports Python today; {path} is not Python"}}
+        py = target.kind in (EntityType.FUNCTION, EntityType.METHOD) and path.endswith(".py")
+        cobol = target.kind == EntityType.LEGACY_PROGRAM and path.endswith((".cbl", ".cob", ".cpy"))
+        if not (py or cobol):
+            return {"ok": False, "tool": "control_flow", "error": {"code": "unsupported",
+                    "message": f"{target.qualified_name} ({target.kind.value}, {path}): control_flow "
+                               "supports Python functions/methods and COBOL programs today"}}
         try:
             source = (Path(self.config.repo_path) / path).read_text(encoding="utf-8", errors="replace")
-            cfg = build_python_cfg(source, target.name, path, target.qualified_name)
+            cfg = (build_python_cfg(source, target.name, path, target.qualified_name) if py
+                   else build_cobol_cfg(source, target.name, path))
         except (OSError, ValueError, SyntaxError) as exc:
             return {"ok": False, "tool": "control_flow",
                     "error": {"code": "build_failed", "message": str(exc)}}

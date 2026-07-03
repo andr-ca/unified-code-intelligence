@@ -202,6 +202,289 @@ def _src(node: ast.AST | None) -> str:
         return type(node).__name__
 
 
+# ----------------------------------------------------------------- COBOL builder
+# Verbs that begin a statement (used to find where an IF/EVALUATE condition ends and code starts).
+_COBOL_VERBS = frozenset({
+    "MOVE", "ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE", "DISPLAY", "ACCEPT",
+    "PERFORM", "IF", "EVALUATE", "GO", "CALL", "GOBACK", "STOP", "EXIT", "OPEN", "CLOSE",
+    "READ", "WRITE", "REWRITE", "DELETE", "START", "SET", "INITIALIZE", "STRING", "UNSTRING",
+    "INSPECT", "SEARCH", "CONTINUE", "EXEC", "RETURN", "MERGE", "SORT", "RELEASE", "CANCEL",
+    "NEXT",
+})
+_COBOL_SCOPE_ENDERS = frozenset({"END-IF", "END-EVALUATE", "END-PERFORM", "ELSE", "WHEN", "."})
+_COBOL_LOOP_CLAUSES = frozenset({"UNTIL", "VARYING", "TIMES"})
+_NOT_PARAGRAPH = frozenset({
+    "PROCEDURE", "IDENTIFICATION", "ENVIRONMENT", "DATA", "DIVISION", "SECTION",
+    "GOBACK", "STOP", "EXIT", "EJECT", "SKIP1", "SKIP2", "SKIP3", "DECLARATIVES",
+})
+
+
+def _cobol_tokens(lines: list[tuple[int, str]]) -> list[tuple[str, str, int]]:
+    """Flatten ``(lineno, code)`` into ``(UPPER, orig, lineno)`` tokens; periods are their own token."""
+    toks: list[tuple[str, str, int]] = []
+    for lineno, code in lines:
+        for word in code.replace(",", " ").replace(";", " ").split():
+            core = word
+            trailing = 0
+            while core.endswith("."):
+                core, trailing = core[:-1], trailing + 1
+            if core:
+                toks.append((core.upper(), core, lineno))
+            toks.extend((".", ".", lineno) for _ in range(trailing))
+    return toks
+
+
+class _CobolCfgBuilder:
+    """Statement-level CFG for a COBOL PROCEDURE DIVISION (or one paragraph). Targets well-structured
+    code (explicit END-IF/END-EVALUATE/END-PERFORM). PERFORM of a paragraph is shown as a call block
+    (subroutine semantics); GO TO is a control transfer to the target paragraph; fall-through links
+    consecutive paragraphs, per COBOL semantics."""
+
+    def __init__(self) -> None:
+        self.nodes: list[CfgNode] = []
+        self.edges: list[CfgEdge] = []
+        self._seq = 0
+        self.para_entry: dict[str, str] = {}
+        self.pending_goto: list[tuple[str, str]] = []
+        self.entry = self._node("entry", "start", 0)
+        self.exit = self._node("exit", "end", 0)
+
+    def _node(self, kind: str, label: str, line: int) -> str:
+        nid = f"n{self._seq}"
+        self._seq += 1
+        self.nodes.append(CfgNode(nid, kind, label, line))
+        return nid
+
+    def _connect(self, preds: list[tuple[str, str]], dst: str) -> None:
+        for pid, label in preds:
+            self.edges.append(CfgEdge(pid, dst, label))
+
+    # -- top level ---------------------------------------------------------
+    def build(self, proc_lines: list[tuple[int, str]]) -> None:
+        segments = self._segment(proc_lines)
+        # pre-create paragraph entry nodes so GO TO can target forward references
+        prepared = []
+        for name, lines, line0 in segments:
+            nid = self._node("paragraph", name, line0) if name else None
+            if name:
+                self.para_entry[name.upper()] = nid
+            prepared.append((nid, lines))
+        cur: list[tuple[str, str]] = [(self.entry, "")]
+        for nid, lines in prepared:
+            if nid is not None:
+                self._connect(cur, nid)
+                cur = [(nid, "")]
+            toks = _cobol_tokens(lines)
+            exits, _ = self._statements(toks, 0, cur, terminators=frozenset())
+            cur = exits
+        self._connect(cur, self.exit)
+        for from_id, target in self.pending_goto:
+            self.edges.append(CfgEdge(from_id, self.para_entry.get(target.upper(), self.exit), ""))
+
+    def _segment(self, lines: list[tuple[int, str]]):
+        """Split procedure lines into (paragraph-name|None, lines, first-lineno). A paragraph header
+        is a lone ``NAME.`` (or ``NAME SECTION.``) line; code before the first header is the None seg."""
+        import re
+        para_re = re.compile(r"^\s*([A-Z0-9][A-Z0-9-]*)\s*(SECTION)?\s*\.\s*$", re.IGNORECASE)
+        segments: list[tuple[str | None, list[tuple[int, str]], int]] = []
+        cur_name: str | None = None
+        cur_lines: list[tuple[int, str]] = []
+        cur_line0 = lines[0][0] if lines else 0
+        for lineno, code in lines:
+            m = para_re.match(code)
+            name = m.group(1).upper() if m else ""
+            if m and name not in _NOT_PARAGRAPH and not name.startswith("END-") \
+                    and name not in _COBOL_VERBS:
+                if cur_lines or cur_name is not None:
+                    segments.append((cur_name, cur_lines, cur_line0))
+                cur_name, cur_lines, cur_line0 = m.group(1), [], lineno
+            else:
+                cur_lines.append((lineno, code))
+        if cur_lines or cur_name is not None:
+            segments.append((cur_name, cur_lines, cur_line0))
+        return segments
+
+    # -- statement stream --------------------------------------------------
+    def _statements(self, toks, i, preds, terminators):
+        cur = preds
+        while i < len(toks):
+            v = toks[i][0]
+            if v in terminators:
+                break
+            if v == ".":
+                i += 1
+                continue
+            if v == "IF":
+                cur, i = self._if(toks, i, cur)
+            elif v == "EVALUATE":
+                cur, i = self._evaluate(toks, i, cur)
+            elif v == "PERFORM":
+                cur, i = self._perform(toks, i, cur)
+            elif v == "GO":
+                cur, i = self._goto(toks, i, cur)
+            elif v == "GOBACK" or (v == "STOP") or (v == "EXIT" and self._peek(toks, i + 1) == "PROGRAM"):
+                cur, i = self._terminate(toks, i, cur)
+            else:
+                cur, i = self._simple(toks, i, cur)
+        return cur, i
+
+    def _peek(self, toks, i):
+        return toks[i][0] if 0 <= i < len(toks) else ""
+
+    def _collect(self, toks, i, stop):
+        """Gather token text until a stop token/verb; returns (text, new_i)."""
+        words = []
+        while i < len(toks) and toks[i][0] not in stop and toks[i][0] not in _COBOL_VERBS:
+            words.append(toks[i][1])
+            i += 1
+        return " ".join(words), i
+
+    def _if(self, toks, i, preds):
+        i += 1  # past IF
+        cond, i = self._collect(toks, i, {"THEN", "."})
+        if self._peek(toks, i) == "THEN":
+            i += 1
+        d = self._node("decision", f"IF {cond}", toks[i - 1][2])
+        self._connect(preds, d)
+        true_exits, i = self._statements(toks, i, [(d, "true")], {"ELSE", "END-IF", "."})
+        if self._peek(toks, i) == "ELSE":
+            i += 1
+            false_exits, i = self._statements(toks, i, [(d, "false")], {"END-IF", "."})
+        else:
+            false_exits = [(d, "false")]
+        if self._peek(toks, i) in ("END-IF", "."):
+            i += 1
+        return true_exits + false_exits, i
+
+    def _evaluate(self, toks, i, preds):
+        line = toks[i][2]
+        i += 1  # past EVALUATE
+        subj, i = self._collect(toks, i, {"WHEN", "."})
+        d = self._node("decision", f"EVALUATE {subj}", line)
+        self._connect(preds, d)
+        exits: list[tuple[str, str]] = []
+        while self._peek(toks, i) == "WHEN":
+            i += 1
+            cond, i = self._collect(toks, i, {"END-EVALUATE", "WHEN", "."})
+            branch, i = self._statements(toks, i, [(d, f"when {cond}".strip())],
+                                         {"WHEN", "END-EVALUATE", "."})
+            exits += branch
+        if self._peek(toks, i) in ("END-EVALUATE", "."):
+            i += 1
+        return (exits or [(d, "")]), i
+
+    def _perform(self, toks, i, preds):
+        line = toks[i][2]
+        i += 1  # past PERFORM
+        # look ahead within this sentence for END-PERFORM (inline) and loop clauses
+        j, inline, is_loop, depth = i, False, False, 0
+        while j < len(toks) and not (toks[j][0] == "." and depth == 0):
+            t = toks[j][0]
+            if t == "PERFORM":
+                depth += 1
+            elif t == "END-PERFORM":
+                if depth == 0:
+                    inline = True
+                    break
+                depth -= 1
+            elif t in _COBOL_LOOP_CLAUSES:
+                is_loop = True
+            j += 1
+        header, i = self._collect(toks, i, {"END-PERFORM", "."})
+        if inline:
+            kind = "loop" if is_loop else "statement"
+            h = self._node(kind, f"PERFORM {header}".strip(), line)
+            self._connect(preds, h)
+            body, i = self._statements(toks, i, [(h, "loop" if is_loop else "")],
+                                       {"END-PERFORM", "."})
+            if self._peek(toks, i) == "END-PERFORM":
+                i += 1
+            if is_loop:
+                self._connect(body, h)          # loop back
+                return [(h, "exit")], i
+            return body or [(h, "")], i
+        # out-of-line: PERFORM para [THRU p2] [UNTIL/TIMES/VARYING …]
+        para = header.split()[0] if header and header.split()[0].upper() not in _COBOL_LOOP_CLAUSES \
+            else ""
+        if not is_loop:
+            node = self._node("call", f"PERFORM {header}".strip(), line)
+            self._connect(preds, node)
+            self._perform_edge(node, para)
+            return [(node, "")], i
+        # a loop: header + the performed paragraph as the body block that loops back
+        h = self._node("loop", f"PERFORM {header}".strip(), line)
+        self._connect(preds, h)
+        if para:
+            body = self._node("call", f"perform {para}", line)
+            self.edges.append(CfgEdge(h, body, "loop"))
+            self.edges.append(CfgEdge(body, h, ""))  # loop back
+            self._perform_edge(body, para)
+        return [(h, "exit")], i
+
+    def _perform_edge(self, from_id: str, para: str) -> None:
+        """Link a PERFORM to its paragraph (a call edge), so performed paragraphs stay reachable."""
+        target = self.para_entry.get(para.upper())
+        if target:
+            self.edges.append(CfgEdge(from_id, target, "perform"))
+
+    def _goto(self, toks, i, preds):
+        line = toks[i][2]
+        i += 1  # past GO
+        if self._peek(toks, i) == "TO":
+            i += 1
+        target = toks[i][1] if i < len(toks) else ""
+        i += 1
+        # a DEPENDING-ON computed GO TO has multiple targets; take the first token as label
+        g = self._node("goto", f"GO TO {target}", line)
+        self._connect(preds, g)
+        self.pending_goto.append((g, target))
+        while i < len(toks) and toks[i][0] != ".":
+            i += 1
+        return [], i  # unconditional transfer: nothing falls through
+
+    def _terminate(self, toks, i, preds):
+        line = toks[i][2]
+        label = toks[i][1].upper()
+        if label == "STOP":
+            label = "STOP RUN"
+        elif label == "EXIT":
+            label = "EXIT PROGRAM"
+        r = self._node("return", label, line)
+        self._connect(preds, r)
+        self.edges.append(CfgEdge(r, self.exit, ""))
+        while i < len(toks) and toks[i][0] != ".":
+            i += 1
+        return [], i
+
+    def _simple(self, toks, i, preds):
+        line = toks[i][2]
+        verb = toks[i][0]
+        words = [toks[i][1]]
+        i += 1
+        while i < len(toks) and toks[i][0] not in _COBOL_VERBS and toks[i][0] not in _COBOL_SCOPE_ENDERS:
+            words.append(toks[i][1])
+            i += 1
+        kind = "call" if verb in ("CALL", "EXEC") else "statement"
+        node = self._node(kind, " ".join(words), line)
+        self._connect(preds, node)
+        return [(node, "")], i
+
+
+def build_cobol_cfg(source: str, symbol: str, path: str) -> ControlFlowGraph:
+    """Build a CFG for a COBOL program's PROCEDURE DIVISION (statement-level, well-structured code)."""
+    from ..parser.cobol_parser import _code_lines
+    lines = list(_code_lines(source))
+    start = next((k for k, (_, code) in enumerate(lines)
+                  if "PROCEDURE" in code.upper() and "DIVISION" in code.upper()), None)
+    if start is None:
+        raise ValueError(f"no PROCEDURE DIVISION found in {path}")
+    proc = lines[start + 1:]
+    builder = _CobolCfgBuilder()
+    builder.build(proc)
+    return ControlFlowGraph(symbol=symbol, path=path, language="cobol",
+                            nodes=builder.nodes, edges=builder.edges)
+
+
 def build_python_cfg(source: str, symbol: str, path: str, qualified_name: str = "") -> ControlFlowGraph:
     """Build a CFG for one function/method in ``source``. ``symbol`` is the (possibly dotted) name;
     the last segment selects the def, matched anywhere in the module (incl. methods in classes)."""

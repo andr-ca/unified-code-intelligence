@@ -78,9 +78,9 @@ TOOL_SPECS: list[dict[str, Any]] = [
     },
     {
         "name": "control_flow",
-        "description": "Control-flow graph (block scheme) of a function/method: decisions, loops, "
-                       "branches, calls, and returns as nodes with source lines, plus a Mermaid "
-                       "flowchart. Shows the logic *inside* a routine. Python today.",
+        "description": "Control-flow graph (block scheme) of a function/method (Python) or program "
+                       "(COBOL): decisions, loops, branches, calls, and returns as nodes with source "
+                       "lines, plus a Mermaid flowchart. Shows the logic *inside* a routine.",
         "inputSchema": {
             "type": "object",
             "properties": {"symbol": {"type": "string"}},

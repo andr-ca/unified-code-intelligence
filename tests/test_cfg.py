@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from uci import Config, Engine
-from uci.analysis.cfg import build_python_cfg
+from uci.analysis.cfg import build_cobol_cfg, build_python_cfg
 
 _OVERDRAFT = '''
 def post(balance, txns):
@@ -83,5 +83,61 @@ def test_engine_control_flow_not_found(tmp_path):
     try:
         data = eng.control_flow("does_not_exist")
         assert not data["ok"] and data["error"]["code"] == "not_found"
+    finally:
+        eng.close()
+
+
+_COBOL = """       IDENTIFICATION DIVISION.
+       PROGRAM-ID. POST.
+       PROCEDURE DIVISION.
+       MAIN-PARA.
+           PERFORM INIT-PARA.
+           IF WS-FLAG = 'Y'
+               MOVE 1 TO WS-CODE
+           ELSE
+               MOVE 0 TO WS-CODE
+           END-IF.
+           PERFORM CHECK-PARA UNTIL WS-DONE = 'Y'.
+           GOBACK.
+       INIT-PARA.
+           MOVE 'N' TO WS-DONE.
+       CHECK-PARA.
+           ADD 1 TO WS-X.
+"""
+
+
+def test_cobol_cfg_structure():
+    cfg = build_cobol_cfg(_COBOL, "POST", "post.cbl")
+    st = cfg.stats()
+    assert st["decisions"] == 1 and st["loops"] == 1 and st["returns"] == 1
+    labels = {n.label for n in cfg.nodes}
+    assert "MAIN-PARA" in labels and "INIT-PARA" in labels and "CHECK-PARA" in labels
+    assert not any(n.label.startswith("END-") for n in cfg.nodes)  # scope terminators aren't nodes
+    idx = {n.id: n for n in cfg.nodes}
+    kinds = {(idx[e.src].kind, e.label, idx[e.dst].kind) for e in cfg.edges}
+    assert ("call", "perform", "paragraph") in kinds       # PERFORM links to its paragraph
+    assert ("decision", "true", "statement") in kinds       # IF forks to a statement
+    assert ("return", "", "exit") in kinds                  # GOBACK → exit
+
+
+def test_cobol_cfg_no_procedure_division_raises():
+    try:
+        build_cobol_cfg("       PROGRAM-ID. X.\n", "X", "x.cbl")
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError when there is no PROCEDURE DIVISION")
+
+
+def test_engine_control_flow_on_cobol(tmp_path):
+    repo = tmp_path / "cob"
+    (repo / "cbl").mkdir(parents=True)
+    (repo / "cbl" / "POST.cbl").write_text(_COBOL, encoding="utf-8")
+    eng = Engine(Config.from_env(repo, {"embedding_provider": "noop"}))
+    eng.index(full=True)
+    try:
+        data = eng.control_flow("POST")
+        assert data["ok"] and data["language"] == "cobol"
+        assert data["stats"]["decisions"] == 1 and data["stats"]["loops"] == 1
+        assert data["mermaid"].startswith("flowchart TD")
     finally:
         eng.close()

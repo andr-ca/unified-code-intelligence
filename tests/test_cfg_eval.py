@@ -19,4 +19,7 @@ def test_cfg_builder_is_structurally_correct_on_all_fixtures():
 def test_cfg_eval_covers_every_construct_family():
     report = E.run()
     fns = {f["function"] for f in report["fixtures"]}
-    assert fns == {"classify", "scan", "route", "guarded"}  # if/elif, loop+break, match, try
+    # python: if/elif, loop+break, match, try — cobol: IF/EVALUATE/PERFORM UNTIL/GO TO, inline PERFORM
+    assert fns == {"classify", "scan", "route", "guarded", "POST", "INQ"}
+    langs = {f["language"] for f in report["fixtures"]}
+    assert langs == {"python", "cobol"}

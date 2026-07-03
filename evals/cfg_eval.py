@@ -18,11 +18,11 @@ from pathlib import Path
 EVALS = Path(__file__).resolve().parent
 sys.path.insert(0, str(EVALS.parent / "src"))
 
-from uci.analysis.cfg import build_python_cfg  # noqa: E402
+from uci.analysis.cfg import build_cobol_cfg, build_python_cfg  # noqa: E402
 
-# (source, function, golden {decisions, loops, returns}) — each exercises a construct family.
+# (language, source, symbol, golden {decisions, loops, returns}) — each exercises a construct family.
 _FIXTURES = [
-    ("""
+    ("python", """
 def classify(x):
     if x < 0:
         return "neg"
@@ -31,7 +31,7 @@ def classify(x):
     else:
         return "pos"
 """, "classify", {"decisions": 2, "loops": 0, "returns": 3}),
-    ("""
+    ("python", """
 def scan(items):
     found = 0
     for it in items:
@@ -42,7 +42,7 @@ def scan(items):
         found += 1
     return found
 """, "scan", {"decisions": 2, "loops": 1, "returns": 1}),
-    ("""
+    ("python", """
 def route(cmd, data):
     match cmd:
         case "add":
@@ -53,7 +53,7 @@ def route(cmd, data):
             r = data
     return r
 """, "route", {"decisions": 1, "loops": 0, "returns": 1}),
-    ("""
+    ("python", """
 def guarded(conn):
     try:
         conn.open()
@@ -65,6 +65,46 @@ def guarded(conn):
         conn.close()
     return conn.status
 """, "guarded", {"decisions": 0, "loops": 1, "returns": 1}),
+    # -- COBOL: IF/ELSE/END-IF, EVALUATE/WHEN, PERFORM UNTIL loop, GO TO, GOBACK, fall-through
+    ("cobol", """       IDENTIFICATION DIVISION.
+       PROGRAM-ID. POST.
+       PROCEDURE DIVISION.
+       MAIN-PARA.
+           PERFORM INIT-PARA.
+           IF WS-FLAG = 'Y'
+               MOVE 1 TO WS-CODE
+           ELSE
+               MOVE 0 TO WS-CODE
+           END-IF.
+           PERFORM CHECK-PARA UNTIL WS-DONE = 'Y'.
+           EVALUATE WS-CODE
+               WHEN 1
+                   DISPLAY 'ONE'
+               WHEN OTHER
+                   DISPLAY 'OTHER'
+           END-EVALUATE.
+           GOBACK.
+       INIT-PARA.
+           MOVE 'N' TO WS-DONE.
+       CHECK-PARA.
+           IF WS-X > 10
+               GO TO DONE-PARA
+           END-IF.
+           ADD 1 TO WS-X.
+       DONE-PARA.
+           MOVE 'Y' TO WS-DONE.
+""", "POST", {"decisions": 3, "loops": 1, "returns": 1}),
+    ("cobol", """       PROGRAM-ID. INQ.
+       PROCEDURE DIVISION.
+       DRIVER.
+           PERFORM VARYING WS-I FROM 1 BY 1 UNTIL WS-I > 10
+               ADD WS-I TO WS-TOTAL
+               IF WS-TOTAL > WS-LIMIT
+                   MOVE 'Y' TO WS-CAP
+               END-IF
+           END-PERFORM.
+           STOP RUN.
+""", "INQ", {"decisions": 1, "loops": 1, "returns": 1}),
 ]
 
 
@@ -106,7 +146,7 @@ def _check(cfg, golden: dict) -> list[tuple[str, bool]]:
     for e in cfg.edges:
         out_labels.setdefault(e.src, set()).add(e.label)
     if_ok = all({"true", "false"} <= out_labels.get(n.id, set())
-                for n in cfg.nodes if n.kind == "decision" and n.label.startswith("if "))
+                for n in cfg.nodes if n.kind == "decision" and n.label.lower().startswith("if "))
     loops = [n for n in cfg.nodes if n.kind == "loop"]
     loop_ok = all(
         any(e.dst == ln.id for e in cfg.edges if e.src != ln.id)          # a back-edge into it
@@ -124,13 +164,14 @@ def _check(cfg, golden: dict) -> list[tuple[str, bool]]:
 def run() -> dict:
     fixtures = []
     total = passed = 0
-    for source, fn, golden in _FIXTURES:
-        cfg = build_python_cfg(source, fn, f"{fn}.py")
+    for lang, source, sym, golden in _FIXTURES:
+        cfg = (build_python_cfg(source, sym, f"{sym}.py") if lang == "python"
+               else build_cobol_cfg(source, sym, f"{sym}.cbl"))
         checks = _check(cfg, golden)
         ok = sum(1 for _, b in checks if b)
         total += len(checks)
         passed += ok
-        fixtures.append({"function": fn, "stats": cfg.stats(),
+        fixtures.append({"function": sym, "language": lang, "stats": cfg.stats(),
                          "checks_passed": ok, "checks_total": len(checks),
                          "failed": [name for name, b in checks if not b]})
     overall = round(passed / total * 100, 1) if total else 0.0
@@ -140,11 +181,11 @@ def run() -> dict:
 
 def main() -> int:
     report = run()
-    print("\nCFG-eval — control-flow-graph structural correctness (Python)")
-    print("=" * 62)
+    print("\nCFG-eval — control-flow-graph structural correctness (Python + COBOL)")
+    print("=" * 70)
     for f in report["fixtures"]:
         mark = "ok" if not f["failed"] else "FAIL: " + ", ".join(f["failed"])
-        print(f"  {f['function']:<10} {f['checks_passed']}/{f['checks_total']}  "
+        print(f"  {f['function']:<10} {f['language']:<7} {f['checks_passed']}/{f['checks_total']}  "
               f"{f['stats']['decisions']}d {f['stats']['loops']}l {f['stats']['nodes']}n  {mark}")
     print(f"\n  overall {report['overall']}  ({report['passed']}/{report['total']} checks)")
     out = EVALS / "reports" / f"cfg-eval-{report['run'].replace(':', '').replace('-', '')}.json"
