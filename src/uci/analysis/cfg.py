@@ -23,6 +23,7 @@ class CfgNode:
     kind: str
     label: str
     line: int
+    note: str = ""  # optional business-language annotation (LLM narration; never structural)
 
 
 @dataclass
@@ -485,6 +486,137 @@ def build_cobol_cfg(source: str, symbol: str, path: str) -> ControlFlowGraph:
                             nodes=builder.nodes, edges=builder.edges)
 
 
+# ----------------------------------------------------------------- HLASM builder
+# Basic-block CFG from raw assembler (macros/conditional assembly NOT expanded — that needs the
+# Che4z LSP; docs/lsp-refactoring-recommendations.md §3.4). Branch families drive the edges.
+_HL_UNCOND = frozenset({"B", "BRU", "J"})                          # unconditional branch to a label
+_HL_COND = frozenset({
+    "BE", "BNE", "BH", "BL", "BNH", "BNL", "BZ", "BNZ", "BP", "BM", "BO", "BNO", "BNP", "BNM",
+    "BCT", "BCTR", "BXH", "BXLE",
+    "JE", "JNE", "JH", "JL", "JNH", "JNL", "JZ", "JNZ", "JP", "JM", "JO", "JNO", "JCT",
+})
+_HL_CALL = frozenset({"BAL", "BALR", "BAS", "BASR", "BRAS", "BRASL", "JAS"})
+_HL_RETURN_REGS = frozenset({"R14", "14", "R14,R15", "14,15"})
+_HL_SECT = frozenset({"CSECT", "RSECT", "START"})
+
+
+def _hlasm_instructions(source: str):
+    """Yield ``(lineno, label, opcode, operand)`` for the first CSECT's body (macros unexpanded)."""
+    started = False
+    for i, raw in enumerate(source.splitlines(), start=1):
+        if not raw.strip() or raw[:1] in ("*",) or raw.lstrip().startswith(".*"):
+            continue
+        line = raw[:72].rstrip()
+        has_label = bool(line) and not line[0].isspace()
+        parts = line.split()
+        if not parts:
+            continue
+        label = parts[0] if has_label else ""
+        rest = parts[1:] if has_label else parts
+        opcode = rest[0].upper() if rest else ""
+        operand = rest[1] if len(rest) > 1 else ""
+        if opcode in _HL_SECT:
+            if started:
+                break            # next section → stop at first CSECT
+            started = True
+            continue
+        if opcode == "END":
+            break
+        if started:
+            yield (i, label, opcode, operand)
+
+
+def _branch_target(operand: str, labels: set[str]) -> str | None:
+    """The label a branch transfers to (last comma-separated operand token), if it's a real label."""
+    tok = operand.split(",")[-1].strip().upper() if operand else ""
+    return tok if tok in labels else None
+
+
+def build_hlasm_cfg(source: str, symbol: str, path: str) -> ControlFlowGraph:
+    """Basic-block CFG for an HLASM CSECT: blocks split at labels/after branches; edges from the
+    branch family of each block's last instruction (fall-through, taken, call, return)."""
+    instrs = list(_hlasm_instructions(source))
+    if not instrs:
+        raise ValueError(f"no assembler instructions found in {path}")
+    labels = {lbl.upper() for _, lbl, _, _ in instrs if lbl}
+    # leaders: first instr; any labeled instr; any instr after a branch/return
+    leaders = {0}
+    for k, (_, lbl, op, _) in enumerate(instrs):
+        if lbl:
+            leaders.add(k)
+        if op in _HL_UNCOND or op in _HL_COND or op in _HL_CALL or op == "BR" or op == "BCR":
+            if k + 1 < len(instrs):
+                leaders.add(k + 1)
+    order = sorted(leaders)
+    blocks = [instrs[order[b]:order[b + 1] if b + 1 < len(order) else len(instrs)]
+              for b in range(len(order))]
+
+    b = _CfgCommon(symbol, path, "hlasm")
+    label_block: dict[str, str] = {}
+    block_nodes: list[str] = []
+    for blk in blocks:
+        lineno, lbl, _, _ = blk[0]
+        last_op = blk[-1][2]
+        kind = ("decision" if last_op in _HL_COND else
+                "call" if last_op in _HL_CALL else
+                "return" if last_op in ("BR", "BCR") and blk[-1][3].upper() in _HL_RETURN_REGS
+                else "statement")
+        text = lbl + ": " if lbl else ""
+        text += " ".join(f"{op} {opnd}".strip() for _, _, op, opnd in blk[:3])
+        nid = b.node(kind, text.strip() or "block", lineno)
+        block_nodes.append(nid)
+        if lbl:
+            label_block[lbl.upper()] = nid
+    b.connect([(b.entry, "")], block_nodes[0])
+
+    for k, blk in enumerate(blocks):
+        nid = block_nodes[k]
+        last_op, last_operand = blk[-1][2], blk[-1][3]
+        target = _branch_target(last_operand, labels)
+        nxt = block_nodes[k + 1] if k + 1 < len(blocks) else b.exit
+        if last_op in _HL_UNCOND and target:
+            b.edge(nid, label_block.get(target, b.exit), "branch")
+        elif last_op in _HL_COND and target:
+            b.edge(nid, label_block.get(target, b.exit), "taken")
+            b.edge(nid, nxt, "fall")
+        elif last_op in _HL_CALL:
+            if target:
+                b.edge(nid, label_block.get(target, b.exit), "call")
+            b.edge(nid, nxt, "")            # BAL/BALR returns → fall-through
+        elif last_op in ("BR", "BCR") and last_operand.upper() in _HL_RETURN_REGS:
+            b.edge(nid, b.exit, "")         # return via R14
+        elif last_op in ("BR", "BCR"):
+            b.edge(nid, b.exit, "computed")  # branch-to-register, untraceable target
+        else:
+            b.edge(nid, nxt, "")            # fall-through
+    return ControlFlowGraph(symbol=symbol, path=path, language="hlasm",
+                            nodes=b.nodes, edges=b.edges)
+
+
+class _CfgCommon:
+    """Small node/edge accumulator with an entry+exit, shared by the block-oriented builders."""
+
+    def __init__(self, symbol: str, path: str, language: str) -> None:
+        self.nodes: list[CfgNode] = []
+        self.edges: list[CfgEdge] = []
+        self._seq = 0
+        self.entry = self.node("entry", "start", 0)
+        self.exit = self.node("exit", "end", 0)
+
+    def node(self, kind: str, label: str, line: int) -> str:
+        nid = f"n{self._seq}"
+        self._seq += 1
+        self.nodes.append(CfgNode(nid, kind, label, line))
+        return nid
+
+    def edge(self, src: str, dst: str, label: str = "") -> None:
+        self.edges.append(CfgEdge(src, dst, label))
+
+    def connect(self, preds: list[tuple[str, str]], dst: str) -> None:
+        for pid, label in preds:
+            self.edges.append(CfgEdge(pid, dst, label))
+
+
 def build_python_cfg(source: str, symbol: str, path: str, qualified_name: str = "") -> ControlFlowGraph:
     """Build a CFG for one function/method in ``source``. ``symbol`` is the (possibly dotted) name;
     the last segment selects the def, matched anywhere in the module (incl. methods in classes)."""
@@ -503,4 +635,36 @@ def build_python_cfg(source: str, symbol: str, path: str, qualified_name: str = 
                             nodes=builder.nodes, edges=builder.edges)
 
 
-__all__ = ["ControlFlowGraph", "CfgNode", "CfgEdge", "build_python_cfg"]
+_SYS_NARRATE = (
+    "You annotate a control-flow graph with short business-language descriptions. You are given a "
+    "routine's blocks (decisions, loops, calls, statements) and edges. Reply with STRICT JSON only: "
+    "{\"notes\": [{\"id\": str, \"note\": str}]} where note is a <=12-word plain-English description "
+    "of what that block does or decides. Use ONLY the block ids provided; do NOT invent blocks or "
+    "control flow. Prioritise decisions and loops. Omit blocks that need no explanation."
+)
+
+
+def narrate_cfg(cfg: ControlFlowGraph, complete_json) -> dict[str, str]:
+    """Attach optional business-language notes to CFG nodes via an injected ``complete_json`` callable
+    (e.g. ``LlmClient.complete_json``). Narration is *labels only* — it can never change structure, and
+    ids the model invents are dropped. Mutates ``cfg`` node ``note`` fields and returns the notes map."""
+    import json
+    payload = {
+        "symbol": cfg.symbol, "language": cfg.language,
+        "blocks": [{"id": n.id, "kind": n.kind, "label": n.label} for n in cfg.nodes
+                   if n.kind not in ("entry", "exit")],
+        "edges": [{"from": e.src, "to": e.dst, "label": e.label} for e in cfg.edges],
+    }
+    data = complete_json(_SYS_NARRATE, json.dumps(payload), max_tokens=600)
+    ids = {n.id for n in cfg.nodes}
+    notes: dict[str, str] = {}
+    for item in (data.get("notes", []) if isinstance(data, dict) else []):
+        if isinstance(item, dict) and item.get("id") in ids and str(item.get("note", "")).strip():
+            notes[item["id"]] = str(item["note"]).strip()[:120]
+    for n in cfg.nodes:
+        n.note = notes.get(n.id, "")
+    return notes
+
+
+__all__ = ["ControlFlowGraph", "CfgNode", "CfgEdge", "build_python_cfg", "build_cobol_cfg",
+           "narrate_cfg"]

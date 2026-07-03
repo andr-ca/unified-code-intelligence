@@ -18,7 +18,7 @@ from pathlib import Path
 EVALS = Path(__file__).resolve().parent
 sys.path.insert(0, str(EVALS.parent / "src"))
 
-from uci.analysis.cfg import build_cobol_cfg, build_python_cfg  # noqa: E402
+from uci.analysis.cfg import build_cobol_cfg, build_hlasm_cfg, build_python_cfg  # noqa: E402
 
 # (language, source, symbol, golden {decisions, loops, returns}) — each exercises a construct family.
 _FIXTURES = [
@@ -105,6 +105,21 @@ def guarded(conn):
            END-PERFORM.
            STOP RUN.
 """, "INQ", {"decisions": 1, "loops": 1, "returns": 1}),
+    # -- HLASM: basic blocks, conditional branch (decision), BAL call, B loop-back, BR R14 return
+    ("hlasm", """SAMPLE   CSECT
+         STM   R14,R12,12(R13)
+         LA    R5,0
+LOOP     C     R5,=F'10'
+         BNL   DONE
+         BAL   R14,PROCESS
+         LA    R5,1(R5)
+         B     LOOP
+DONE     L     R14,12(R13)
+         BR    R14
+PROCESS  AR    R6,R5
+         BR    R14
+         END
+""", "SAMPLE", {"decisions": 1, "loops": 0, "returns": 2}),
 ]
 
 
@@ -166,7 +181,8 @@ def run() -> dict:
     total = passed = 0
     for lang, source, sym, golden in _FIXTURES:
         cfg = (build_python_cfg(source, sym, f"{sym}.py") if lang == "python"
-               else build_cobol_cfg(source, sym, f"{sym}.cbl"))
+               else build_cobol_cfg(source, sym, f"{sym}.cbl") if lang == "cobol"
+               else build_hlasm_cfg(source, sym, f"{sym}.asm"))
         checks = _check(cfg, golden)
         ok = sum(1 for _, b in checks if b)
         total += len(checks)
@@ -181,8 +197,8 @@ def run() -> dict:
 
 def main() -> int:
     report = run()
-    print("\nCFG-eval — control-flow-graph structural correctness (Python + COBOL)")
-    print("=" * 70)
+    print("\nCFG-eval — control-flow-graph structural correctness (Python + COBOL + HLASM)")
+    print("=" * 76)
     for f in report["fixtures"]:
         mark = "ok" if not f["failed"] else "FAIL: " + ", ".join(f["failed"])
         print(f"  {f['function']:<10} {f['language']:<7} {f['checks_passed']}/{f['checks_total']}  "

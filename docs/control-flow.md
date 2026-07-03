@@ -11,16 +11,24 @@ a block scheme you can read as logic. This is the "full understanding of the log
 - **Deterministic, on-demand analysis** — computed from source when asked (like `walkthrough` /
   `architecture`), **not persisted** as graph entities. So it never bloats the canonical graph, and
   every node cites a source line. (Promoting hot CFGs into the graph is a future option.)
-- **Parsed fact, not narration** — no LLM in the structure. An optional LLM pass can *label* blocks
-  in business terms later, but it can never invent control flow (same honesty contract as the rest).
-- **Per-language builders, one model.** Ships **Python** (stdlib `ast`, fully faithful) and **COBOL**
-  (procedure-division: `IF`/`ELSE`/`END-IF`, `EVALUATE`/`WHEN`, `PERFORM … UNTIL` loops, inline
-  `PERFORM … END-PERFORM`, `GO TO`, `GOBACK`/`STOP RUN`, paragraph fall-through, and `PERFORM` shown
-  as a call into its paragraph). HLASM rides on the Che4z LSP expanded view; JS/TS waits on a real
-  parser. See `lsp-refactoring-recommendations.md` for the per-language feasibility.
-
-  COBOL note: the builder targets well-structured code with explicit scope terminators
-  (`END-IF`/`END-EVALUATE`/`END-PERFORM`); deeply nested period-only scoping is approximated.
+- **Parsed fact, with optional narration.** No LLM in the *structure*. An optional LLM pass
+  (`--narrate`) *labels* blocks in business terms — attached as node `note` fields — but can never
+  invent or change control flow: ids it returns are validated against the real graph and hallucinated
+  ones dropped (same honesty contract as the rest).
+- **Per-language builders, one model:**
+  - **Python** — stdlib `ast`, fully faithful (`if/elif/else`, `while`/`for` + `break`/`continue`,
+    `match/case`, `with`, `try/except/finally`).
+  - **COBOL** — procedure-division statement-level: `IF/ELSE/END-IF`, `EVALUATE/WHEN`, `PERFORM …
+    UNTIL` loops, inline `PERFORM … END-PERFORM`, `GO TO`, `GOBACK`/`STOP RUN`, paragraph
+    fall-through, and `PERFORM` shown as a call into its paragraph. Targets well-structured code
+    (explicit scope terminators); deeply nested period-only scoping is approximated.
+  - **HLASM** — basic-block CFG from raw source: blocks split at labels/after branches; edges from the
+    branch family (`B`/`J` branch, conditional `BE/BNE/…` → `taken`/`fall`, `BAL`/`BALR` calls, `BR
+    R14` return). Macros and conditional assembly are **not** expanded — that needs the Che4z HLASM
+    LSP (roadmap); the raw-source CFG is honest about what it sees.
+  - **JS/TS** — still blocked: the JavaScript parser is regex-based (no AST), so a faithful CFG isn't
+    extractable yet. Needs a real parser (tree-sitter or the TS compiler). See
+    `lsp-refactoring-recommendations.md` for per-language feasibility.
 
 ## Model
 
@@ -44,12 +52,15 @@ paragraph; consecutive COBOL paragraphs fall through, per COBOL semantics.
 ## Use it
 
 ```bash
-uci cfg <function>            # Mermaid flowchart of the routine's logic
-uci cfg <function> --json     # nodes, edges, per-kind stats, and the Mermaid string
+uci cfg <routine>             # Mermaid flowchart of the routine's logic (Python fn / COBOL/HLASM program)
+uci cfg <routine> --json      # nodes, edges, per-kind stats, and the Mermaid string
+uci cfg <routine> --narrate   # + optional LLM business-language notes per block (needs an LLM)
 ```
 
-MCP: the `control_flow` tool returns the same structured JSON for agents. Programmatic:
-`Engine.control_flow(symbol)`.
+Surfaces: `uci cfg`, the `control_flow` **MCP tool** (structured JSON for agents; deterministic — no
+narration in the MCP path), `Engine.control_flow(symbol, narrate=…)`, and the **dashboard** — the
+symbol page shows a *Control flow* block scheme (renders as a diagram when `mermaid.js` is present in
+`static/`, source otherwise, so airgapped installs still work).
 
 Example (`uci cfg post`):
 
@@ -81,6 +92,11 @@ means adding a builder + fixtures to the same harness.
 
 ## Next
 
-1. **Dashboard view** — render the Mermaid on the symbol-detail page.
-2. **Optional LLM narration** — business-language labels per block, layered on the deterministic CFG.
-3. **HLASM** — via the Che4z LSP expanded view (basic-block CFG); **JS/TS** once a real parser lands.
+1. **JS/TS** — blocked on a real parser (tree-sitter or the TS compiler / an LSP-AST source); the
+   regex parser can't yield a faithful CFG.
+2. **HLASM macro expansion** — a *faithful* HLASM CFG needs the Che4z HLASM LSP's conditional-assembly
+   evaluation; today's builder is raw-source basic blocks.
+3. **Vendored `mermaid.js`** — drop the minified file into `static/` for in-dashboard diagram
+   rendering without any network (the page already looks for it).
+4. **CFG in the graph** — optionally persist hot CFGs so impact analysis can answer "what logic
+   guards this call?" (currently on-demand only).

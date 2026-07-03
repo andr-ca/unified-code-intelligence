@@ -92,8 +92,9 @@ data, churn, risk score) built by graph traversal — see it in action with `uci
 **Block schemes.** Two levels of "how it works" diagrams: the graph gives flow-level structure
 (which programs/paragraphs/data connect), and `uci cfg <function>` renders a **control-flow graph** —
 the logic *inside* a routine (decisions, loops, branches, returns) as a Mermaid flowchart, computed
-deterministically from source. **Python and COBOL** (`IF`/`EVALUATE`/`PERFORM UNTIL`/`GO TO`/
-paragraph flow) today. Details: [`docs/control-flow.md`](docs/control-flow.md).
+deterministically from source — **Python, COBOL, and HLASM** — on the dashboard symbol page, `uci cfg`,
+and the `control_flow` MCP tool, with optional LLM business-language narration (`--narrate`). Details:
+[`docs/control-flow.md`](docs/control-flow.md).
 
 ## For coding agents (MCP)
 

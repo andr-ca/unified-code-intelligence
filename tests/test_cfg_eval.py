@@ -20,6 +20,6 @@ def test_cfg_eval_covers_every_construct_family():
     report = E.run()
     fns = {f["function"] for f in report["fixtures"]}
     # python: if/elif, loop+break, match, try — cobol: IF/EVALUATE/PERFORM UNTIL/GO TO, inline PERFORM
-    assert fns == {"classify", "scan", "route", "guarded", "POST", "INQ"}
+    assert fns == {"classify", "scan", "route", "guarded", "POST", "INQ", "SAMPLE"}
     langs = {f["language"] for f in report["fixtures"]}
-    assert langs == {"python", "cobol"}
+    assert langs == {"python", "cobol", "hlasm"}

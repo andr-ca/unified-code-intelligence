@@ -214,7 +214,7 @@ def cmd_onboarding(args) -> int:
 def cmd_cfg(args) -> int:
     with _engine(args) as engine:
         _ensure_indexed(engine)
-        data = engine.control_flow(args.symbol)
+        data = engine.control_flow(args.symbol, narrate=args.narrate)
         if args.json:
             print(json.dumps(data, indent=2))
             return 0 if data.get("ok") else 1
@@ -225,6 +225,13 @@ def cmd_cfg(args) -> int:
         print(f"# {data['symbol']}  ({data['path']}, {data['language']}) — "
               f"{st['decisions']} decision(s), {st['loops']} loop(s), {st['nodes']} blocks\n")
         print(data["mermaid"])
+        if args.narrate and data.get("narrated"):
+            print("\n# Narration (LLM business-language notes):")
+            for n in data["nodes"]:
+                if n.get("note"):
+                    print(f"  {n['id']} [{n['kind']}] {n['note']}")
+        elif args.narrate and data.get("narrate_error"):
+            print(f"\n# narration unavailable: {data['narrate_error']}")
     return 0
 
 
@@ -437,8 +444,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("module"); sp.add_argument("--json", action="store_true")
     sp.add_argument("--path"); sp.set_defaults(func=cmd_explain)
 
-    sp = sub.add_parser("cfg", help="control-flow graph (block scheme) of a function — Mermaid")
-    sp.add_argument("symbol", help="function/method name to diagram")
+    sp = sub.add_parser("cfg", help="control-flow graph (block scheme) of a routine — Mermaid")
+    sp.add_argument("symbol", help="function/method (Python) or program (COBOL/HLASM) to diagram")
+    sp.add_argument("--narrate", action="store_true",
+                    help="add optional LLM business-language notes per block (needs an LLM configured)")
     sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
     sp.set_defaults(func=cmd_cfg)
 

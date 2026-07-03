@@ -439,12 +439,13 @@ class Engine:
     def onboarding(self) -> dict:
         return onboarding_guide(self.graph, self.metadata, self.repo_id)
 
-    def control_flow(self, symbol: str) -> dict:
+    def control_flow(self, symbol: str, narrate: bool = False, client=None) -> dict:
         """Block scheme of the logic *inside* a routine: a deterministic control-flow graph
         (decisions, loops, branches, calls) with a Mermaid rendering (docs/control-flow.md).
-        Python functions/methods and COBOL programs today."""
+        Python functions/methods and COBOL programs today. ``narrate`` layers optional LLM
+        business-language notes on the blocks (structure is never changed by the LLM)."""
         from pathlib import Path
-        from .analysis.cfg import build_cobol_cfg, build_python_cfg
+        from .analysis.cfg import build_cobol_cfg, build_python_cfg, narrate_cfg
         target = resolve_one(self.graph, symbol)
         if target is None:
             return {"ok": False, "tool": "control_flow",
@@ -452,18 +453,35 @@ class Engine:
         path = target.provenance.path
         py = target.kind in (EntityType.FUNCTION, EntityType.METHOD) and path.endswith(".py")
         cobol = target.kind == EntityType.LEGACY_PROGRAM and path.endswith((".cbl", ".cob", ".cpy"))
-        if not (py or cobol):
+        hlasm = target.kind == EntityType.LEGACY_PROGRAM and path.endswith((".asm", ".hlasm", ".mlc"))
+        if not (py or cobol or hlasm):
             return {"ok": False, "tool": "control_flow", "error": {"code": "unsupported",
                     "message": f"{target.qualified_name} ({target.kind.value}, {path}): control_flow "
-                               "supports Python functions/methods and COBOL programs today"}}
+                               "supports Python functions/methods, COBOL and HLASM programs today"}}
         try:
             source = (Path(self.config.repo_path) / path).read_text(encoding="utf-8", errors="replace")
-            cfg = (build_python_cfg(source, target.name, path, target.qualified_name) if py
-                   else build_cobol_cfg(source, target.name, path))
+            if py:
+                cfg = build_python_cfg(source, target.name, path, target.qualified_name)
+            elif cobol:
+                cfg = build_cobol_cfg(source, target.name, path)
+            else:
+                from .analysis.cfg import build_hlasm_cfg
+                cfg = build_hlasm_cfg(source, target.name, path)
         except (OSError, ValueError, SyntaxError) as exc:
             return {"ok": False, "tool": "control_flow",
                     "error": {"code": "build_failed", "message": str(exc)}}
-        return {"ok": True, "tool": "control_flow", **cfg.to_dict()}
+        narrated = False
+        if narrate:
+            try:
+                from .enrich import LlmClient
+                client = client or LlmClient(self.config)
+                client.default_tag = "control_flow:narrate"
+                narrate_cfg(cfg, client.complete_json)
+                narrated = True
+            except Exception as exc:  # narration is best-effort — never fail the diagram
+                return {"ok": True, "tool": "control_flow", "narrated": False,
+                        "narrate_error": str(exc), **cfg.to_dict()}
+        return {"ok": True, "tool": "control_flow", "narrated": narrated, **cfg.to_dict()}
 
     def flows(self, trigger_depth: int = 4) -> dict:
         """Business-capability flows for the dashboard's Flows tab.

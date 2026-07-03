@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from uci import Config, Engine
-from uci.analysis.cfg import build_cobol_cfg, build_python_cfg
+from uci.analysis.cfg import build_cobol_cfg, build_hlasm_cfg, build_python_cfg, narrate_cfg
 
 _OVERDRAFT = '''
 def post(balance, txns):
@@ -139,5 +139,74 @@ def test_engine_control_flow_on_cobol(tmp_path):
         assert data["ok"] and data["language"] == "cobol"
         assert data["stats"]["decisions"] == 1 and data["stats"]["loops"] == 1
         assert data["mermaid"].startswith("flowchart TD")
+    finally:
+        eng.close()
+
+
+_HLASM = """SAMPLE   CSECT
+         LA    R5,0
+LOOP     C     R5,=F'10'
+         BNL   DONE
+         BAL   R14,PROCESS
+         B     LOOP
+DONE     BR    R14
+PROCESS  AR    R6,R5
+         BR    R14
+         END
+"""
+
+
+def test_hlasm_cfg_basic_blocks_and_branches():
+    cfg = build_hlasm_cfg(_HLASM, "SAMPLE", "sample.asm")
+    st = cfg.stats()
+    assert st["decisions"] == 1 and st["calls"] == 1 and st["returns"] == 2
+    idx = {n.id: n for n in cfg.nodes}
+    kinds = {(idx[e.src].kind, e.label, idx[e.dst].kind) for e in cfg.edges}
+    assert ("decision", "taken", "return") in kinds     # BNL DONE → the DONE return block
+    assert ("decision", "fall", "call") in kinds        # fall-through to the BAL block
+    assert ("return", "", "exit") in kinds              # BR R14 → exit
+    # the B LOOP back-edge makes a loop: some block branches back to the LOOP decision block
+    loop_id = next(n.id for n in cfg.nodes if n.label.startswith("LOOP:"))
+    assert any(e.dst == loop_id and e.label == "branch" for e in cfg.edges)
+
+
+def test_hlasm_cfg_no_instructions_raises():
+    try:
+        build_hlasm_cfg("* just a comment\n", "X", "x.asm")
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError when there are no instructions")
+
+
+# ------------------------------------------------------------------- narration
+def _fake_complete_json(system, user, max_tokens=None):
+    import json
+    blocks = json.loads(user)["blocks"]
+    return {"notes": [{"id": blocks[0]["id"], "note": "sets up the running total"},
+                      {"id": "n-ghost", "note": "hallucinated block"}]}  # ghost must be dropped
+
+
+def test_narrate_cfg_attaches_notes_and_drops_hallucinated_ids():
+    cfg = build_python_cfg(_OVERDRAFT, "post", "bank.py")
+    first = next(n for n in cfg.nodes if n.kind not in ("entry", "exit"))
+    notes = narrate_cfg(cfg, _fake_complete_json)
+    assert first.id in notes and "n-ghost" not in notes
+    assert cfg.nodes[[n.id for n in cfg.nodes].index(first.id)].note == "sets up the running total"
+
+
+class _FakeClient:
+    default_tag = ""
+    model = "fake"
+
+    def complete_json(self, system, user, max_tokens=None):
+        return _fake_complete_json(system, user, max_tokens)
+
+
+def test_engine_control_flow_narrate_with_client(tmp_path):
+    eng = _py_repo(tmp_path)
+    try:
+        data = eng.control_flow("post", narrate=True, client=_FakeClient())
+        assert data["ok"] and data["narrated"] is True
+        assert any(n.get("note") == "sets up the running total" for n in data["nodes"])
     finally:
         eng.close()
