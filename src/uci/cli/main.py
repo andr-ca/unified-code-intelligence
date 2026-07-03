@@ -235,6 +235,24 @@ def cmd_cfg(args) -> int:
     return 0
 
 
+def cmd_flow(args) -> int:
+    with _engine(args) as engine:
+        _ensure_indexed(engine)
+        data = engine.flow(args.symbol, depth=args.depth)
+        if args.json:
+            print(json.dumps(data, indent=2))
+            return 0 if data.get("ok") else 1
+        if not data.get("ok"):
+            print(f"flow failed: {data['error']['message']}")
+            return 1
+        st = data["stats"]
+        trunc = " (truncated)" if st.get("truncated") else ""
+        print(f"# {data['anchor']}  ({data['anchor_kind']}) — {st['programs']} program(s), "
+              f"{st['data']} data, {st['screens']} screen(s){trunc}\n")
+        print(data["mermaid"])
+    return 0
+
+
 def cmd_gaps(args) -> int:
     with _engine(args) as engine:
         _ensure_indexed(engine)
@@ -450,6 +468,13 @@ def build_parser() -> argparse.ArgumentParser:
                     help="add optional LLM business-language notes per block (needs an LLM configured)")
     sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
     sp.set_defaults(func=cmd_cfg)
+
+    sp = sub.add_parser("flow", help="flow-level block scheme across programs (trigger/program/"
+                                     "capability → programs → data/screens) — Mermaid")
+    sp.add_argument("symbol", help="transaction, job, capability, or program to trace from")
+    sp.add_argument("--depth", type=int, default=3, help="how far to expand the call chain (default 3)")
+    sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.set_defaults(func=cmd_flow)
 
     for name, func in (("overview", cmd_overview), ("architecture", cmd_architecture),
                        ("onboarding", cmd_onboarding)):

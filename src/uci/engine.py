@@ -483,6 +483,21 @@ class Engine:
                         "narrate_error": str(exc), **cfg.to_dict()}
         return {"ok": True, "tool": "control_flow", "narrated": narrated, **cfg.to_dict()}
 
+    def flow(self, symbol: str, depth: int = 3) -> dict:
+        """Flow-level block scheme (Tier-1): a business flow traced across the graph from an anchor
+        (transaction / job / capability / program) — control edges expand the reachable programs,
+        data and screens attach as leaves — rendered as Mermaid (docs/control-flow.md §Flow)."""
+        from .analysis.flow import build_flow, resolve_roots
+        anchor = resolve_one(self.graph, symbol)
+        if anchor is None:
+            return {"ok": False, "tool": "flow", "error": {"code": "not_found", "message": symbol}}
+        roots = resolve_roots(self.graph, anchor)
+        if not roots:
+            return {"ok": False, "tool": "flow", "error": {"code": "no_roots",
+                    "message": f"{anchor.qualified_name} has no programs to trace a flow from"}}
+        fg = build_flow(self.graph, roots, depth=depth)
+        return {"ok": True, "tool": "flow", "anchor_kind": anchor.kind.value, **fg.to_dict()}
+
     def flows(self, trigger_depth: int = 4) -> dict:
         """Business-capability flows for the dashboard's Flows tab.
 

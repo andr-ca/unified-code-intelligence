@@ -88,6 +88,20 @@ TOOL_SPECS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "flow_diagram",
+        "description": "Flow-level block scheme: traces a business flow across programs from an "
+                       "anchor (transaction, job, business capability, or program) — control edges "
+                       "expand the reachable programs, data (reads/writes) and screens attach as "
+                       "leaves — as a Mermaid flowchart. Shows the flow *between* routines (pair with "
+                       "control_flow for the logic inside each).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"symbol": {"type": "string"},
+                           "depth": {"type": "integer", "default": 3}},
+            "required": ["symbol"],
+        },
+    },
+    {
         "name": "retrieve_edit_context",
         "description": "Everything needed to safely edit a symbol: source, callers/callees with "
                        "source, tests, imports, and an edit checklist.",
@@ -178,6 +192,8 @@ def dispatch(engine: Engine, name: str, arguments: dict[str, Any]) -> dict[str, 
         return engine.explain_module(args["module_or_path"])
     if name == "control_flow":
         return engine.control_flow(args["symbol"])
+    if name == "flow_diagram":
+        return engine.flow(args["symbol"], depth=int(args.get("depth", 3)))
     if name == "retrieve_edit_context":
         return engine.edit_context(args["symbol"])
     if name == "find_tests_for_symbol":

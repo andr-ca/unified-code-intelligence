@@ -89,18 +89,19 @@ hit explains which signals fired and suggests next queries. Details:
 The flagship query, *impact analysis*, returns a structured pack (callers, callees, tests, config,
 data, churn, risk score) built by graph traversal — see it in action with `uci impact`.
 
-**Block schemes.** Two levels of "how it works" diagrams: the graph gives flow-level structure
-(which programs/paragraphs/data connect), and `uci cfg <function>` renders a **control-flow graph** —
-the logic *inside* a routine (decisions, loops, branches, returns) as a Mermaid flowchart, computed
-deterministically from source — **Python, COBOL, and HLASM** — on the dashboard symbol page, `uci cfg`,
-and the `control_flow` MCP tool, with optional LLM business-language narration (`--narrate`). Details:
-[`docs/control-flow.md`](docs/control-flow.md).
+**Block schemes.** Two complementary "how it works" Mermaid diagrams, both computed deterministically
+on demand: `uci flow <anchor>` traces a business flow **between** programs (transaction/job/capability
+→ programs → data/screens), and `uci cfg <routine>` renders the logic **inside** a routine (decisions,
+loops, branches, returns) — **Python, COBOL, and HLASM**, with optional LLM narration (`--narrate`).
+They compose (a flow node opens into its CFG) and are exposed on the dashboard, the `flow_diagram` /
+`control_flow` MCP tools, and the CLI. Details: [`docs/control-flow.md`](docs/control-flow.md).
 
 ## For coding agents (MCP)
 
 `uci mcp` exposes structured-JSON tools: `search_code`, `find_symbol`, `get_callers`, `get_callees`,
-`impact_analysis`, `explain_module`, `control_flow`, `retrieve_edit_context`, `find_tests_for_symbol`,
-`find_data_lineage`, `find_config_dependencies`, `list_index_gaps`. Register it with your agent:
+`impact_analysis`, `explain_module`, `control_flow`, `flow_diagram`, `retrieve_edit_context`,
+`find_tests_for_symbol`, `find_data_lineage`, `find_config_dependencies`, `list_index_gaps`. Register
+it with your agent:
 
 ```jsonc
 { "mcpServers": { "uci": { "command": "uci", "args": ["mcp", "--repo", "/path/to/repo"] } } }

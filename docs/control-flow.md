@@ -1,9 +1,40 @@
-# Control-Flow Graphs — the logic *inside* a routine (Tier-2 block scheme)
+# Block Schemes — flow *between* programs and logic *inside* a routine
 
-**Date:** 2026-07-03 · **Module:** `src/uci/analysis/cfg.py` · **Eval:** `evals/cfg_eval.py`
+**Date:** 2026-07-03 · **Modules:** `analysis/flow.py` (Tier-1), `analysis/cfg.py` (Tier-2) ·
+**Evals:** `evals/flow_eval.py`, `evals/cfg_eval.py`
 
-Where the graph shows *how programs connect* (calls, data, screens — the flow-level block scheme),
-a **control-flow graph (CFG)** shows *how one routine decides* — its branches, loops, and returns as
+UCI renders two complementary block schemes, both deterministic Mermaid diagrams computed on demand
+from the graph/source (no new parsing, never persisted):
+
+- **Tier-1 — flow *between* programs** (`uci flow <anchor>`): a business flow traced across the graph
+  from a transaction, job, capability, or program — control edges expand the reachable programs, and
+  each program's data and screens attach as leaves.
+- **Tier-2 — logic *inside* a routine** (`uci cfg <routine>`): one routine's branches, loops, and
+  returns as a control-flow graph you read as logic.
+
+They compose: a Tier-1 flow node is a program you then open with `uci cfg` to see its Tier-2 logic.
+
+---
+
+## Tier-1 — flow-level block scheme (`analysis/flow.py`)
+
+`uci flow <anchor>` / `Engine.flow(symbol, depth)` / the `flow_diagram` MCP tool. The anchor resolves
+to a starting set of programs (a **capability** expands to its member programs; a **transaction**/
+**job**/**program** is its own root), then a bounded BFS follows **control** edges
+(`INVOKES`/`RUNS`/`CALLS`) to `depth`, attaching each program's **data** (`READS`/`WRITES`) and
+**screens** (`USES`) as leaves. Node shapes: trigger = stadium, capability = hexagon, program =
+rectangle, data = cylinder, screen = flag; edges are labelled by relationship (`invokes`, `calls`,
+`reads`, `writes`, `uses`). `--depth` bounds expansion; large flows set `truncated`.
+
+Correctness: `evals/flow_eval.py` checks the invariants a correct flow must satisfy — no dangling
+edges, every node reachable from the flow's sources, data/screens are leaves — across transaction,
+job, and capability anchors. **100/100**, CI-gated by `tests/test_flow_eval.py`.
+
+---
+
+## Tier-2 — control-flow graph: the logic *inside* a routine
+
+A **control-flow graph (CFG)** shows *how one routine decides* — its branches, loops, and returns as
 a block scheme you can read as logic. This is the "full understanding of the logic inside" layer.
 
 ## What it is (and isn't)
