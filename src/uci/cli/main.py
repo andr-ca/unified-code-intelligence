@@ -271,6 +271,23 @@ def cmd_metrics(args) -> int:
 def cmd_enrich(args) -> int:
     with _engine(args) as engine:
         _ensure_indexed(engine)
+        # edge oracles (LSP/SCIP) are a separate, LLM-free enrichment path
+        if args.lsp or args.scip:
+            data = engine.enrich_edges(lsp=args.lsp, scip=args.scip,
+                                       budget_seconds=args.budget, verify_only=args.verify_only)
+            if args.json:
+                print(json.dumps(data, indent=2))
+                return 0 if data.get("ok") else 1
+            if not data.get("ok"):
+                print(f"edge enrichment failed: {data['error']['message']}")
+                return 1
+            for s in data["sources"]:
+                if not s["available"]:
+                    print(f"  {s['source']}: unavailable (toolchain not found) — skipped")
+                    continue
+                print(f"  {s['source']}: promoted {s['promoted']}  pruned {s['pruned']}  "
+                      f"discovered {s['discovered']}  (queried {s['queried']})")
+            return 0
         passes = args.passes or ["summaries", "capabilities", "candidates", "fields", "architecture"]
         if args.dry_run:
             from uci.enrich import LlmClient, LlmError
@@ -421,6 +438,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--force", action="store_true", help="ignore the content-hash cache")
     sp.add_argument("--agentic", action="store_true",
                     help="candidates pass: bounded tool-loop (docs/agentic-enrichment.md)")
+    sp.add_argument("--lsp", action="append", metavar="LANG",
+                    help="edge oracle: verify/prune speculative edges via a language server "
+                         "(cobol|python|typescript; repeatable). Needs UCI_LSP_<LANG>_CMD.")
+    sp.add_argument("--scip", action="append", metavar="PATH",
+                    help="edge oracle: ingest a SCIP index (index.scip) as provable edges (repeatable)")
+    sp.add_argument("--budget", type=float, default=60.0,
+                    help="edge-oracle time budget in seconds per source (default 60)")
+    sp.add_argument("--verify-only", action="store_true",
+                    help="edge oracles: only verify/prune existing edges, skip discovery")
     sp.add_argument("--dry-run", action="store_true", help="show LLM config and plan, call nothing")
     sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
     sp.set_defaults(func=cmd_enrich)

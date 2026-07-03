@@ -75,7 +75,10 @@ DATA_FLOW: frozenset[RelationType] = frozenset(
 
 #: Call-edge resolution levels considered "exact enough" (R0-R3) to drive multi-hop traversal.
 #: R4 (name-match) and R5 (candidate) are speculative and only appear at depth 1, clearly labeled.
-RESOLVED_LEVELS: frozenset[str] = frozenset({"syntactic", "import-traced", "inherited", "inferred"})
+#: ``lsp-verified`` / ``scip`` come from an external oracle confirming an edge (docs/
+#: lsp-refactoring-recommendations.md §2) — provable, so they count as resolved.
+RESOLVED_LEVELS: frozenset[str] = frozenset(
+    {"syntactic", "import-traced", "inherited", "inferred", "lsp-verified", "scip"})
 
 
 @dataclass

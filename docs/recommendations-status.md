@@ -13,7 +13,7 @@ Maps each item in [`recommendations.md`](recommendations.md) (and the concept ga
 | 1.4 | Receiver-aware narrowing (`self`/`Cls.m`/`alias.m`); fan-out cap + stoplist; R4/R5 never drive multi-hop | ✅ | `graph_builder` (receiver + `_FANOUT_CAP=5` drop→unresolved); multi-hop gating in `engine._call_graph` + `retrieval/hybrid._graph_signal` (`RESOLVED_LEVELS`) |
 | 1.5 | Stratified impact pack (`resolved`/`candidates`/`unresolved`) + computed `completeness` | ✅ | `retrieval/impact.py` `analyze` + `_stratify` + `_completeness` |
 | 1.6 | Record `unresolved_call` facts | ✅ | `graph_builder.unresolved_calls` → persisted to state; surfaced in impact `callers.unresolved` |
-| 1.7 | Optional LSP bridge to promote/prune edges | ⏳ | roadmap Phase 2 (`extractor="lsp-*", resolution="inferred"` slot ready) |
+| 1.7 | Optional LSP/SCIP bridge to promote/prune edges | 🚧 | `enrich/base.py` (`EdgeSource`/`EdgeDelta`/`Budget`), `enrich/lsp_client.py`, `enrich/lsp_source.py` (Verify: promote→`lsp-verified`/prune-with-tombstone), `enrich/scip_source.py` (Discover→`resolution="scip"`), `enrich/servers.py` (Che4z COBOL + pyright + tsserver registry); `engine.enrich_edges` + `uci enrich --lsp/--scip`. Discover for LSP + Complete mode still ⏳ |
 | 1.8 | Reword the determinism promise | ✅ | `architecture.md` §6, `retrieval-strategy.md` §8–9 |
 
 ## 2. Incremental indexing without graph rot (P4)

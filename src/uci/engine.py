@@ -138,6 +138,8 @@ class Engine:
             if hop >= depth:
                 continue
             for rel in rel_fn(node, [RelationType.CALLS]):
+                if rel.attributes.get("pruned"):  # tombstoned by an oracle (LSP/SCIP) — not a real edge
+                    continue
                 resolution = rel.attributes.get("resolution", "")
                 is_resolved = resolution in RESOLVED_LEVELS
                 # speculative edges (R4/R5) appear only at depth 1, never drive multi-hop (§1.4)
@@ -226,6 +228,44 @@ class Engine:
             return {"ok": False, "tool": "enrich", "error": {"code": "llm", "message": str(exc)}}
         return {"ok": True, "tool": "enrich", "passes": passes, "agentic": agentic,
                 "llm": enricher.client.describe(), "stats": stats.to_dict()}
+
+    # -- optional edge oracles: LSP / SCIP (docs/lsp-refactoring-recommendations.md) ----------
+    def enrich_edges(self, lsp: list[str] | None = None, scip: list[str] | None = None,
+                     budget_seconds: float = 60.0, verify_only: bool = False) -> dict:
+        """Run optional LSP/SCIP edge sources: verify (promote/prune speculative call edges) and,
+        unless ``verify_only``, discover missed edges. No LLM involved; missing toolchains are
+        skipped with ``available: false`` rather than failing the run."""
+        from .enrich.base import Budget
+        from .enrich.lsp_source import LspEdgeSource
+        from .enrich.scip_source import ScipSource
+
+        sources = []
+        for lang in lsp or []:
+            sources.append(LspEdgeSource(lang, self.config.repo_path, settings=self.config.settings))
+        for path in scip or []:
+            sources.append(ScipSource(path, self.config.repo_path))
+        if not sources:
+            return {"ok": False, "tool": "enrich_edges",
+                    "error": {"code": "no_sources", "message": "pass at least one --lsp or --scip"}}
+
+        worklist = self.metadata.get_state(self.repo_id, "unresolved_calls", []) or []
+        reports = []
+        for source in sources:
+            entry: dict = {"source": source.name, "available": source.available,
+                           "promoted": 0, "pruned": 0, "discovered": 0, "queried": 0}
+            if source.available:
+                try:
+                    delta = source.verify(self.graph, self.repo_id, Budget.for_seconds(budget_seconds))
+                    if not verify_only:
+                        delta.extend(source.discover(self.graph, self.repo_id, worklist,
+                                                     Budget.for_seconds(budget_seconds)))
+                    for rel in (*delta.promoted, *delta.pruned, *delta.discovered):
+                        self.graph.add_relationship(rel)  # upsert by id
+                    entry.update(delta.counts())
+                finally:
+                    source.close()
+            reports.append(entry)
+        return {"ok": True, "tool": "enrich_edges", "verify_only": verify_only, "sources": reports}
 
     def briefing(self, symbol: str, client=None) -> dict:
         """Render the (already-proven) impact pack as a prose modernization briefing."""

@@ -252,7 +252,11 @@ def _collect_settings(env: dict[str, str]) -> dict[str, Any]:
         "UCI_QDRANT_URL", "UCI_MEMGRAPH_URL", "UCI_NEO4J_URL", "UCI_NEO4J_USER",
         "UCI_NEO4J_PASSWORD", "UCI_POSTGRES_DSN", "UCI_LLM_API_KEY",
     ]
-    return {k[4:].lower(): v for k, v in env.items() if k in keys}
+    out = {k[4:].lower(): v for k, v in env.items() if k in keys}
+    # LSP edge-oracle config is per-language and open-ended (UCI_LSP_<LANG>_CMD,
+    # UCI_LSP_<LANG>_COPYBOOKS, …) — collect by prefix (docs/lsp-refactoring-recommendations.md §2.2).
+    out.update({k[4:].lower(): v for k, v in env.items() if k.startswith("UCI_LSP_")})
+    return out
 
 
 __all__ = ["Config", "DEFAULT_IGNORE_GLOBS"]

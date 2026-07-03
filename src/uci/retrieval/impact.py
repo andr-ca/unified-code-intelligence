@@ -155,6 +155,8 @@ class ImpactAnalyzer:
     def _callers(self, target: Entity) -> list[RetrievalHit]:
         hits: list[RetrievalHit] = []
         for rel in self.graph.in_relationships(target.id, [RelationType.CALLS]):
+            if rel.attributes.get("pruned"):  # oracle-tombstoned edge — excluded from impact
+                continue
             caller = self.graph.get_entity(rel.src_id)
             if caller:
                 resolution = rel.attributes.get("resolution", "")
@@ -171,6 +173,8 @@ class ImpactAnalyzer:
     def _callees(self, target: Entity) -> list[RetrievalHit]:
         hits: list[RetrievalHit] = []
         for rel in self.graph.out_relationships(target.id, [RelationType.CALLS]):
+            if rel.attributes.get("pruned"):  # oracle-tombstoned edge — excluded from impact
+                continue
             callee = self.graph.get_entity(rel.dst_id)
             if callee:
                 resolution = rel.attributes.get("resolution", "")
