@@ -5,10 +5,19 @@ Separate from the main eval (run_eval.py): the main eval scores the *system* wit
 applied; LLM-eval scores the *model's raw ability* on the production prompts, so you can pick a
 model per deployment (and catch failure modes like thinking models returning empty content).
 
-Usage:
-    python3 evals/llm_eval.py --models qwen3.5:4b,gemma4:e4b            # local Ollama
-    python3 evals/llm_eval.py --protocol openai --url https://... --models gpt-4o-mini
-    UCI_LLM_API_KEY=... python3 evals/llm_eval.py --protocol anthropic --models claude-haiku-4-5-20251001
+Usage (three ways to run):
+    python3 evals/llm_eval.py --interactive                  # step-by-step interactive mode (easiest)
+    python3 evals/llm_eval.py --models frontier --tools      # direct flags (fast)
+    python3 evals/llm_eval.py --list                         # show the model/scope menu
+
+Examples:
+    python3 evals/llm_eval.py --models local --scope smoke   # quick local sanity
+    python3 evals/llm_eval.py --models qwen-coder,gemma4b --tools  # mix frontier + local
+    python3 evals/llm_eval.py --models freellm:gpt-4.1       # raw protocol:model syntax
+
+`--models` takes aliases (`qwen-coder`), groups (`local|frontier|all`), raw `protocol:model`, or
+bare names (on `--protocol`, default ollama). `--scope smoke|full` sizes the task set; `--tools`
+adds the agentic tool-loop tasks. Edit the MODELS / GROUPS / SCOPES tables below to change the menu.
 
 Uses the SAME system prompts as production (imported from uci.enrich.enricher) against golden
 fixtures with known answers. No repo indexing needed — pure prompt->response scoring.
@@ -20,6 +29,7 @@ import argparse
 import json
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -302,22 +312,99 @@ AGENTIC_TASKS = [
     ("agentic", "agentic_restraint", score_agentic_restraint),
 ]
 
+# ---------------------------------------------------------------- model presets & scopes
+_PROTOCOLS = ("ollama", "openai", "anthropic", "freellm")
 
-def evaluate_model(protocol: str, url: str, model: str, timeout: int,
-                   agentic: bool, agentic_engine=None, log_path: str = "") -> dict:
+
+@dataclass(frozen=True)
+class ModelSpec:
+    alias: str
+    protocol: str
+    model: str
+    url: str = ""
+
+    @property
+    def label(self) -> str:
+        return self.model or self.alias
+
+
+#: short aliases → (protocol, model). Edit here to add a model to the menu.
+MODELS: dict[str, ModelSpec] = {
+    # local Ollama (keyless)
+    "qwen4b":      ModelSpec("qwen4b", "ollama", "qwen3.5:4b"),
+    "qwen2b":      ModelSpec("qwen2b", "ollama", "qwen3.5:2b"),
+    "gemma4b":     ModelSpec("gemma4b", "ollama", "gemma4:e4b"),
+    # free-frontier via the local freellm gateway (key in .env)
+    "qwen-coder":  ModelSpec("qwen-coder", "freellm", "qwen3-coder-480b"),
+    "gpt-4.1":     ModelSpec("gpt-4.1", "freellm", "gpt-4.1"),
+    "gemini-lite": ModelSpec("gemini-lite", "freellm", "gemini-2.5-flash-lite"),
+}
+
+#: named bundles so `--models local` / `frontier` / `all` just work.
+GROUPS: dict[str, list[str]] = {
+    "local":    ["qwen4b", "gemma4b"],
+    "frontier": ["qwen-coder", "gpt-4.1"],
+    "all":      ["qwen4b", "gemma4b", "qwen-coder", "gpt-4.1"],
+}
+
+#: scope → the set of task ids to run (None = every task). Smaller scope = faster sanity check.
+SCOPES: dict[str, set[str] | None] = {
+    # fast, high-signal subset: one summary, the safety-critical restraint task, one routing task,
+    # plus both agentic tasks (only run when --tools is on).
+    "smoke": {"summary_prodinq", "candidates_restraint_when_opaque", "ask_data_resident",
+              "agentic_cross_file_resolution", "agentic_restraint"},
+    "full": None,
+}
+
+
+def resolve_models(spec: str, default_protocol: str = "ollama") -> list[ModelSpec]:
+    """Turn a --models string into ModelSpecs. Accepts aliases (`qwen-coder`), groups (`frontier`),
+    raw `protocol:model` (`freellm:gpt-4.1`), or a bare model name (uses ``default_protocol``)."""
+    out: list[ModelSpec] = []
+    seen: set[str] = set()
+    for tok in (t.strip() for t in spec.split(",")):
+        if not tok:
+            continue
+        specs: list[ModelSpec]
+        if tok in GROUPS:
+            specs = [MODELS[a] for a in GROUPS[tok]]
+        elif tok in MODELS:
+            specs = [MODELS[tok]]
+        elif ":" in tok and tok.split(":", 1)[0] in _PROTOCOLS:
+            proto, model = tok.split(":", 1)
+            specs = [ModelSpec(tok, proto, model)]
+        else:  # bare model name on the default protocol (back-compat with --protocol)
+            specs = [ModelSpec(tok, default_protocol, tok)]
+        for s in specs:
+            key = f"{s.protocol}:{s.model}"
+            if key not in seen:
+                seen.add(key)
+                out.append(s)
+    return out
+
+
+def select_tasks(scope: str, tools: bool, agentic_engine=None) -> list[tuple]:
+    """Build the (area, task_id, fn) list for the chosen scope, adding agentic tasks when tools=on."""
+    keep = SCOPES.get(scope, None)
+    tasks = [t for t in TASKS if keep is None or t[1] in keep]
+    if tools and agentic_engine is not None:
+        tasks += [(a, tid, lambda c, fn=fn: fn(c, agentic_engine))
+                  for a, tid, fn in AGENTIC_TASKS if keep is None or tid in keep]
+    return tasks
+
+
+def evaluate_model(spec: ModelSpec, timeout: int, tasks: list[tuple],
+                   log_path: str = "") -> dict:
     cfg = Config.from_env(overrides={
-        "llm_protocol": protocol, "llm_url": url, "llm_model": model, "llm_timeout": timeout,
-        "llm_log": log_path,
+        "llm_protocol": spec.protocol, "llm_url": spec.url, "llm_model": spec.model,
+        "llm_timeout": timeout, "llm_log": log_path,
     })
     client = LlmClient(cfg)
     areas: dict[str, list[float]] = {}
     details = []
     t0 = time.perf_counter()
-    tasks = list(TASKS)
-    if agentic and agentic_engine is not None:
-        tasks += [(a, tid, lambda c, fn=fn: fn(c, agentic_engine)) for a, tid, fn in AGENTIC_TASKS]
     for area, task_id, fn in tasks:
-        client.default_tag = f"{model}:{task_id}"  # attribute every logged call to this task
+        client.default_tag = f"{spec.label}:{task_id}"  # attribute every logged call to this task
         started = time.perf_counter()
         try:
             score, note = fn(client)
@@ -329,38 +416,172 @@ def evaluate_model(protocol: str, url: str, model: str, timeout: int,
                         "note": note, "seconds": elapsed})
         print(f"    {task_id:<34} {score:>5.2f}  ({elapsed}s)  {note[:76]}")
     area_scores = {a: round(sum(v) / len(v), 3) for a, v in areas.items()}
-    overall = round(sum(area_scores.values()) / len(area_scores) * 100, 1)
-    return {"model": model, "overall": overall, "areas": area_scores,
-            "tasks": details, "total_seconds": round(time.perf_counter() - t0, 1)}
+    overall = round(sum(area_scores.values()) / len(area_scores) * 100, 1) if area_scores else 0.0
+    return {"model": spec.label, "protocol": spec.protocol, "overall": overall,
+            "areas": area_scores, "tasks": details,
+            "total_seconds": round(time.perf_counter() - t0, 1)}
+
+
+def _print_menu() -> None:
+    print("Model aliases (use with --models):")
+    for alias, s in MODELS.items():
+        print(f"  {alias:<13} {s.protocol}/{s.model}")
+    print("\nGroups:")
+    for g, members in GROUPS.items():
+        print(f"  {g:<13} {', '.join(members)}")
+    print("\nScopes (--scope):  smoke = fast subset,  full = every task (default)")
+    print("Also accepted: raw  protocol:model  (e.g. freellm:gpt-4.1) or a bare model name.")
+    print("\nExamples:")
+    print("  llm_eval.py --models frontier --tools           # qwen-coder + gpt-4.1, with tools")
+    print("  llm_eval.py --models local --scope smoke         # quick local sanity, no tools")
+    print("  llm_eval.py --models qwen-coder,gemma4b --tools  # mix a frontier + a local model")
+
+
+def _interactive() -> tuple[str, str, bool]:
+    """Interactive step-by-step CLI. Returns (models_str, scope, tools)."""
+    print("\n" + "="*70)
+    print("LLM-Eval Interactive Mode")
+    print("="*70)
+
+    # Step 1: Pick models
+    print("\n[Step 1 of 3] Pick models")
+    print("\nAvailable models:")
+    for alias in sorted(MODELS):
+        s = MODELS[alias]
+        print(f"  {alias:<15} {s.protocol}/{s.model}")
+    print("\nAvailable groups:")
+    for g in sorted(GROUPS):
+        print(f"  {g:<15} {', '.join(GROUPS[g])}")
+    print("\n(You can also use 'protocol:model' syntax, e.g. 'freellm:gpt-4.1')")
+    while True:
+        models_str = input("\nEnter model(s) [comma-separated]: ").strip()
+        if not models_str:
+            print("  (required)")
+            continue
+        # Validate input: must be aliases, groups, or valid protocol:model syntax
+        valid = True
+        for tok in (t.strip() for t in models_str.split(",")):
+            if tok not in MODELS and tok not in GROUPS:
+                if ":" in tok:
+                    proto = tok.split(":", 1)[0]
+                    if proto not in _PROTOCOLS:
+                        valid = False
+                        break
+                else:
+                    # bare name without protocol:model syntax is invalid in interactive mode
+                    valid = False
+                    break
+        if not valid:
+            print(f"  ✗ '{tok}' not found. Use an alias, group, or protocol:model syntax. See --list")
+            continue
+        specs = resolve_models(models_str, default_protocol="ollama")
+        if specs:
+            print(f"  ✓ Resolved to: {', '.join(f'{s.protocol}/{s.model}' for s in specs)}")
+            break
+        print(f"  ✗ Could not resolve {models_str!r}. Check spelling or use --list")
+
+    # Step 2: Pick scope
+    print("\n[Step 2 of 3] Pick scope")
+    for scope in sorted(SCOPES):
+        task_count = len(SCOPES[scope]) if SCOPES[scope] else len(TASKS)
+        print(f"  {scope:<10} {task_count} one-shot task(s)")
+    while True:
+        scope = input(f"\nEnter scope [{'/'.join(sorted(SCOPES))}]: ").strip() or "full"
+        if scope in SCOPES:
+            print(f"  ✓ Scope: {scope}")
+            break
+        print(f"  ✗ Unknown scope {scope!r}")
+
+    # Step 3: Toggle tools
+    print("\n[Step 3 of 3] Include the agentic tool-loop?")
+    print("  (adds 2 extra tasks that let LLM fetch missing context)")
+    while True:
+        response = input("Include agentic tasks? [y/n]: ").strip().lower()
+        if response in ("y", "yes"):
+            tools = True
+            print("  ✓ Tools: ON")
+            break
+        elif response in ("n", "no"):
+            tools = False
+            print("  ✓ Tools: OFF")
+            break
+        print("  (enter 'y' or 'n')")
+
+    # Step 4: Review
+    print("\n[Step 4 of 4] Review")
+    specs = resolve_models(models_str, default_protocol="ollama")
+    print(f"  Models:  {', '.join(f'{s.label}' for s in specs)}")
+    print(f"  Scope:   {scope}")
+    print(f"  Tools:   {'ON (agentic tasks enabled)' if tools else 'OFF (one-shot only)'}")
+    while True:
+        response = input("\nProceed? [y/n]: ").strip().lower()
+        if response in ("y", "yes"):
+            print("\n" + "="*70)
+            return models_str, scope, tools
+        elif response in ("n", "no"):
+            print("Cancelled.")
+            import sys
+            sys.exit(0)
+        print("  (enter 'y' or 'n')")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--models", required=True, help="comma-separated model names")
-    ap.add_argument("--protocol", default="ollama",
-                    choices=["ollama", "openai", "anthropic", "freellm"])
-    ap.add_argument("--url", default="", help="base URL (default per protocol)")
+    ap = argparse.ArgumentParser(
+        description="Simple LLM-eval runner: pick models, choose scope, toggle tools.",
+        epilog="Run with --list to see the model menu.")
+    ap.add_argument("--models",
+                    help="aliases (qwen-coder), groups (local|frontier|all), raw protocol:model, "
+                         "or bare names — comma-separated. See --list.")
+    ap.add_argument("--scope", default="full", choices=list(SCOPES),
+                    help="smaller/broader task set (default: full)")
+    tools = ap.add_mutually_exclusive_group()
+    tools.add_argument("--tools", dest="tools", action="store_true",
+                       help="include the agentic tool-loop tasks (with-tools run)")
+    tools.add_argument("--no-tools", dest="tools", action="store_false",
+                       help="one-shot only (default)")
+    ap.set_defaults(tools=False)
+    ap.add_argument("--agentic", dest="tools", action="store_true", help=argparse.SUPPRESS)  # alias
+    ap.add_argument("--protocol", default="ollama", choices=list(_PROTOCOLS),
+                    help="default protocol for bare model names (default: ollama)")
     ap.add_argument("--timeout", type=int, default=120)
-    ap.add_argument("--agentic", action="store_true",
-                    help="also run the agentic tool-loop tasks (docs/agentic-enrichment.md)")
+    ap.add_argument("--list", action="store_true", help="print the model/scope menu and exit")
+    ap.add_argument("--interactive", action="store_true", help="step-by-step interactive mode")
     args = ap.parse_args()
+
+    if args.list:
+        _print_menu()
+        return 0
+
+    # Interactive mode takes precedence
+    if args.interactive:
+        models_str, scope, tools = _interactive()
+        args.models = models_str
+        args.scope = scope
+        args.tools = tools
+    elif not args.models:
+        ap.error("--models is required (or use --list to see options or --interactive for step-by-step)")
+
+    specs = resolve_models(args.models, args.protocol)
+    if not specs:
+        ap.error(f"no models resolved from {args.models!r} — try --list")
 
     agentic_engine = None
     tmp = None
-    if args.agentic:
+    if args.tools:
         import tempfile
         tmp = tempfile.mkdtemp(prefix="uci-llm-eval-")
         agentic_engine = _agentic_repo(Path(tmp))
+    tasks = select_tasks(args.scope, args.tools, agentic_engine)
 
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     log_path = str(EVALS / "reports" / "llm-logs" / f"llm-eval-{run_id}.jsonl")
 
     results = []
     try:
-        for model in [m.strip() for m in args.models.split(",") if m.strip()]:
-            print(f"[llm-eval] {args.protocol}/{model}{' +agentic' if args.agentic else ''}")
-            results.append(evaluate_model(args.protocol, args.url, model, args.timeout,
-                                          args.agentic, agentic_engine, log_path=log_path))
+        for spec in specs:
+            print(f"[llm-eval] {spec.protocol}/{spec.model}  "
+                  f"scope={args.scope} tools={'on' if args.tools else 'off'}")
+            results.append(evaluate_model(spec, args.timeout, tasks, log_path=log_path))
     finally:
         if agentic_engine is not None:
             agentic_engine.close()
@@ -371,20 +592,22 @@ def main() -> int:
     report = {
         "run": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "tasks_version": TASKS_VERSION,
-        "protocol": args.protocol,
+        "scope": args.scope,
+        "tools": args.tools,
         "models": results,
     }
     out = EVALS / "reports" / f"llm-eval-{report['run'].replace(':', '').replace('-', '')}.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
-    cols = ["summaries", "capabilities", "candidates", "fields", "ask"]
-    if args.agentic:
-        cols.append("agentic")
-    print(f"\n{'model':<26} {'overall':>7}  " + "  ".join(f"{a:>12}" for a in cols))
+    ran_areas = [a for a in ("summaries", "capabilities", "candidates", "fields", "ask", "agentic")
+                 if any(a in r["areas"] for r in results)]
+    print(f"\n{'model':<24} {'proto':<8} {'overall':>7}  "
+          + "  ".join(f"{a:>11}" for a in ran_areas))
     for r in sorted(results, key=lambda r: r["overall"], reverse=True):
-        print(f"{r['model']:<26} {r['overall']:>7.1f}  " + "  ".join(
-            f"{r['areas'].get(a, 0):>12.2f}" for a in cols))
+        print(f"{r['model']:<24} {r.get('protocol', ''):<8} {r['overall']:>7.1f}  " + "  ".join(
+            f"{r['areas'].get(a, 0):>11.2f}" if a in r["areas"] else f"{'—':>11}"
+            for a in ran_areas))
     print(f"\nreport: {out.relative_to(EVALS.parent)}")
     if Path(log_path).exists():
         print(f"call log: {Path(log_path).relative_to(EVALS.parent)}")

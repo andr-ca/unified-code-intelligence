@@ -7,10 +7,18 @@ on the production prompts, so you can choose a model per deployment and catch pr
 failure modes before they reach enrichment.
 
 ```bash
-python3 evals/llm_eval.py --models qwen3.5:4b,gemma4:e4b                  # local Ollama
-python3 evals/llm_eval.py --protocol openai --url https://gw/v1 --models gpt-4o-mini
-UCI_LLM_API_KEY=... python3 evals/llm_eval.py --protocol anthropic --models claude-haiku-4-5-20251001
+python3 evals/llm_eval.py --list                        # model menu, groups, scopes
+python3 evals/llm_eval.py --models local                 # local Ollama group, one-shot
+python3 evals/llm_eval.py --models frontier --tools      # freellm group, with the tool-loop
+python3 evals/llm_eval.py --models frontier --scope smoke # fast subset for a quick check
+python3 evals/llm_eval.py --models qwen-coder,gemma4b     # mix tiers in one run
 ```
+
+**Pick models** by alias (`qwen-coder`), group (`local` | `frontier` | `all`), raw `protocol:model`
+(`freellm:gpt-4.1`), or bare name (on `--protocol`, default ollama). **Size the run** with
+`--scope smoke|full`. **Toggle tools** with `--tools` / `--no-tools`. The menu (MODELS / GROUPS /
+SCOPES) lives at the top of `llm_eval.py`. `openai`/`anthropic` still work via
+`--protocol` + `UCI_LLM_API_KEY` and a bare model name.
 
 ## Task areas (production prompts, golden fixtures, deterministic scoring)
 

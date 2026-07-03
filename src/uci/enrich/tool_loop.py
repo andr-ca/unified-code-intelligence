@@ -83,13 +83,17 @@ class ToolLoop:
             f"per turn:\n{lines}\n"
             "  {\"action\": \"answer\", ...}   (your final answer; required)\n"
             f"You get at most {self.max_tool_calls} tool calls — spend them well:\n"
-            f"- To resolve a variable set from a copied table (COBOL `COPY MEMBER`, or an index into "
-            f"a table), find the copybook that defines it: {find} for the MEMBER or table name to "
-            f"get its file path, then get_source that file to read the literal VALUEs.{list_hint}\n"
-            "- get_source tells you the file's total length; if it says END OF FILE, do NOT re-read "
-            "the same file — the content you want is in a DIFFERENT file (usually a copybook).\n"
-            "- If the value comes from LINKAGE SECTION / DFHCOMMAREA / a caller (not a table you can "
-            "read), it is opaque — answer with the empty/negative result.\n"
+            "1. FIRST read THIS program's own source (get_source of its file) to see how the "
+            "variable actually gets its value. get_source lists any COPY members with their paths, "
+            "and tells you the file's total length — if it says END OF FILE, do NOT re-read it.\n"
+            "2. If the value is loaded from a table the program itself defines or COPYs, open that "
+            f"copybook (its path is shown, or {find} the member name) and return the literal VALUEs."
+            f"{list_hint}\n"
+            "3. If the value comes from LINKAGE SECTION / a PROCEDURE DIVISION USING parameter / "
+            "DFHCOMMAREA / an external caller, it is opaque — answer with the empty/negative result. "
+            "Do NOT borrow a table from another program you did not see this program COPY. Only "
+            "return programs whose names you actually read as literal VALUEs in a table THIS program "
+            "uses.\n"
             "No markdown, one JSON object only."
         )
 
@@ -170,7 +174,25 @@ class ToolLoop:
         eof = " — END OF FILE, this is the whole file" if end >= total else \
               f" (truncated to {MAX_SOURCE_LINES} lines; ask for {end + 1}+ for more)" \
               if end - start + 1 >= MAX_SOURCE_LINES else ""
-        return f"{path}:{start}-{end} of {total} lines{eof}\n{body}"
+        # resolve any COPY MEMBER statements in view to their indexed file paths, so the model can
+        # open the copybook directly instead of guessing the path (the #1 wasted-call failure mode)
+        footer = self._resolve_copies(body)
+        return f"{path}:{start}-{end} of {total} lines{eof}\n{body}{footer}"
+
+    def _resolve_copies(self, body: str) -> str:
+        import re
+        members = {m.group(1) for m in re.finditer(r"(?im)^\s*COPY\s+([A-Z0-9$#@-]+)", body)}
+        if not members:
+            return ""
+        resolved = []
+        for member in sorted(members):
+            for ent in self.graph.find_by_name(member, exact=True):
+                path = getattr(ent.provenance, "path", "")
+                if path and path.endswith((".cpy", ".copy", ".cbl")):
+                    resolved.append(f"  COPY {member} → {path}")
+                    break
+        return ("\n\n[copybooks referenced above — open with get_source at these paths:]\n"
+                + "\n".join(resolved)) if resolved else ""
 
     def _rag_search(self, query: str) -> str:
         """Follow-up question against the full hybrid RAG (symbol+keyword+semantic+graph)."""

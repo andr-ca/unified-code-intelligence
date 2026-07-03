@@ -436,6 +436,7 @@ class Engine:
         overview = self.overview()
         flows = self.flows()
         metrics = self.metrics()
+        architecture = self.architecture()
         m = metrics.get("metrics", {}) if metrics.get("ok") else {}
         capabilities = flows.get("capabilities", [])
         enriched = bool(flows.get("enriched"))
@@ -450,7 +451,8 @@ class Engine:
                 "purpose": [{"name": c["name"], "description": c["description"]}
                             for c in capabilities if c.get("description")][:6],
             },
-            "organization": {"layers": self.architecture().get("layers", []),
+            "organization": {"layers": architecture.get("layers", []),
+                             "edges": architecture.get("edges", []),
                              "capabilities": capabilities},
             "execution": {"entry_points": m.get("entry_points", {}),
                           "mains": overview.get("entry_points", []),

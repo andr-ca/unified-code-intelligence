@@ -99,6 +99,7 @@ class SqliteDatabase:
         if self.path != ":memory:":
             try:
                 self.conn.execute("PRAGMA journal_mode=WAL")
+                self.conn.execute("PRAGMA busy_timeout=5000")  # wait, don't fail, on concurrent access
             except sqlite3.OperationalError:  # pragma: no cover
                 pass
         self.conn.executescript(_SCHEMA)

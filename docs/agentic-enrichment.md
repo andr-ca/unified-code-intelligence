@@ -180,20 +180,31 @@ cross-file resolution — is unproven on every model tested; until a model clear
 outcome "measure before adopting" exists to catch: a plausible, well-built feature that the
 evidence says not to turn on. The harness and gate remain ready for the next model.
 
-### Reproduced on a second frontier model (2026-07-03, freellm `qwen3-coder-480b`)
+### CORRECTION (2026-07-03): the negative cross-file result was a blind harness
 
-| model | one-shot restraint | agentic_cross_file | agentic_restraint | tool calls on cross_file |
+⚠️ The "Conclusion" above (research feature; no model clears the bar) is **superseded**. Reading the
+call log showed the models never actually saw the copybook — not a reasoning limit, a **tooling**
+limit:
+
+- `search` was blind to data items (`search MENU-PGM` → "no matches", so gpt-4.1 correctly abstained
+  on no evidence);
+- `get_source` gave no end-of-file signal, so `qwen3-coder-480b` re-read the same 10-line program
+  three times and never reached the copybook in budget;
+- the discovery tools `rag_search` / `list_files` were **never wired into the candidates loop**.
+
+Four harness fixes — `search` RAG-fallback, `get_source` resolving `COPY MEMBER → path` + printing
+`END OF FILE`, wiring `rag_search`/`list_files`, and a rebalanced prompt (read the program's own
+source first; abstain on `LINKAGE`; don't borrow another program's table) — with **no model change**:
+
+| model | agentic_cross_file | agentic_restraint | agentic area | overall |
 | --- | --- | --- | --- | --- |
-| **qwen3-coder-480b** (freellm) | **1.00** | 0.20 | 1.00 | 3 → returned `[]` |
-| gemma4:e4b (local) | 0.00 | 0.63 (table + 2 noise) | 0.20 | **0** (never pulled) |
-| qwen3.5:4b (local) | 0.00 | 0.10 | 0.90 (pulled `LINKAGE`) | 2 → returned `[]` |
+| **qwen3-coder-480b** | 0.20 → **1.00** (2 calls, exact) | **1.00** | 0.60 → **1.00** | 91.4 → **98.0** |
+| gpt-4.1 | 0.20 → 0.90 → 0.10\* | 0.10 → 0.90 | ~0.50 | ~90 |
 
-A 480B code-specialist reproduces the exact pattern: it **solves one-shot restraint** (1.00, so the
-loop's motivating task needs no loop) and **fails cross-file** (pulls the copybook 3× then returns
-`[]`, 0.20). The bottleneck is confirmed as *reasoning over fetched evidence*, not fetching. The
-call log (docs/llm-enrichment.md §2.1) also exposes that gemma's agentic restraint failure is a
-**non-use** (0 tool calls), not a mis-reason — the full analysis is in
-`evals/docs/llm-comparison.md`.
+\* gpt-4.1 is prompt-sensitive and provider-flaky (empty completions after navigating correctly);
+its swing is noise. `qwen3-coder-480b` ran clean and **clears the `≥ 0.8` gate at 1.00** — the first
+model to do so. The loop is **viable**; it stays opt-in for cost/variance/per-model-prompt-tuning
+reasons, not because it fails. Full analysis: `evals/docs/llm-comparison.md` §4.
 
 ## 7. Explicit non-goals
 

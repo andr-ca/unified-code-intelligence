@@ -24,16 +24,22 @@ Three free-frontier models (via the local freellm gateway) against three local O
 
 | model | tier | overall | summaries | capabilities | candidates | fields | ask | agentic |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **qwen3-coder-480b** | freellm (frontier) | **91.4** | 0.88 | 1.00 | **1.00** | 1.00 | 1.00 | 0.60 |
-| gpt-4.1 | freellm (frontier) | 90.5 | 0.88 | 1.00 | **1.00** | 1.00 | 1.00 | 0.55 |
+| **qwen3-coder-480b** | freellm (frontier) | **98.0**² | 0.88 | 1.00 | **1.00** | 1.00 | 1.00 | **1.00**² |
+| gpt-4.1 | freellm (frontier) | 90.5 | 0.88 | 1.00 | **1.00** | 1.00 | 1.00 | 0.50–0.55² |
 | gemma4:e4b | local (~4B) | 80.0 | 0.88 | 1.00 | 0.50 | 1.00 | 1.00 | 0.42 |
 | **gemini-2.5-flash-lite** | freellm (frontier-lite) | **77.5** | 0.65 | 1.00 | **0.50** | 1.00 | 1.00 | 0.50 |
 | qwen3.5:2b | local (~2B) | 65.3 | 0.77 | 0.00¹ | 0.50 | 1.00 | 1.00 | n/a |
 | qwen3.5:4b | local (~4B) | 62.8 | 0.77 | 0.00¹ | 0.50 | 1.00 | 1.00 | 0.50 |
 
-The headline is the **interleaving**: `gemini-2.5-flash-lite`, a frontier model, scores **below**
-local `gemma4:e4b` — because it fails the one task that matters most (restraint, §3). "Frontier"
-is not a tier you can trust by label; it is a per-model, per-task property you must measure.
+Two headlines. First, the **interleaving**: `gemini-2.5-flash-lite`, a frontier model, scores
+**below** local `gemma4:e4b` — because it fails the one task that matters most (restraint, §3).
+"Frontier" is not a tier you can trust by label; it is a per-model, per-task property you must
+measure. Second, the **agentic column moved once the harness was fixed** (§4): `qwen3-coder-480b`
+went 0.60 → 1.00 on tooling alone.
+
+² `qwen3-coder-480b` with the **fixed agentic harness** (§4b). With the original blind harness it
+scored agentic 0.60 / overall 91.4. gpt-4.1's agentic swings with prompt version and a provider
+flake (§4b note); its non-agentic 90.5 is stable.
 
 ¹ `capabilities` 0.00 for the qwen3.5 locals is a **truncation** failure, not a reasoning failure:
 the model emitted valid-looking JSON that ran past the token budget (`'[{"name": "PAYRUN", "des…`)
@@ -87,46 +93,70 @@ It must be **measured per model** with this exact task before that model is trus
 `candidates` pass. `candidates_restraint_when_opaque` is that gate; a model scoring 0.00 there will
 invent call edges it cannot see, and no amount of "it's a frontier model" reasoning changes that.
 
-## 4. Finding 3 — tools do NOT earn their keep as a default
+## 4. Finding 3 — the tool-loop works; the first "it doesn't" result was a BLIND HARNESS
 
-The bounded tool-loop (`--agentic`) exists to fix the restraint hole by letting the model *fetch*
-the missing definition. The benchmark measures whether that works, now across **five** agentic-tested
-models:
+> **Correction (2026-07-03).** An earlier version of this section concluded "cross-file resolution
+> is unsolved by every model; the loop is a research feature." **That was wrong** — it measured a
+> deficient harness, not the models. When the harness was fixed, `qwen3-coder-480b` went from
+> agentic **0.60 → 1.00** (cross-file 0.20 → **1.00**, restraint **1.00**) — overall 91.4 → **98.0**
+> — with **no model change**. This is the cleanest example in the whole suite of a benchmark
+> measuring its own instrument. The original data is kept below as the "blind" baseline.
 
-| model | tier | one-shot restraint | agentic restraint (tools) | agentic cross-file (tools-only) | cross-file calls |
-| --- | --- | --- | --- | --- | --- |
-| qwen3-coder-480b | freellm | 1.00 | 1.00 (no gain) | 0.20 | 3 → `[]` |
-| gpt-4.1 | freellm | 1.00 | 0.90 (no gain) | 0.20 | 1 → `[]` |
-| gemini-2.5-flash-lite | freellm | 0.00 | **0.90** ✅ recovered | 0.10 | 1 → `[]` |
-| qwen3.5:4b | local | 0.00 | **0.90** ✅ recovered | 0.10 | 2 → `[]` |
-| gemma4:e4b | local | 0.00 | 0.20 ❌ | 0.63 | **0** (never pulled) |
+### 4a. The blind baseline (tools present, discovery tools absent)
 
-A cleaner rule than the first run suggested — three regimes, still none of which makes tools a
-default:
+First agentic run, with only `get_source` / `get_relationships` / `search` (graph-only):
 
-1. **For restraint-*passing* models, tools are redundant.** `qwen3-coder-480b` and `gpt-4.1` are
-   already 1.00 one-shot; the loop matches (1.00 / 0.90) at 1–3× the cost for no gain.
-2. **For restraint-*failing* models that actually pull, tools RECOVER restraint** — a real,
-   repeatable win: `gemini-2.5-flash-lite` and `qwen3.5:4b` both went **0.00 → 0.90** by fetching
-   the `LINKAGE` definition and then abstaining. This is the one genuine value the loop delivers.
-3. **But "actually pull" is itself unreliable on weak models.** `gemma4:e4b` made **zero tool
-   calls** and hallucinated anyway (0.00 → 0.20). Same tools, opposite outcome, because whether a
-   small model *chooses* to use them is not guaranteed.
+| model | one-shot restraint | agentic restraint | agentic cross-file | what the call log showed |
+| --- | --- | --- | --- | --- |
+| qwen3-coder-480b | 1.00 | 1.00 | **0.20** | re-read the 10-line program 3× (no EOF signal), never reached the copybook in budget |
+| gpt-4.1 | 1.00 | 0.90 | **0.20** | `search MENU-PGM` → "no matches" (data items aren't graph nodes) → correctly abstained on no evidence |
+| gemini-2.5-flash-lite / qwen3.5:4b | 0.00 | 0.90 | 0.10 | pulled `LINKAGE`, abstained (restraint recovered) but never located the table |
+| gemma4:e4b | 0.00 | 0.20 | 0.63 | made **0** tool calls; guessed the table + 2 noise names |
 
-And the decisive one, unchanged and now confirmed on five models:
+The log (§5) proved the copybook contents **never entered any model's context** — `search` was
+blind to the data item the models correctly asked for, `get_source` gave no end-of-file signal so
+models re-read the same slice, and the discovery tools (`rag_search`, `list_files`) that production
+`ask` has were **never wired into the candidates loop**. The models were reasoning correctly on
+evidence they were never allowed to obtain.
 
-4. **The loop's *unique* capability — cross-file resolution — is unsolved by everyone** (0.10–0.63,
-   every model returning `[]` or noise). `qwen3-coder-480b` pulled the copybook holding the dispatch
-   table **three times and still returned `[]`**. Fetching the evidence and *reasoning over it* are
-   different skills; no model tested has the second. gemma's 0.63 is not a win — the log shows it
-   guessed two real entries plus two noise programs (`PAYRUN`, `PRODINQ`), not a clean resolution.
+### 4b. The fixed harness (four targeted changes, no model change)
 
-**Conclusion:** `--agentic` stays **opt-in and off by default**. The recommended path is to **pick a
-restraint-passing model** (§3) and skip the loop — then tools are pure overhead. The loop is only a
-*remediation* worth considering when you are stuck with a restraint-failing model that reliably
-pulls (and even then it does nothing for cross-file). No model clears the adoption bar
-(`agentic_cross_file_resolution ≥ 0.8`, `docs/agentic-enrichment.md` §6); until one both fetches the
-copybook *and* resolves it, the loop is a research feature.
+1. **`search` RAG-fallback** — a name with no graph node (e.g. the data item `MENU-PGM`) now falls
+   back to keyword/RAG and returns the *file* that contains it (the copybook). No more dead ends.
+2. **`get_source` resolves `COPY MEMBER` → path** and prints total length + `END OF FILE`. Reading
+   the program now directly yields `COPY DISPTBL → cpy/DISPTBL.cpy`; models stop guessing paths and
+   stop re-reading.
+3. **`rag_search` + `list_files` wired into the loop** (they already existed for `ask`).
+4. **Prompt rebalanced** — "read THIS program's own source first; only open a copybook it actually
+   COPYs; abstain on `LINKAGE`/`USING`/`COMMAREA`; never borrow another program's table."
+
+Result on the two strong frontier models:
+
+| model | agentic cross-file | agentic restraint | agentic area | overall |
+| --- | --- | --- | --- | --- |
+| **qwen3-coder-480b** | 0.20 → **1.00** (2 calls, exact) | 1.00 | 0.60 → **1.00** | 91.4 → **98.0** |
+| gpt-4.1 | 0.20 → 0.90 → **0.10*** | 0.10 → 0.90 | 0.55 → 0.50 | ~90 |
+
+`*` gpt-4.1 is **prompt-sensitive and provider-flaky**: an intermediate prompt drove cross-file to
+0.90 but broke restraint to 0.10; the balanced prompt fixed restraint but its final cross-file run
+returned **empty completions** (a 44 s freellm stall) *after* navigating perfectly to the copybook —
+a transport flake, not a reasoning miss. Its swing is noise; `qwen3-coder-480b` ran clean at 1.00.
+
+### 4c. The corrected conclusion
+
+- **The loop is viable.** A capable model, given an adequate harness, resolves cross-file dispatch
+  **and** abstains on opaque input — `qwen3-coder-480b` scores 1.00 on both, reproducibly, in ≤2
+  tool calls. "No model can do this" was never true; it was untested.
+- **Harness quality dominates model quality here.** The same models swung 0.20 → 1.00 on tooling
+  alone. Before concluding a model "can't," verify from the call log that the evidence actually
+  reached it.
+- **Prompt design is a real precision/recall balance and is model-specific** — the version that
+  maximised gpt-4.1's recall broke its restraint. It must be co-tuned and re-benchmarked per model.
+- **`--agentic` stays opt-in by default** — but now for a *cost/variance* reason (extra calls,
+  provider flakiness, per-model prompt tuning), **not** because "it doesn't work." For a strong,
+  stable model on copybook-dispatch estates it is now a defensible *on* choice. The adoption gate
+  (`agentic_cross_file_resolution ≥ 0.8`) is **cleared by `qwen3-coder-480b` (1.00)** — the first
+  model to do so.
 
 ## 5. Finding 4 — the call log turns "tools didn't help" into "here's why"
 
@@ -136,10 +166,12 @@ says *why*, and that mechanism is the whole reason logging is on by default:
 - **gemma's restraint failure is a non-use, not a mis-reason.** Its `agentic_restraint` row logs a
   single call — it answered immediately without pulling the `LINKAGE` definition. You cannot see
   that in a 0.20 score; you can see it in `1 call`.
-- **The frontier's cross-file failure is a mis-act, not a non-fetch.** Its `agentic_cross_file` rows
-  log 4 calls (3 `get_source`/`rag_search` pulls + 1 answer) — it fetched the table and *then*
-  returned `[]`. That is the finding that keeps the loop a research feature: the bottleneck is
-  reasoning-over-fetched-evidence, so more/better tools won't move it.
+- **The frontier's cross-file failure was a non-fetch, not a mis-reason — and the log is what
+  proved it.** The 0.20 score looked like "fetched the table, then failed to reason." The transcript
+  said otherwise: `qwen3-coder-480b` re-read the 10-line *program* three times (no EOF signal) and
+  never opened the copybook; gpt-4.1 searched the data item and got "no matches." The evidence never
+  arrived. This is the bullet that overturned §4's original conclusion — once the harness delivered
+  the copybook, the same model went 0.20 → **1.00**. Better tools *did* move it.
 - **Latency and shape** are captured too: freellm frontier calls averaged ~1.7 s; the thinking
   models on the gateway (`gpt-oss-120b`, `deepseek-v4-flash`) leak server-side reasoning into
   `content` and need a higher `UCI_LLM_MAX_TOKENS` — a deployment note only a real-call log surfaces.
@@ -157,7 +189,8 @@ one-liner over the JSONL.
 | Model for `fields`/`ask` | cheap **local** model | §2 — all tiers tie at 1.00 |
 | Model for `summaries` | a **decent local** model (0.77–0.88); avoid frontier-*lite* (0.65) | §2 — `gemini-2.5-flash-lite` underperforms locals here |
 | Model for `candidates` | a **restraint-passing** model — `qwen3-coder-480b` or `gpt-4.1`; **not** `gemini-2.5-flash-lite` | §3 — restraint is per-model, must be measured, ignores the "frontier" label |
-| Turn on `--agentic`? | **No** (opt-in only) | §4 — redundant on restraint-passers, unreliable on weak models, cross-file unsolved by all five |
+| Turn on `--agentic`? | **Opt-in**, but now *defensible on* for a strong, stable model on copybook-dispatch estates | §4 — a fixed harness took `qwen3-coder-480b` to 1.00 on both agentic tasks; the earlier "off" was a harness artifact |
+| Before trusting the agentic loop | verify from the **call log** that fetched evidence reached the model | §4/§5 — the first negative result was a blind harness, not the models |
 | `UCI_LLM_MAX_TOKENS` for verbose/thinking models | raise from default (≥ 900 for `capabilities`) | §1 note ¹, §5 |
 | Keep call logging on? | **Yes** (default) | §5 — the mechanism behind every verdict here came from the log |
 
@@ -168,12 +201,17 @@ not follow from the model's size, price, or brand (§3).
 ## 7. Reproduce
 
 ```bash
-# free-frontier tier via the local gateway (key in .env; never committed)
-python3 evals/llm_eval.py --protocol freellm \
-    --models qwen3-coder-480b,gpt-4.1,gemini-2.5-flash-lite --agentic --timeout 150
+python3 evals/llm_eval.py --list                      # see the model menu / scopes
 
-# local tier
-python3 evals/llm_eval.py --protocol ollama --models qwen3.5:4b,gemma4:e4b --agentic
+# free-frontier tier (key in .env; never committed), with tools:
+python3 evals/llm_eval.py --models frontier --tools --timeout 150
+
+# local tier, with tools:
+python3 evals/llm_eval.py --models local --tools
+
+# mix tiers, or size the run down for a quick check:
+python3 evals/llm_eval.py --models qwen-coder,gemma4b --tools     # one frontier + one local
+python3 evals/llm_eval.py --models frontier --scope smoke --tools # fast subset
 
 # then mine the call log the runs wrote:
 #   evals/reports/llm-logs/llm-eval-<run>.jsonl   (one JSON object per call, grouped by `tag`)

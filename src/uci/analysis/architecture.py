@@ -38,6 +38,15 @@ def infer_architecture(graph: GraphStore, repo_id: str) -> dict:
     module_layer: dict[str, str] = {}
     descriptions: dict[str, str] = {}
 
+    # purpose summaries from the optional LLM enrichment, keyed by qualified_name AND short name so a
+    # module can borrow the summary of its same-named program (COBOL: file <-> LEGACY_PROGRAM).
+    summaries: dict[str, str] = {}
+    for entity in graph.entities(repo_id=repo_id):
+        text = entity.attributes.get("summary")
+        if text:
+            summaries.setdefault(entity.qualified_name, text)
+            summaries.setdefault(entity.name, text)
+
     for module in graph.entities(kind=EntityType.MODULE, repo_id=repo_id):
         layer, desc = layer_for_path(module.provenance.path)
         descriptions[layer] = desc
@@ -47,6 +56,8 @@ def infer_architecture(graph: GraphStore, repo_id: str) -> dict:
             "qualified_name": module.qualified_name,
             "path": module.provenance.path,
             "symbols": symbol_count,
+            "summary": module.attributes.get("summary") or summaries.get(module.qualified_name)
+            or summaries.get(module.name, ""),
         })
 
     # aggregate inter-layer dependency weights from module IMPORTS
@@ -62,7 +73,7 @@ def infer_architecture(graph: GraphStore, repo_id: str) -> dict:
             "name": name,
             "description": descriptions.get(name, ""),
             "module_count": len(mods),
-            "modules": sorted(mods, key=lambda m: m["symbols"], reverse=True),
+            "modules": sorted(mods, key=lambda m: (bool(m["summary"]), m["symbols"]), reverse=True),
         }
         for name, mods in sorted(layer_modules.items(), key=lambda kv: -len(kv[1]))
     ]

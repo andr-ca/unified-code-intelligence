@@ -160,10 +160,11 @@ class Config:
     ) -> Config:
         repo = Path(repo_path or os.environ.get("UCI_REPO_PATH") or Path.cwd()).resolve()
 
-        # merge .env (the repo's .uci/.env first, then cwd) into a lookup dict, then real env wins.
-        # Repo config lives under .uci/ so it never pollutes the processed repo's root.
+        # merge .env: the invocation dir's .env is a default, then the repo's own .uci/.env
+        # overrides it (repo config is authoritative), then real UCI_* env vars win. Repo
+        # config lives under .uci/ so it never pollutes the processed repo's root.
         env: dict[str, str] = {}
-        for candidate in (repo / ".uci" / ".env", Path.cwd() / ".env"):
+        for candidate in (Path.cwd() / ".env", repo / ".uci" / ".env"):
             if candidate.exists():
                 env.update(_parse_env_file(candidate))
         env.update({k: v for k, v in os.environ.items() if k.startswith("UCI_")})

@@ -82,6 +82,15 @@ class Enricher:
         self.repo_id = repo_id
         self.client = client or LlmClient(config)
         self.stats = EnrichStats()
+        self._retriever_cache = None
+
+    def _retriever(self):
+        """Hybrid retriever for the agentic candidates loop's rag_search tool (built lazily)."""
+        if self._retriever_cache is None:
+            from ..retrieval.hybrid import HybridRetriever
+            self._retriever_cache = HybridRetriever(
+                self.config, self.graph, self.metadata, self.vectors, self.embedder)
+        return self._retriever_cache
 
     # ------------------------------------------------------------------ passes
     def run(self, passes: list[str], limit: int = 200, force: bool = False,
@@ -279,7 +288,11 @@ class Enricher:
             data = self.client.complete_json(_SYS_CANDIDATES, user, max_tokens=300)
             return self._json_list(data, "candidates"), None
         from .tool_loop import ToolLoop
-        loop = ToolLoop(self.client, self.graph, self.config.repo_path, self.repo_id)
+        # give the loop the discovery surfaces that let it locate a copybook holding a dispatch
+        # table (rag_search + list_files + COPY-path resolution) — the difference between agentic
+        # 0.20 and 1.00 on cross-file resolution (evals/docs/llm-comparison.md §4).
+        loop = ToolLoop(self.client, self.graph, self.config.repo_path, self.repo_id,
+                        retriever=self._retriever(), metadata=self.metadata, max_tool_calls=4)
         result = loop.run(_SYS_CANDIDATES, user, answer_key="candidates", max_tokens=400)
         evidence = {"digest": result.evidence_digest(), "tool_calls": result.tool_calls,
                     "protocol_errors": result.protocol_errors} if result.transcript else None

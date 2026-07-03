@@ -115,23 +115,87 @@ spend matters.
 Both are provider/model-shape failures that never appear in a functional test with a fake client —
 only a benchmark against real models finds them.
 
-### 2.5 The benchmark argued *against* a feature we built — the highest form of eval value
-The bounded agentic tool-loop was built to fix the restraint failure. The benchmark then showed:
-- The **cheap** fix (a hardened one-shot prompt) already solves restraint on a capable model
-  (gemini 1.00), removing the loop's motivation.
-- The loop's *unique* job — cross-file resolution (pull the copybook holding the dispatch table) —
-  is **unsolved by every model tested**, frontier included (all return `[]` after pulling; 0.10).
+### 2.5 The agentic tool-loop: how a "the models can't" result turned out to be "our harness wouldn't let them" — a case study
 
-So the loop neither restores what the prompt fixed nor delivers what it was meant to add. It ships
-**opt-in, off by default**, gated behind `agentic_cross_file_resolution ≥ 0.8` — a bar no model
-has cleared. A well-built, plausible feature that the evidence says not to enable is precisely what
-"measure before adopting" is for.
+This is the richest methodological episode in the project. It is documented in full because the
+mistake it contains — reading a tooling failure as a model-capability ceiling — is the single
+easiest way to draw a wrong conclusion from an agentic benchmark.
 
-**Reproduced 2026-07-03** on a second, larger frontier model (`qwen3-coder-480b` via the local
-freellm gateway): one-shot restraint 1.00, agentic cross-file 0.20 (pulled the copybook 3× then
-returned `[]`). The full local-vs-frontier and with-vs-without-tools breakdown — including how the
-per-call log turns "tools didn't help" into "gemma made 0 tool calls, the 480B model made 3 and
-still failed" — is in `llm-comparison.md`.
+**What we built and why.** Dynamic dispatch (`EXEC CICS XCTL PROGRAM(WS-DISPATCH)` where
+`WS-DISPATCH` is loaded from a table) can't be resolved from the ±40-line window around the call —
+the deciding information (the table's literal `VALUE 'ACCTVIEW'…` entries) lives in a *copybook*.
+So we built a bounded tool-loop that lets the model *fetch* that context: read a source slice, ask
+the graph for relationships, search by name — then answer. The eval task `agentic_cross_file_resolution`
+puts the dispatch table in `cpy/DISPTBL.cpy`, which the seed window does not show; the loop must go
+get it. `agentic_restraint` is the opposite: the variable is fed from `LINKAGE`, so the correct
+answer is to abstain.
+
+**What didn't work — and, crucially, WHY.** The first run scored 0.10–0.63 across five models, every
+one returning `[]` or noise. We wrote it up as "cross-file resolution is unsolved by every model,
+frontier included; the loop is a research feature." **That conclusion was wrong.** Reading the
+per-call log (default-on JSONL, §2.4's sibling win) showed the copybook's contents *never entered
+any model's context* — three distinct harness defects, each provable from a transcript:
+
+1. **`search` was blind to the thing the models correctly asked for.** `search` was `find_by_name`
+   over graph *entities*, and a COBOL data item like `MENU-PGM` is not its own node — it lives
+   inside a copybook. gpt-4.1 reasoned correctly (`search MENU-PGM`), got **"no matches"**, and —
+   given no evidence — correctly abstained (`[]`). A perfect chain of reasoning defeated by a blind
+   tool.
+2. **`get_source` gave no end-of-file signal, so models burned their budget re-reading.**
+   `qwen3-coder-480b` asked for `MROUTER.cbl` lines 1–100, then 1–200, then 1–300 — the file is 10
+   lines. Each call returned the same 10 lines with no "this is the whole file," so the model kept
+   asking, spent its entire budget, and never reached the copybook.
+3. **The discovery tools were never wired in.** `rag_search` (hybrid RAG) and `list_files` — the two
+   tools that would have located `cpy/DISPTBL.cpy` in one call — existed for production `ask` but
+   were never passed into the candidates loop. And nothing resolved a `COPY DISPTBL` statement to
+   its path, so models that tried guessed wrong (`cbl/DISPTBL.cpy`).
+
+The models were reasoning correctly on evidence they were structurally prevented from obtaining.
+
+**How we diagnosed it.** Entirely from the call log. The scores said "0.20, returned `[]`" for every
+model — indistinguishable from a genuine reasoning failure. The *transcript* said "searched the
+right symbol → tool returned no-match" and "re-read a 10-line file three times." Without the log we
+would have shipped the wrong conclusion. (This is why LLM logging is on by default — see the
+recommendation in `llm-comparison.md` §5/§6.)
+
+**How we fixed it — four changes, each aimed at one defect, no model change.**
+1. `search` now **falls back to keyword/RAG** when there is no graph node, so `search MENU-PGM`
+   returns the *file* that contains it (`cpy/DISPTBL.cpy`) instead of a dead "no matches."
+2. `get_source` now **resolves `COPY MEMBER` → its indexed path** and prints total length +
+   `END OF FILE`. Reading `MROUTER.cbl` now directly yields `COPY DISPTBL → cpy/DISPTBL.cpy`, and
+   the model never re-reads a file it has already seen whole.
+3. `rag_search` + `list_files` **wired into the loop** (budget 3 → 4).
+4. The prompt was **rebalanced**: read THIS program's own source first; only open a copybook the
+   program actually COPYs; abstain on `LINKAGE`/`USING`/`COMMAREA`; never borrow another program's
+   table.
+
+**What started working — and why.** `qwen3-coder-480b` went **agentic 0.60 → 1.00** (cross-file
+0.20 → **1.00**, restraint **1.00**), overall **91.4 → 98.0** — the first model ever to clear the
+`agentic_cross_file_resolution ≥ 0.8` adoption gate. The *why* is legible in the transcript: it now
+reads `MROUTER.cbl` (fix 2 hands it `→ cpy/DISPTBL.cpy` inline), opens that copybook, reads the two
+literal `VALUE` entries, and answers exactly `['ACCTVIEW','ACCTEDIT']` in **two** tool calls — while
+on the `LINKAGE` case it sees no COPY, correctly abstains (fix 4), in one call. Fixes 1 and 3 give
+alternative discovery paths for models that search the data item rather than the copybook.
+
+**What the intermediate attempts taught us (precision vs recall).** A first prompt revision that only
+pushed "go find the copybook table" drove gpt-4.1's cross-file to 0.90 but **broke its restraint to
+0.10** — primed to expect a table, it borrowed `DISPTBL`'s values on the `LINKAGE` case where no
+table exists. The rebalanced prompt (fix 4: verify the table belongs to *this* program; abstain on
+`LINKAGE`) restored restraint. Lesson: the discovery prompt is a **precision/recall dial**, and it
+is **model-specific** — `qwen3-coder-480b` was robust to it; gpt-4.1 was not.
+
+**What still doesn't fully work / honest caveats.** gpt-4.1 is prompt-sensitive and **provider-flaky**
+— its final cross-file run returned empty completions (a 44 s freellm stall) *after* navigating
+correctly to the copybook, so its 0.10 there is transport noise, not reasoning. All of this is on a
+tiny synthetic fixture at n=1 clean; a larger, real copybook-dispatch repo is still owed. The fix is
+also now wired into production (`_pass_candidates`), so the benchmark represents what ships.
+
+**The lasting methodological lesson.** *A negative agentic result is guilty until the call log proves
+the evidence reached the model.* "The model can't" and "our harness never let it" produce **identical
+scores**; only the transcript distinguishes them. Harness quality dominated model quality here — the
+same models swung 0.20 → 1.00 on tooling alone. The loop is **viable**; it stays opt-in for
+cost/variance/per-model-prompt-tuning reasons, not because it fails. Full breakdown in
+`llm-comparison.md` §4; design + correction in `../../docs/agentic-enrichment.md` §6.
 
 ---
 

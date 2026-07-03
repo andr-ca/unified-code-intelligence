@@ -1001,14 +1001,31 @@ def _u_what(summary: dict) -> str:
 
 
 def _u_organized(org: dict) -> str:
+    layers = org.get("layers", [])
+    edges = org.get("edges", [])
+    if layers:
+        n = len(layers)
+        dep = (f", wired by <b>{len(edges)}</b> cross-layer dependenc{'y' if len(edges) == 1 else 'ies'}"
+               if edges else "")
+        items = "".join(
+            f"<li><b>{_e(lyr['name'])}</b> — {_e(lyr.get('description') or 'a group of related modules')}</li>"
+            for lyr in layers)
+        lead = (f"<p>At a high level, this system is organized into <b>{n}</b> layer"
+                f"{'' if n == 1 else 's'}{dep}. In plain terms:</p><ul class='clean'>{items}</ul>"
+                "<p class='muted small' style='margin-top:10px'>The layers in detail:</p>")
+    else:
+        lead = ("<p class='muted'>No clear layering was inferred — likely a flat or single-purpose "
+                "codebase.</p>")
     layer_cards = "".join(
         f"<div class='card'><div class='card-h'>{_e(lyr['name'])} "
         f"<span class='tag'>· {lyr.get('module_count', len(lyr.get('modules', [])))} modules</span></div>"
         f"<p class='muted small'>{_e(lyr.get('description', ''))}</p><ul class='clean'>" + "".join(
-            f"<li><a href='/module?q={quote(m['qualified_name'])}'>{_e(m['qualified_name'])}</a> "
-            f"<span class='muted small'>({m.get('symbols', 0)} symbols)</span></li>"
+            f"<li><a href='/module?q={quote(m['qualified_name'])}'>{_e(m['qualified_name'])}</a>"
+            + (f" — <span class='muted small'>{_e(m['summary'])}</span>" if m.get("summary")
+               else f" <span class='muted small'>({m.get('symbols', 0)} symbols)</span>")
+            + "</li>"
             for m in lyr.get("modules", [])[:5]) + "</ul></div>"
-        for lyr in org.get("layers", [])) or "<p class='muted small'>No layered structure inferred.</p>"
+        for lyr in layers)
     caps = org.get("capabilities", [])
     if caps:
         strip = ("<p class='small' style='margin-top:14px'><b>Business capabilities</b> "
@@ -1018,7 +1035,7 @@ def _u_organized(org: dict) -> str:
     else:
         strip = ("<p class='muted small' style='margin-top:14px'>Domain grouping (business "
                  "capabilities) appears here once <a href='/enrich'>enrichment</a> runs.</p>")
-    return f"<div class='u-cardrow'>{layer_cards}</div>{strip}"
+    return f"{lead}<div class='u-cardrow'>{layer_cards}</div>{strip}"
 
 
 def _u_runs(ex: dict) -> str:
