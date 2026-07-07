@@ -98,6 +98,11 @@ keeps vendor imports out of the report. Spec: [`next-iteration-gap-registry.md`]
   column-level DCLGEN mapping, IMS PSB/gen semantics (PCB `PROCOPT` read/write intent),
   PL/I + REXX, Che4z LSP bridge (macro expansion, copybook line mapping).
 - ⏳ Modernization: `LEGACY_MODULE → CANDIDATE_FOR_MIGRATION → TargetService` with mapping reports.
+- 📘 Strategy: how UCI + AI agents run a modernization program end-to-end —
+  [`mainframe-modernization-approaches.md`](mainframe-modernization-approaches.md) (approach
+  comparison + recommended pipeline) and
+  [`mainframe-modernization-tooling-roadmap.md`](mainframe-modernization-tooling-roadmap.md)
+  (Copilot integration, new tools, harness catalog, build order).
 
 ## LLM enrichment (optional layer)  ✅ (docs/llm-enrichment.md, docs/agentic-enrichment.md)
 - `uci.enrich`: protocol-pluggable client (ollama / openai-compatible / anthropic; stdlib HTTP,

@@ -1,0 +1,65 @@
+{
+  "run": "2026-07-03T18:09:19Z",
+  "overall": 100.0,
+  "passed": 24,
+  "total": 24,
+  "fixtures": [
+    {
+      "anchor": "transaction",
+      "stats": {
+        "nodes": 5,
+        "edges": 5,
+        "programs": 2,
+        "data": 1,
+        "screens": 1,
+        "kinds": {
+          "transaction_code": 1,
+          "legacy_program": 2,
+          "database_table": 1,
+          "screen": 1
+        },
+        "truncated": false
+      },
+      "checks_passed": 8,
+      "checks_total": 8,
+      "failed": []
+    },
+    {
+      "anchor": "job",
+      "stats": {
+        "nodes": 4,
+        "edges": 4,
+        "programs": 2,
+        "data": 1,
+        "screens": 0,
+        "kinds": {
+          "jcl_job": 1,
+          "legacy_program": 2,
+          "dataset": 1
+        },
+        "truncated": false
+      },
+      "checks_passed": 8,
+      "checks_total": 8,
+      "failed": []
+    },
+    {
+      "anchor": "capability",
+      "stats": {
+        "nodes": 3,
+        "edges": 2,
+        "programs": 2,
+        "data": 1,
+        "screens": 0,
+        "kinds": {
+          "legacy_program": 2,
+          "database_table": 1
+        },
+        "truncated": false
+      },
+      "checks_passed": 8,
+      "checks_total": 8,
+      "failed": []
+    }
+  ]
+}

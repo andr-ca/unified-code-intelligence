@@ -1,0 +1,148 @@
+{
+  "run": "2026-07-03T17:24:42Z",
+  "overall": 100.0,
+  "passed": 60,
+  "total": 60,
+  "fixtures": [
+    {
+      "function": "classify",
+      "language": "python",
+      "stats": {
+        "nodes": 7,
+        "edges": 8,
+        "decisions": 2,
+        "loops": 0,
+        "returns": 3,
+        "calls": 0,
+        "kinds": {
+          "entry": 1,
+          "exit": 1,
+          "decision": 2,
+          "return": 3
+        }
+      },
+      "checks_passed": 10,
+      "checks_total": 10,
+      "failed": []
+    },
+    {
+      "function": "scan",
+      "language": "python",
+      "stats": {
+        "nodes": 10,
+        "edges": 12,
+        "decisions": 2,
+        "loops": 1,
+        "returns": 1,
+        "calls": 0,
+        "kinds": {
+          "entry": 1,
+          "exit": 1,
+          "statement": 2,
+          "loop": 1,
+          "decision": 2,
+          "continue": 1,
+          "break": 1,
+          "return": 1
+        }
+      },
+      "checks_passed": 10,
+      "checks_total": 10,
+      "failed": []
+    },
+    {
+      "function": "route",
+      "language": "python",
+      "stats": {
+        "nodes": 7,
+        "edges": 8,
+        "decisions": 1,
+        "loops": 0,
+        "returns": 1,
+        "calls": 0,
+        "kinds": {
+          "entry": 1,
+          "exit": 1,
+          "decision": 1,
+          "statement": 3,
+          "return": 1
+        }
+      },
+      "checks_passed": 10,
+      "checks_total": 10,
+      "failed": []
+    },
+    {
+      "function": "guarded",
+      "language": "python",
+      "stats": {
+        "nodes": 8,
+        "edges": 9,
+        "decisions": 0,
+        "loops": 1,
+        "returns": 1,
+        "calls": 4,
+        "kinds": {
+          "entry": 1,
+          "exit": 1,
+          "call": 4,
+          "loop": 1,
+          "return": 1
+        }
+      },
+      "checks_passed": 10,
+      "checks_total": 10,
+      "failed": []
+    },
+    {
+      "function": "POST",
+      "language": "cobol",
+      "stats": {
+        "nodes": 21,
+        "edges": 26,
+        "decisions": 3,
+        "loops": 1,
+        "returns": 1,
+        "calls": 2,
+        "kinds": {
+          "entry": 1,
+          "exit": 1,
+          "paragraph": 4,
+          "call": 2,
+          "decision": 3,
+          "statement": 7,
+          "loop": 1,
+          "return": 1,
+          "goto": 1
+        }
+      },
+      "checks_passed": 10,
+      "checks_total": 10,
+      "failed": []
+    },
+    {
+      "function": "INQ",
+      "language": "cobol",
+      "stats": {
+        "nodes": 8,
+        "edges": 9,
+        "decisions": 1,
+        "loops": 1,
+        "returns": 1,
+        "calls": 0,
+        "kinds": {
+          "entry": 1,
+          "exit": 1,
+          "paragraph": 1,
+          "loop": 1,
+          "statement": 2,
+          "decision": 1,
+          "return": 1
+        }
+      },
+      "checks_passed": 10,
+      "checks_total": 10,
+      "failed": []
+    }
+  ]
+}

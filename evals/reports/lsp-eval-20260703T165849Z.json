@@ -1,0 +1,44 @@
+{
+  "run": "2026-07-03T16:58:49Z",
+  "overall": 100.0,
+  "left_uncertain_ok": true,
+  "scores": {
+    "promote": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 1,
+      "predicted": 1,
+      "golden": 1
+    },
+    "prune": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 1,
+      "predicted": 1,
+      "golden": 1
+    },
+    "discover": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 1,
+      "predicted": 1,
+      "golden": 1
+    },
+    "complete": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 2,
+      "predicted": 2,
+      "golden": 2
+    }
+  },
+  "queried": {
+    "verify": 3,
+    "discover": 1,
+    "complete": 1
+  }
+}
