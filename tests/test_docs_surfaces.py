@@ -48,3 +48,17 @@ def test_entity_detail_lists_documentation(tmp_path):
         sym = eng.find_symbol("COSGN00C")["results"][0]
         detail = eng.entity_detail(sym["entity_id"])
         assert any(d["path"] == "README.md" for d in detail.get("documentation", []))
+
+
+def test_docs_overview_and_page_render(tmp_path):
+    from uci.api import views
+
+    with _mk(tmp_path / "dash", True) as eng:
+        data = eng.docs_overview()
+        assert data["coverage"]["total"] >= 1
+        assert any(d["path"] == "README.md" for d in data["documents"])
+        html = views.docs_page(data)
+        assert "Documentation" in html and "README.md" in html
+        detail = eng.doc_detail("README.md")
+        assert detail["ok"] and detail["sections"]
+        assert "Signon" in views.doc_detail_page(detail)

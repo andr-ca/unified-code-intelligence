@@ -717,6 +717,36 @@ class Engine:
                 "undocumented": sorted(undocumented, key=lambda d: d["name"])[:200],
                 "index": self._index_status()}
 
+    def doc_detail(self, path: str) -> dict:
+        """Sections of one document (in order) with their DESCRIBES links and chunk text."""
+        sections = [s for s in self.graph.entities(kind=EntityType.DOC_SECTION, repo_id=self.repo_id)
+                    if s.provenance.path == path]
+        sections.sort(key=lambda s: s.provenance.start_line)
+        chunks_by_entity: dict[str, list] = {}
+        for c in self.metadata.iter_chunks(self.repo_id):
+            eid = c.get("entity_id")
+            if eid:
+                chunks_by_entity.setdefault(eid, []).append(c.get("text", ""))
+        out = []
+        for sec in sections:
+            links = []
+            for rel in self.graph.out_relationships(sec.id, [RelationType.DESCRIBES]):
+                tgt = self.graph.get_entity(rel.dst_id)
+                if tgt is None:
+                    continue
+                links.append({"target_id": tgt.id, "name": tgt.name, "kind": tgt.kind.value,
+                              "resolution": rel.attributes.get("resolution", ""),
+                              "confidence": rel.provenance.confidence,
+                              "missing": bool(tgt.attributes.get("missing"))})
+            out.append({
+                "entity_id": sec.id, "heading": sec.attributes.get("heading", sec.name),
+                "level": sec.attributes.get("level", 0),
+                "start_line": sec.provenance.start_line, "end_line": sec.provenance.end_line,
+                "links": links,
+                "text": "\n".join(chunks_by_entity.get(sec.id, []))[:2000],
+            })
+        return {"ok": bool(sections), "path": path, "sections": out}
+
     # -- database browser (read-only inspection of the raw store) -----------
     def db_tables(self) -> dict:
         """Row counts per browsable table, scoped to this repo."""

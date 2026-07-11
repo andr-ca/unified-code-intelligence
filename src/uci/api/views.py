@@ -12,6 +12,7 @@ _NAV_GROUPS: list[tuple[str, str | None, list[tuple[str, str]]]] = [
         ("/architecture", "Architecture"),
         ("/flows", "Flows"),
         ("/onboarding", "Onboarding"),
+        ("/docs", "Docs"),
     ]),
     ("Explore", None, [
         ("/search", "Search"),
@@ -560,6 +561,65 @@ def db_page(tables: list, table: str, data: dict | None, sql: str, result: dict 
         f'<div class="pillrow" style="margin-bottom:16px">{chips}</div>'
         f'{sqlbox}{panel}</div>')
     return layout("Database", "/db", body)
+
+
+def docs_page(data: dict) -> str:
+    cov = data.get("coverage", {})
+    documents = data.get("documents", [])
+    undoc = data.get("undocumented", [])
+    if not documents:
+        body = ('<div class="container"><h1>Documentation</h1>'
+                '<p class="sub">No documentation indexed yet. Add README/spec files, or check '
+                '<span class="mono">UCI_INDEX_DOCS</span>.</p></div>')
+        return layout("Docs", "/docs", body)
+    stat = (f'<div class="card"><div class="card-h">Coverage</div>'
+            f'<p><b style="font-size:22px">{cov.get("pct", 0)}%</b> '
+            f'<span class="muted">of key artifacts documented '
+            f'({cov.get("described", 0)}/{cov.get("total", 0)})</span></p></div>')
+    doc_rows = "".join(
+        f'<tr><td><a href="/docs?path={quote(d["path"])}">{_e(d["path"])}</a></td>'
+        f'<td>{d["sections"]}</td><td>{d["links"]}</td></tr>' for d in documents)
+    doc_table = (f'<div class="card"><div class="card-h">Documents</div>'
+                 f'<table><thead><tr><th>path</th><th>sections</th><th>links</th></tr></thead>'
+                 f'<tbody>{doc_rows}</tbody></table></div>')
+    undoc_block = ""
+    if undoc:
+        rows = "".join(
+            f'<tr><td>{_kind_pill(u["kind"])} <a href="/search?q={quote(u["name"])}">{_e(u["name"])}</a></td>'
+            f'<td class="mono muted small">{_e(u["path"])}</td></tr>' for u in undoc[:50])
+        undoc_block = (f'<div class="card"><div class="card-h">Undocumented '
+                       f'<span class="muted small">· {len(undoc)}</span></div>'
+                       f'<table><thead><tr><th>artifact</th><th>path</th></tr></thead>'
+                       f'<tbody>{rows}</tbody></table></div>')
+    body = (f'<div class="container"><h1>Documentation</h1>'
+            f'<p class="sub">Docs ingested into the graph, linked to the code they describe.</p>'
+            f'{stat}{doc_table}{undoc_block}</div>')
+    return layout("Docs", "/docs", body)
+
+
+def doc_detail_page(data: dict) -> str:
+    path = data.get("path", "")
+    sections = data.get("sections", [])
+    if not sections:
+        body = (f'<div class="container"><h1>{_e(path)}</h1>'
+                f'<p class="sub"><a href="/docs">&larr; all docs</a></p>'
+                f'<p class="muted">No sections.</p></div>')
+        return layout("Doc", "/docs", body)
+    blocks = []
+    for sec in sections:
+        links = "".join(
+            f'<a class="pill" href="/search?q={quote(link["name"])}">{_e(link["name"])} '
+            f'<span class="muted small">{_e(link["resolution"])}</span></a> '
+            for link in sec.get("links", []))
+        link_row = f'<div class="pillrow" style="margin:6px 0">{links}</div>' if links else ""
+        text = _e(sec.get("text", ""))[:1500]
+        blocks.append(
+            f'<div class="card"><div class="card-h">{_e(sec["heading"])} '
+            f'<span class="muted small">· lines {sec["start_line"]}–{sec["end_line"]}</span></div>'
+            f'{link_row}<pre class="dsjson" style="max-height:220px">{text}</pre></div>')
+    body = (f'<div class="container"><h1>{_e(path)}</h1>'
+            f'<p class="sub"><a href="/docs">&larr; all docs</a></p>{"".join(blocks)}</div>')
+    return layout("Doc", "/docs", body)
 
 
 def _metrics_reindex_body(msg: str) -> str:
