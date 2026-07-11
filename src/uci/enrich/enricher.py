@@ -74,6 +74,7 @@ class EnrichStats:
     candidate_edges: int = 0
     field_dictionaries: int = 0
     architecture: int = 0
+    doc_links: int = 0
     cached: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -82,6 +83,7 @@ class EnrichStats:
                 "candidate_edges": self.candidate_edges,
                 "field_dictionaries": self.field_dictionaries,
                 "architecture": self.architecture,
+                "doc_links": self.doc_links,
                 "cached": self.cached, "errors": self.errors[:20]}
 
 
@@ -126,7 +128,15 @@ class Enricher:
         if "architecture" in passes:
             self.client.default_tag = "enrich:architecture"
             self._pass_architecture(force)
+        if "doc_links" in passes:
+            self.client.default_tag = "enrich:doc_links"
+            self._pass_doc_links(limit, force)
         return self.stats
+
+    def _pass_doc_links(self, limit: int, force: bool) -> None:
+        """Optional LLM pass: link unlinked doc sections to code (docs/documentation-ingestion.md)."""
+        from .doc_links import run_doc_links
+        run_doc_links(self, limit, force)
 
     # -- pass 1: summaries ---------------------------------------------------
     def _pass_summaries(self, limit: int, force: bool) -> None:

@@ -94,6 +94,8 @@ class FakeLlm:
         if "system-architecture overview" in system:
             return {"overview": "A small COBOL product-inquiry system organized into a Core layer.",
                     "key_points": ["Core layer holds the programs", "PRODINQ looks up products"]}
+        if "linking one documentation section" in system:
+            return {"describes": ["COSGN00C", "NOTAREAL1"]}
         return {}
 
 
@@ -479,3 +481,27 @@ def test_ask_agentic_degrades_honestly_on_unverifiable_targets(llm_repo):
     data = llm_repo.ask("what products are supported?", client=HallucinatingLlm([]), agentic=True)
     assert data["ok"] and data["answer_location"] == "not_in_repo"
     assert data["targets"] == []
+
+
+def test_doc_links_pass_links_unlinked_sections(tmp_path: Path):
+    from uci.core.relationships import RelationType
+
+    repo = tmp_path / "doclinks"
+    (repo / "cbl").mkdir(parents=True)
+    (repo / "cbl" / "COSGN00C.cbl").write_text(
+        "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. COSGN00C.\n"
+        "       PROCEDURE DIVISION.\n           MOVE 1 TO X.\n", encoding="utf-8")
+    # a section that describes the signon program WITHOUT naming it → no deterministic link
+    (repo / "GUIDE.md").write_text(
+        "# Overview\n\nThis section describes the signon component of the system.\n",
+        encoding="utf-8")
+    eng = Engine(Config.from_env(repo, {"embedding_provider": "local"}))
+    eng.index(full=True)
+    try:
+        out = eng.enrich(["doc_links"], client=FakeLlm())
+        assert out["stats"]["doc_links"] == 1          # hallucinated NOTAREAL1 dropped
+        edges = [r for r in eng.graph.relationships(RelationType.DESCRIBES)
+                 if r.attributes.get("resolution") == "llm-suggested"]
+        assert len(edges) == 1 and edges[0].provenance.confidence == 0.6
+    finally:
+        eng.close()
