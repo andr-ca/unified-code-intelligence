@@ -58,3 +58,16 @@ def test_cli_init(capsys, sample_repo: Path):
     rc = main(["init", str(sample_repo)])
     assert rc == 0
     assert (sample_repo / ".uci" / "config.json").exists()
+
+
+def test_cli_docs_coverage(capsys, tmp_path: Path):
+    (tmp_path / "cbl").mkdir()
+    (tmp_path / "cbl" / "COSGN00C.cbl").write_text(
+        "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. COSGN00C.\n"
+        "       PROCEDURE DIVISION.\n           MOVE 1 TO X.\n")
+    (tmp_path / "README.md").write_text(
+        "# App\n\n## Signon — COSGN00C\n\n`COSGN00C` handles signon.\n")
+    rc = main(["docs", "--path", str(tmp_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "coverage" in out.lower() and "README.md" in out
