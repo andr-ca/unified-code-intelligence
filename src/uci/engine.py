@@ -660,8 +660,62 @@ class Engine:
             or next(self.graph.relationships(RelationType.MAPS_TO), None) is not None
         )
         has_metrics = self.metadata.get_state(self.repo_id, "code_metrics") is not None
+        has_docs = next(self.graph.entities(kind=EntityType.DOC_SECTION, repo_id=self.repo_id), None) is not None
         return {"find_config_dependencies": has_config, "find_data_lineage": has_data,
-                "get_code_metrics": has_metrics}
+                "get_code_metrics": has_metrics,
+                "search_docs": has_docs, "get_documentation": has_docs}
+
+    # -- documentation ------------------------------------------------------
+    def search_docs(self, query: str, top_k: int = 10) -> dict:
+        """Documentation-only search: DOC_SECTION hits with excerpts."""
+        return self.search(query, top_k=top_k, kinds=[EntityType.DOC_SECTION])
+
+    def get_documentation(self, symbol: str) -> dict:
+        """Doc sections that describe *symbol* (or its file/module), best-confidence first."""
+        found = self.find_symbol(symbol)
+        matches = found.get("results", [])
+        if not matches:
+            return {**found, "documentation": []}
+        entity = self.graph.get_entity(matches[0]["entity_id"])
+        docs = self._impact()._documentation(entity) if entity else []
+        for d in docs:
+            chunk_texts = [c["text"] for c in self.metadata.iter_chunks(self.repo_id)
+                           if c.get("entity_id") == d["entity_id"]]
+            d["excerpt"] = (chunk_texts[0][:600] if chunk_texts else "")
+        return {"ok": True, "symbol": symbol, "documentation": docs, "index": self._index_status()}
+
+    def docs_overview(self) -> dict:
+        """All doc files with their sections, link counts, and coverage of key artifacts."""
+        sections = list(self.graph.entities(kind=EntityType.DOC_SECTION, repo_id=self.repo_id))
+        by_path: dict[str, list] = {}
+        linked: set[str] = set()
+        for sec in sections:
+            by_path.setdefault(sec.provenance.path, []).append(sec)
+            for rel in self.graph.out_relationships(sec.id, [RelationType.DESCRIBES]):
+                linked.add(rel.dst_id)
+        key_kinds = (EntityType.LEGACY_PROGRAM, EntityType.JCL_JOB, EntityType.TRANSACTION_CODE)
+        undocumented = []
+        total_key = 0
+        for kind in key_kinds:
+            for ent in self.graph.entities(kind=kind, repo_id=self.repo_id):
+                if ent.attributes.get("missing") or ent.attributes.get("external"):
+                    continue
+                total_key += 1
+                if ent.id not in linked:
+                    undocumented.append({"entity_id": ent.id, "name": ent.name,
+                                         "kind": ent.kind.value, "path": ent.provenance.path})
+        documents = [{
+            "path": path,
+            "sections": len(secs),
+            "links": sum(len(self.graph.out_relationships(s.id, [RelationType.DESCRIBES]))
+                         for s in secs),
+        } for path, secs in sorted(by_path.items())]
+        covered = total_key - len(undocumented)
+        return {"ok": True, "documents": documents,
+                "coverage": {"described": covered, "total": total_key,
+                             "pct": round(100.0 * covered / total_key, 1) if total_key else 0.0},
+                "undocumented": sorted(undocumented, key=lambda d: d["name"])[:200],
+                "index": self._index_status()}
 
     # -- database browser (read-only inspection of the raw store) -----------
     def db_tables(self) -> dict:

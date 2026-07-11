@@ -155,6 +155,23 @@ TOOL_SPECS: list[dict[str, Any]] = [
             "properties": {"kind": {"type": "string", "description": "filter by artifact_kind"}},
         },
     },
+    {
+        "name": "search_docs",
+        "description": "Search ingested documentation (READMEs, specs, guides). Returns doc "
+                       "sections with path+line provenance — pair with get_documentation for "
+                       "the sections describing a specific symbol.",
+        "inputSchema": {"type": "object", "required": ["query"],
+                        "properties": {"query": {"type": "string"},
+                                       "top_k": {"type": "integer", "default": 10}}},
+    },
+    {
+        "name": "get_documentation",
+        "description": "Documentation sections that describe a symbol (program, job, table, "
+                       "function), with confidence-labeled links and excerpts. The design/spec "
+                       "context a safe change needs.",
+        "inputSchema": {"type": "object", "required": ["symbol"],
+                        "properties": {"symbol": {"type": "string"}}},
+    },
 ]
 
 
@@ -206,6 +223,10 @@ def dispatch(engine: Engine, name: str, arguments: dict[str, Any]) -> dict[str, 
         return engine.metrics()
     if name == "list_index_gaps":
         return engine.gaps(args.get("kind"))
+    if name == "search_docs":
+        return engine.search_docs(args["query"], top_k=int(args.get("top_k", 10)))
+    if name == "get_documentation":
+        return engine.get_documentation(args["symbol"])
     return {"ok": False, "error": {"code": "unknown_tool", "message": name}}
 
 
