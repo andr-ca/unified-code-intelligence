@@ -104,6 +104,12 @@ extractors; MCP tools advertise `available: false` for fact types not yet presen
 | `TRANSACTION_CODE` * | CICS transaction (CSD `DEFINE TRANSACTION`) |
 | `SCREEN` * | BMS mapset/map (`DFHMSD`/`DFHMDI`, CSD `DEFINE MAPSET`) |
 
+**Documentation** (tier `*`):
+
+| Type | Notes |
+| --- | --- |
+| `DOC_SECTION` * | A documentation heading/section (Markdown/RST/AsciiDoc/text/HTML/PDF/DOCX). Rides under its file's MODULE like a `PARAGRAPH`; **not** a symbol kind. See [`documentation-ingestion.md`](documentation-ingestion.md). |
+
 ## 3. Relationship types (`RelationType`)
 
 `*` = produced by MVP parsers/analyzers.
@@ -127,6 +133,7 @@ extractors; MCP tools advertise `available: false` for fact types not yet presen
 | `CHANGED` * | Commit → File/Symbol | Commit touched entity |
 | `RELATES_TO` | Ticket → Commit/Module/Capability | Loose relation |
 | `IMPLEMENTS_CAPABILITY` | Module/Service/Function → BusinessCapability | Capability realization |
+| `DESCRIBES` * | DocSection → any artifact | Documentation describes the artifact. **Never** dependency-like — excluded from impact/completeness (`documented-artifact-missing` misses feed the gap registry). |
 | `RUNS` * | JCLJob/PROC → Program/PROC | Execution (`EXEC PGM=` / `EXEC PROC=`) |
 | `SCHEDULES` | Scheduler → Job | Scheduling |
 | `MAPS_TO` * | DCLGEN Copybook → Table | Mapping/lineage (`EXEC SQL DECLARE <t> TABLE`) |

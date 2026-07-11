@@ -57,6 +57,14 @@ keeps vendor imports out of the report. Spec: [`next-iteration-gap-registry.md`]
   (`uci enrich`) that writes `summary`/`layer`/`domain`/`capability` attributes with
   `extractor="llm:<model>", confidence<1.0` — enrichment as just another extractor over the same graph.
 
+## Documentation ingestion  ✅ (this repo)
+Repository docs (Markdown/RST/AsciiDoc/text/HTML, +PDF/DOCX via `.[docs]`) are ingested as
+`DOC_SECTION` entities and deterministically linked to the code they describe (`DESCRIBES`, a
+confidence-labeled ladder mirroring call resolution). Surfaced in retrieval, impact/symbol packs,
+the `/docs` dashboard page, and the `search_docs`/`get_documentation` MCP tools; an optional
+`doc_links` LLM pass links prose the deterministic ladder can't. Impact-neutral by design
+(`DESCRIBES ∉ DEPENDENCY_LIKE`). Guide: [`documentation-ingestion.md`](documentation-ingestion.md).
+
 ## Phase 4 — Non-semantic relationships  ⏳ (schema-ready, extractors to add)
 - Data: SQL/ORM extractors → `Query`/`Table`/`Column`, `READS`/`WRITES`, DTO↔entity `MAPS_TO`.
 - Runtime/config: route extractors → `API_ENDPOINT` `HANDLES`; `FEATURE_FLAG` `CONTROLS`; `EMITS` log events.

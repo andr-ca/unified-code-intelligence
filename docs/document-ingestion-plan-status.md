@@ -20,16 +20,16 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 4 | DocParser — structure (sections) | ✅ | heading→section, setext/adoc/html/page markers; registered per dialect; 3 tests |
 | 5 | DocParser — mention extraction | ✅ | path/code-span/heading/bare + fence skip + stoplist; 7 tests |
 | 6 | GraphBuilder — resolve `describes` (honesty ladder) | ✅ | doc-path/heading/code-span/mention ladder; documented-artifact gaps; impact-neutral; 3 tests; full suite 319 pass |
-| 7 | Indexer + chunking — doc sections into FTS/vectors | ⬜ | |
-| 8 | Retrieval — doc weighting + `DESCRIBES` expansion | ⬜ | |
-| 9 | Impact & symbol packs — `documentation` stratum | ⬜ | |
-| 10 | Engine facade + MCP tools | ⬜ | |
-| 11 | CLI — `uci docs` | ⬜ | |
-| 12 | Dashboard — `/docs` page + API + nav | ⬜ | |
-| 13 | Optional LLM pass — `doc_links` | ⬜ | |
-| 14 | Eval — doc-linkage track | ⬜ | |
-| 15 | Documentation updates | ⬜ | |
-| 16 | Final verification gate | ⬜ | |
+| 7 | Indexer + chunking — doc sections into FTS/vectors | ✅ | DOC_SECTION chunkable; doc read/chunk gates; doc_sections/doc_links counters; 16 tests |
+| 8 | Retrieval — doc weighting + `DESCRIBES` expansion | ✅ | doc reason+priority, weight_doc multiplier, DESCRIBES graph expansion; 9 tests |
+| 9 | Impact & symbol packs — `documentation` stratum | ✅ | risk-neutral documentation stratum in impact + entity_detail; 10 tests |
+| 10 | Engine facade + MCP tools | ✅ | search_docs/get_documentation/docs_overview + capabilities gating; 11 tests |
+| 11 | CLI — `uci docs` | ✅ | documents/links/coverage/undocumented; 8 tests |
+| 12 | Dashboard — `/docs` page + API + nav | ✅ | docs_page + doc_detail_page, /docs + /api/docs + /api/doc, Understand nav; 8 tests |
+| 13 | Optional LLM pass — `doc_links` | ✅ | validated llm-suggested edges (conf 0.6), impact-neutral; 23 tests |
+| 14 | Eval — doc-linkage track | ✅ | docs_eval.py precision/recall gate; carddemo golden 1.00/1.00 PASS; smoke + gate tests |
+| 15 | Documentation updates | ✅ | documentation-ingestion.md guide + README/schema/mcp/dashboard/retrieval/enrichment/roadmap |
+| 16 | Final verification gate | 🚧 | full suite + evals + smoke |
 
 ---
 

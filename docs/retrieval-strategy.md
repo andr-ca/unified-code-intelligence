@@ -11,7 +11,8 @@ degrades gracefully when embeddings are unavailable.
 | **Symbol lookup** | exact/qualified-name match in metadata store | ✅ |
 | **Keyword / lexical** | entity names/docstrings + **FTS5 BM25 over chunk text** (token-overlap fallback) | ✅ |
 | **Semantic** | vector similarity over symbol-aware chunks | ❌ (optional) |
-| **Graph expansion** | 1..N-hop neighborhood over CALLS/IMPORTS/DEFINES/... | ✅ |
+| **Graph expansion** | 1..N-hop neighborhood over CALLS/IMPORTS/DEFINES/DESCRIBES/... | ✅ |
+| **Documentation** | `DOC_SECTION` chunks (FTS5 + vectors), weighted by `UCI_WEIGHT_DOC` (default 0.8; `0` = off). `DESCRIBES` bridges docs↔code in graph expansion. See [`documentation-ingestion.md`](documentation-ingestion.md). | ✅ |
 | **File proximity** | same file / same directory / same module | ✅ |
 | **Churn / recency** | git commit + churn signal | ✅ (if git present) |
 

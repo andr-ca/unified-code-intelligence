@@ -56,8 +56,10 @@ Fields required on every hit: `entity_id`, `path`, `start_line`/`end_line`, `rea
 | `find_config_dependencies` | `component_or_path` | CONFIGURES/CONTROLS keys & flags reaching the target |
 | `get_code_metrics` | — | Index-time codebase metrics: LOC per language (code/comment/blank), files, entry points, cross-file dependency counts, call-resolution distribution, fan-in hubs |
 | `list_index_gaps` | `kind?` | Missing artifacts referenced but not indexed, ranked by fan-in (the acquisition checklist) |
+| `search_docs` | `query`, `top_k?` | Documentation-only search: `DOC_SECTION` hits (READMEs, specs, guides) with path+line provenance and excerpts |
+| `get_documentation` | `symbol` | Doc sections that describe a symbol — confidence-labeled `DESCRIBES` links + excerpts (the design/spec context a safe change needs) |
 
-All twelve tools are wired. `find_data_lineage`, `find_config_dependencies`, `get_code_metrics`, and `list_index_gaps`
+All fourteen tools are wired. `find_data_lineage`, `find_config_dependencies`, `get_code_metrics`, and `list_index_gaps`
 reflect the facts present in the current index (config keys and gaps are populated in the MVP; SQL/data
 lineage grows in Phase 4), and `tools/list` advertises an `available` flag per tool so agents skip
 always-empty ones.

@@ -35,6 +35,10 @@ prompt instead of a broken/empty view.
   weights; when the optional `architecture` enrichment pass has run, a **System overview** card shows
   the LLM's prose narrative (clearly labeled LLM-generated, grounded in the facts below).
 - **Gaps** (known unknowns), **Onboarding** (dependency-ordered reading path).
+- **Docs** — the ingested documentation: a coverage stat, the documents table (path · sections ·
+  links, each opening a per-document view of its sections and their confidence-labeled `DESCRIBES`
+  links), and the undocumented-key-artifacts list. See
+  [`documentation-ingestion.md`](documentation-ingestion.md).
 - **Flows** — business-capability browser: each LLM-derived capability with the programs that
   implement it (+ their one-line summaries), the transaction codes / JCL jobs that **trigger** it,
   and the tables it **reads/writes**. Populated by the optional enrichment `capabilities` pass

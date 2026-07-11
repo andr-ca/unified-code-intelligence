@@ -25,8 +25,9 @@ cites a file and line range**. Embeddings then add fuzzy recall on top of a stru
 mainframe estate: **COBOL** (calls, copybooks, embedded SQL, VSAM files, paragraphs, CICS
 commands, literal dataflow with taint tracking) · **JCL + PROC** (jobs→programs, DD datasets) ·
 **CICS CSD** (transactions, files, mapsets) · **HLASM** (CSECT/EXTRN linkage) · **BMS** screens ·
-DCLGEN→table lineage. Scored continuously against real repos in [`evals/`](evals/README.md)
-(mainframe track ≈ 94/100).
+DCLGEN→table lineage · **documentation** (Markdown/RST/AsciiDoc/text/HTML, +PDF/DOCX via `.[docs]`)
+ingested as `DOC_SECTION`s and deterministically linked to the code they describe. Scored
+continuously against real repos in [`evals/`](evals/README.md) (mainframe track ≈ 94/100).
 
 ## Design principles
 
@@ -45,6 +46,7 @@ pip install -e .            # zero required dependencies (local-lite)
 # optional extras:
 pip install -e ".[embeddings]"   # real local ONNX embeddings (fastembed)
 pip install -e ".[api]"          # FastAPI variant (the default dashboard uses the stdlib server)
+pip install -e ".[docs]"         # PDF/DOCX documentation ingestion (pypdf + python-docx)
 pip install -e ".[all]"          # every optional adapter
 ```
 
@@ -74,10 +76,12 @@ uci impact PricingCalculator.calculate --path tests/fixtures/sample_repo
 
 Entities span code, tests, data, runtime/config, ownership, business/domain, and legacy tiers
 (`FUNCTION`, `CLASS`, `MODULE`, `TEST`, `DATABASE_TABLE`, `CONFIG_KEY`, `COMMIT`, `AUTHOR`,
-`BUSINESS_CAPABILITY`, `LEGACY_PROGRAM`, `COPYBOOK`, `JCL_JOB`, …). Relationships include `CALLS`,
+`BUSINESS_CAPABILITY`, `LEGACY_PROGRAM`, `COPYBOOK`, `JCL_JOB`, `DOC_SECTION`, …). Relationships include `CALLS`,
 `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, `DEFINES`, `TESTS`, `READS`/`WRITES`, `CONFIGURES`, `OWNS`,
-`CHANGED`, `MAPS_TO`, `CANDIDATE_FOR_MIGRATION`, … Full taxonomy:
-[`docs/canonical-schema.md`](docs/canonical-schema.md).
+`CHANGED`, `MAPS_TO`, `DESCRIBES` (doc→code), `CANDIDATE_FOR_MIGRATION`, … Full taxonomy:
+[`docs/canonical-schema.md`](docs/canonical-schema.md). Documentation ingestion (docs as first-class
+graph citizens, linked to the code they describe) is its own guide:
+[`docs/documentation-ingestion.md`](docs/documentation-ingestion.md).
 
 ## Retrieval
 
