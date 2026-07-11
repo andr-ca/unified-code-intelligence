@@ -29,7 +29,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 13 | Optional LLM pass — `doc_links` | ✅ | validated llm-suggested edges (conf 0.6), impact-neutral; 23 tests |
 | 14 | Eval — doc-linkage track | ✅ | docs_eval.py precision/recall gate; carddemo golden 1.00/1.00 PASS; smoke + gate tests |
 | 15 | Documentation updates | ✅ | documentation-ingestion.md guide + README/schema/mcp/dashboard/retrieval/enrichment/roadmap |
-| 16 | Final verification gate | 🚧 | full suite + evals + smoke |
+| 16 | Final verification gate | ✅ | full suite 333 pass (2 skip = PDF/DOCX libs); docs_eval 1.00/1.00 PASS; E2E smoke (docs/query/impact) green; new code ruff-clean |
 
 ---
 
@@ -37,3 +37,6 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 - **Task 0** — feature branch `feat/doc-ingestion` created off `main`. Baseline test run: 283 passed, 2 pre-existing `test_eval.py` failures (unrelated WIP). Proceeding TDD task-by-task.
 - **Tasks 1–6** — deterministic core landed: schema (DOC_SECTION/DESCRIBES), doc detection + config, PDF/DOCX converter, DocParser (structure + mentions), and the GraphBuilder honesty ladder (doc-path/heading/code-span/mention → DESCRIBES; documented-artifact gaps; impact-neutral). Full suite **319 passed**, 2 skipped (converter libs), 2 pre-existing eval failures. Each task committed on the branch.
+- **Tasks 7–14** — surfaces + eval: indexer/chunking (doc chunks → FTS/vectors), retrieval (doc weighting + DESCRIBES expansion), impact/symbol documentation stratum (risk-neutral), engine facade + `search_docs`/`get_documentation` MCP tools, `uci docs` CLI, `/docs` dashboard page, optional `doc_links` LLM pass (validated, llm-suggested, conf 0.6), and the `docs_eval.py` precision/recall track (CardDemo golden **1.00/1.00 PASS**).
+- **Task 15** — docs: new [`documentation-ingestion.md`](documentation-ingestion.md) guide + README / canonical-schema / mcp-tools / dashboard / retrieval-strategy / llm-enrichment / roadmap updates.
+- **Task 16** — final gate: full suite **333 passed**, 2 skipped (PDF/DOCX libraries not installed), 2 pre-existing `test_eval.py` harness failures (unrelated WIP, present at baseline). `docs_eval.py` PASS. E2E smoke on CardDemo: `uci docs` → README.md 30 sections / 155 links; `uci query` → doc-section hit labeled "Documentation…"; `uci impact COSGN00C` → documentation stratum present, risk unchanged (0.39). New doc code ruff-clean. Branch `feat/doc-ingestion` ready for review (merge decision left to the human per the plan).
