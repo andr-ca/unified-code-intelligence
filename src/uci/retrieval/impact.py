@@ -97,6 +97,7 @@ class ImpactAnalyzer:
             "tests": [h.to_dict() for h in tests],
             "config": [h.to_dict() for h in config],
             "data": [h.to_dict() for h in data],
+            "documentation": self._documentation(target),
             "overrides": [h.to_dict() for h in overrides],
             "churn": {
                 "commits": churn.get("commits", 0),
@@ -110,6 +111,32 @@ class ImpactAnalyzer:
                 f"retrieve_edit_context {target.qualified_name}",
             ],
         }
+
+    def _documentation(self, target: Entity) -> list[dict]:
+        """Doc sections describing the target (direct, or via its file/module). Never affects risk."""
+        out: list[dict] = []
+        seen: set[str] = set()
+        ids = [target.id]
+        for other in self.graph.entities(repo_id=target.provenance.repo_id):  # file/module twins
+            if other.provenance.path == target.provenance.path and \
+                    other.kind in (EntityType.FILE, EntityType.MODULE) and other.id != target.id:
+                ids.append(other.id)
+        for eid in ids:
+            for rel in self.graph.in_relationships(eid, [RelationType.DESCRIBES]):
+                sec = self.graph.get_entity(rel.src_id)
+                if sec is None or sec.id in seen or rel.attributes.get("resolution") == "missing":
+                    continue
+                seen.add(sec.id)
+                out.append({
+                    "entity_id": sec.id, "heading": sec.attributes.get("heading", sec.name),
+                    "path": sec.provenance.path, "start_line": sec.provenance.start_line,
+                    "end_line": sec.provenance.end_line,
+                    "resolution": rel.attributes.get("resolution", ""),
+                    "confidence": rel.provenance.confidence,
+                    "context": rel.attributes.get("context", ""),
+                })
+        out.sort(key=lambda d: -d["confidence"])
+        return out[:10]
 
     def _unresolved_for(self, target: Entity) -> list[dict]:
         """Unresolved call sites whose callee name matches the target (possible hidden callers)."""

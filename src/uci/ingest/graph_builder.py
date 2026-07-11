@@ -8,6 +8,7 @@ cross-file calls, imports, and inheritance against a global symbol index. This i
 from __future__ import annotations
 
 import builtins
+import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -35,6 +36,17 @@ _SYSTEM_UTILITIES = frozenset({
     "IKJEFT01", "IKJEFT1A", "IKJEFT1B", "SDSF", "FTP", "ADRDSSU", "GIMSMP",
 })
 
+# --- documentation mention resolution (the doc honesty ladder) ---
+_DOC_CONFIDENCE = {"path": 0.95, "heading": 0.95, "code-span": 0.9, "bare": 0.85}
+_DOC_RESOLUTION = {"path": "doc-path", "heading": "doc-heading",
+                   "code-span": "doc-code-span", "bare": "doc-mention"}
+_DOC_TARGET_KINDS = (
+    EntityType.LEGACY_PROGRAM, EntityType.JCL_JOB, EntityType.TRANSACTION_CODE,
+    EntityType.COPYBOOK, EntityType.SCREEN, EntityType.DATASET, EntityType.DATABASE_TABLE,
+    EntityType.FUNCTION, EntityType.CLASS, EntityType.MODULE,
+)
+_MEMBER_SHAPE = re.compile(r"^[A-Z@#$][A-Z0-9@#$]{2,7}$")
+
 _LINK_RELATIONS = {
     "runs": RelationType.RUNS,
     "invokes": RelationType.INVOKES,
@@ -44,6 +56,7 @@ _LINK_RELATIONS = {
     "depends_on": RelationType.DEPENDS_ON,  # HLASM EXTRN/WXTRN -> external symbol
     "uses": RelationType.USES,              # program -> BMS screen (SEND/RECEIVE MAP)
     "performs": RelationType.CALLS,         # paragraph -> paragraph (intra-program)
+    "describes": RelationType.DESCRIBES,    # doc section -> code artifact it documents
 }
 
 #: Link target kinds that are *materialized* (created on first reference) rather than resolved:
@@ -559,6 +572,7 @@ class GraphBuilder:
         "depends_on": (EntityType.LEGACY_PROGRAM,),
         "uses": (EntityType.LEGACY_PROGRAM,),
         "performs": (EntityType.PARAGRAPH, EntityType.LEGACY_PROGRAM),
+        "describes": (EntityType.DOC_SECTION,),
     }
 
     def _resolve_links(self, files: list[FileParse]) -> None:
@@ -576,6 +590,9 @@ class GraphBuilder:
                        or next((s for s in sources if s.kind in SYMBOL_KINDS), None)
                        or (sources[0] if sources else None))
                 if rtype is None or src is None:
+                    continue
+                if link.relation == "describes":
+                    self._resolve_doc_link(link, src, fp)
                     continue
                 prov = Provenance(self.repo_id, fp.path, link.start_line, link.start_line,
                                   f"{fp.language}_parser", 1.0)
@@ -610,6 +627,52 @@ class GraphBuilder:
                                            f"{link.target_name} (library member)", external=False)
                     self._add_rel(rtype, src.id, stub.id, prov,
                                   {"resolution": "missing", **link.attributes})
+
+    def _resolve_doc_link(self, link, src: Entity, fp: FileParse) -> None:
+        """Resolve one doc mention through the doc ladder. Unique real target -> DESCRIBES edge;
+        code-span member miss -> documented-artifact gap + stub edge; other misses -> dropped."""
+        match = link.attributes.get("match", "bare")
+        confidence = _DOC_CONFIDENCE.get(match, 0.8)
+        resolution = _DOC_RESOLUTION.get(match, "doc-mention")
+        prov = Provenance(self.repo_id, fp.path, link.start_line, link.start_line,
+                          f"{fp.language}_parser", confidence)
+        attrs = {"resolution": resolution, "match": match,
+                 "context": link.attributes.get("context", "")}
+        target = self._doc_target(link.target_name, match)
+        if target is not None:
+            if target.id != src.id:
+                self._add_rel(RelationType.DESCRIBES, src.id, target.id, prov, attrs)
+            return
+        name = link.target_name.upper()
+        if match == "code-span" and _MEMBER_SHAPE.match(name) and not self._is_external_name(name):
+            stub = self.report_gap("documented-artifact", name, EntityType.LEGACY_PROGRAM,
+                                   prov, "documented-artifact-missing",
+                                   f"{name} (referenced in documentation)", external=False)
+            self._add_rel(RelationType.DESCRIBES, src.id, stub.id, prov,
+                          {**attrs, "resolution": "missing"})
+
+    def _doc_target(self, name: str, match: str) -> Entity | None:
+        """Unique, real (non-stub) target for a doc mention, or None."""
+        if match == "path" or "/" in name:
+            return self.entities.get(entity_id(EntityType.FILE, self.repo_id, name, name))
+        if "." in name and not _MEMBER_SHAPE.match(name):   # dotted qualified name
+            cands = [e for e in self.by_qname.get(name, [])
+                     if not e.attributes.get("missing") and not e.attributes.get("external")]
+            pref = [e for e in cands if e.kind in SYMBOL_KINDS]
+            pool = pref or cands
+            return pool[0] if len(pool) == 1 else None
+        cands = [e for e in self.by_name.get(name.lower(), [])
+                 if e.kind in _DOC_TARGET_KINDS
+                 and not e.attributes.get("missing") and not e.attributes.get("external")]
+        if not cands or len(cands) > _FANOUT_CAP:
+            return None
+        for kind in _DOC_TARGET_KINDS:      # priority order, unique within the winning kind
+            of_kind = [e for e in cands if e.kind == kind]
+            if len(of_kind) == 1:
+                return of_kind[0]
+            if len(of_kind) > 1:
+                return None
+        return None
 
     def _resolve_member(
         self, name: str,

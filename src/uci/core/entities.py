@@ -74,6 +74,9 @@ class EntityType(str, Enum):
     TRANSACTION_CODE = "transaction_code"
     SCREEN = "screen"
 
+    # --- Documentation ---
+    DOC_SECTION = "doc_section"
+
     def __str__(self) -> str:  # pragma: no cover - trivial
         return self.value
 

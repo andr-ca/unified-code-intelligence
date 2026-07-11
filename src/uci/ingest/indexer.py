@@ -25,9 +25,10 @@ from ..embeddings.chunking import build_chunks, embed_chunks
 from ..parser.base import ParseResult
 from ..parser.registry import get_parser
 from . import git_meta
+from .docconvert import extract_text
 from .graph_builder import FileParse, GraphBuilder
 from .hashing import hash_text, read_text
-from .langdetect import is_code, module_qname
+from .langdetect import DOC_CONVERTER_LANGS, is_code, is_doc, module_qname
 from .metrics import MetricsCollector
 from .scanner import scan
 
@@ -44,6 +45,8 @@ class IndexStats:
     embedded: int = 0
     commits: int = 0
     gaps: int = 0
+    doc_sections: int = 0
+    doc_links: int = 0
     elapsed_ms: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -97,7 +100,10 @@ class Indexer:
         metrics = MetricsCollector()
 
         for sf in scanned:
-            source = read_text(sf.abs_path, self.config.max_file_bytes)
+            if sf.language in DOC_CONVERTER_LANGS:
+                source = extract_text(sf.abs_path, sf.language, self.config.doc_max_bytes)
+            else:
+                source = read_text(sf.abs_path, self.config.max_file_bytes)
             if source is None:
                 continue
             metrics.add_file(sf.rel_path, sf.language, source)
@@ -130,6 +136,8 @@ class Indexer:
         self.graph.add_relationships(relationships)
         stats.entities = len(entities)
         stats.relationships = len(relationships)
+        stats.doc_sections = sum(1 for e in entities if e.kind is EntityType.DOC_SECTION)
+        stats.doc_links = sum(1 for r in relationships if r.type is RelationType.DESCRIBES)
 
         # -- deleted files: purge chunks/vectors/records -------------------
         deleted = set(stored) - scanned_paths
@@ -150,13 +158,13 @@ class Indexer:
         prev_embed_meta = self.metadata.get_state(rid, "embedding_meta")
         if prev_embed_meta and prev_embed_meta != embed_meta:
             self.vectors.clear(rid)
-            changed |= {fp.path for fp in file_parses if is_code(fp.path)}
+            changed |= {fp.path for fp in file_parses if is_code(fp.path) or is_doc(fp.language)}
             existing_chunks.clear()
         self.metadata.set_state(rid, "embedding_meta", embed_meta)
 
         # -- chunks + embeddings (incremental) -----------------------------
         for fp in file_parses:
-            if not is_code(fp.path):
+            if not (is_code(fp.path) or is_doc(fp.language)):
                 continue
             path = fp.path
             if path not in changed and existing_chunks.get(path):

@@ -10,7 +10,7 @@ from ..config import Config
 from .hashing import read_head
 from .ignore import IgnoreMatcher
 from .langanalyze import analyze_language
-from .langdetect import is_text
+from .langdetect import DOC_CONVERTER_LANGS, detect_language, is_doc, is_text
 
 
 @dataclass
@@ -47,6 +47,19 @@ def _classify(config: Config, rel_dir: str, dirpath: str, fn: str,
         st = os.stat(abs_path)
     except OSError:
         return None
+    # Converter formats (PDF/DOCX) are binary: classify by extension, use the doc size cap, and
+    # skip when the doc pipeline is off or the converter library isn't installed.
+    ext_lang = detect_language(rp)
+    if ext_lang in DOC_CONVERTER_LANGS:
+        if not config.index_docs or st.st_size > config.doc_max_bytes:
+            return None
+        try:
+            from .docconvert import available
+        except ImportError:
+            return None
+        if not available(ext_lang):
+            return None
+        return ScannedFile(rp, abs_path, st.st_size, st.st_mtime, ext_lang)
     if st.st_size > config.max_file_bytes:
         return None
     # content-first: classify by the file's head (the extension is only a tiebreaker), so
@@ -57,6 +70,8 @@ def _classify(config: Config, rel_dir: str, dirpath: str, fn: str,
         if not (config.index_all_text and is_text(rp)):
             return None
         language = "text"
+    if is_doc(language) and not config.index_docs:
+        return None
     return ScannedFile(rp, abs_path, st.st_size, st.st_mtime, language)
 
 

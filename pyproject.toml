@@ -35,11 +35,14 @@ ollama = ["httpx>=0.27"]
 openai = ["openai>=1.0"]
 # Nicer API server (optional; the default `uci serve` uses the stdlib http.server).
 api = ["fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1"]
+# Documentation converters for the doc-ingestion pipeline (PDF/DOCX; docs/documentation-ingestion.md).
+docs = ["pypdf>=4.0", "python-docx>=1.1"]
 dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4", "mypy>=1.8"]
 all = [
     "fastembed>=0.3", "qdrant-client>=1.7", "lancedb>=0.6", "neo4j>=5.0",
     "psycopg[binary]>=3.1", "httpx>=0.27", "openai>=1.0",
     "fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1",
+    "pypdf>=4.0", "python-docx>=1.1",
 ]
 
 [project.scripts]

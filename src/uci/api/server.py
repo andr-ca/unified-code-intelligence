@@ -122,6 +122,10 @@ def make_handler(target, jobs: JobRunner | None = None):
                 return self._json(engine.flows())
             if path == "/api/understand":
                 return self._json(engine.understand())
+            if path == "/api/docs":
+                return self._json(engine.docs_overview())
+            if path == "/api/doc":
+                return self._json(engine.doc_detail(q.get("path", "")))
             if path == "/api/search":
                 return self._json(engine.search(q.get("q", ""), top_k=int(q.get("k", 10))))
             if path == "/api/symbol":
@@ -191,6 +195,11 @@ def make_handler(target, jobs: JobRunner | None = None):
                 return self._html(views.flows_page(engine.flows()))
             if path == "/understand":
                 return self._html(views.understand_page(engine.understand()))
+            if path == "/docs":
+                doc_path = q.get("path")
+                if doc_path:
+                    return self._html(views.doc_detail_page(engine.doc_detail(doc_path)))
+                return self._html(views.docs_page(engine.docs_overview()))
             if path == "/gaps":
                 return self._html(views.gaps_page(engine.gaps(q.get("kind"))))
             if path == "/db":

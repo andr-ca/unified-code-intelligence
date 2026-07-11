@@ -21,6 +21,7 @@ from .types import RetrievalHit
 
 _REASONS = {
     "symbol": "Name matches the query symbol",
+    "doc": "Documentation describes this / matches the query",
     "keyword": "Lexical/keyword match on code or docs",
     "semantic": "Semantically similar to the query",
     "lexical-hash": "Lexical (hash) similarity to the query",
@@ -28,7 +29,7 @@ _REASONS = {
     "proximity": "Defined near a top match (same file)",
     "churn": "Recently changed (elevated risk)",
 }
-_SIGNAL_PRIORITY = ["symbol", "semantic", "lexical-hash", "keyword", "graph", "proximity", "churn"]
+_SIGNAL_PRIORITY = ["symbol", "doc", "semantic", "lexical-hash", "keyword", "graph", "proximity", "churn"]
 
 
 class HybridRetriever:
@@ -71,6 +72,7 @@ class HybridRetriever:
         weights = self._weights(query)
         scores, membership = reciprocal_rank_fusion(ranked, weights, self.config.rrf_k)
         scores = self._apply_churn(scores, membership, weights)
+        self._apply_doc_weight(scores, membership)
 
         hits: list[RetrievalHit] = []
         kind_set = set(kinds) if kinds else None
@@ -159,7 +161,7 @@ class HybridRetriever:
     def _graph_signal(self, seeds: list[str]) -> tuple[list[str], dict[str, list[str]]]:
         ordered: list[str] = []
         paths: dict[str, list[str]] = {}
-        rtypes = list(DEPENDENCY_LIKE | {RelationType.DEFINES})
+        rtypes = list(DEPENDENCY_LIKE | {RelationType.DEFINES, RelationType.DESCRIBES})
         for seed in seeds:
             seed_entity = self.graph.get_entity(seed)
             if seed_entity is None:
@@ -207,6 +209,21 @@ class HybridRetriever:
                 if "churn" not in membership[entity_id]:
                     membership[entity_id].append("churn")
         return scores
+
+    def _apply_doc_weight(self, scores: dict[str, float], membership: dict[str, list[str]]) -> None:
+        """Post-fusion multiplier on DOC_SECTION hits (UCI_WEIGHT_DOC) so docs enrich but never
+        swamp code; weight_doc <= 0 removes doc hits entirely. Labels the hit with the 'doc' signal."""
+        for eid in list(scores):
+            entity = self.graph.get_entity(eid)
+            if entity is None or entity.kind is not EntityType.DOC_SECTION:
+                continue
+            if self.config.weight_doc <= 0:
+                scores.pop(eid)
+                continue
+            scores[eid] *= self.config.weight_doc
+            membership.setdefault(eid, [])
+            if "doc" not in membership[eid]:
+                membership[eid].append("doc")
 
     # -- helpers ------------------------------------------------------------
     def _weights(self, query: str) -> dict[str, float]:

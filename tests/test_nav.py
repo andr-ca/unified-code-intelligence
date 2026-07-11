@@ -7,7 +7,7 @@ import pytest
 from uci.api import views
 
 ALL_ROUTES = [
-    "/", "/understand", "/architecture", "/flows", "/onboarding",
+    "/", "/understand", "/architecture", "/flows", "/onboarding", "/docs",
     "/search", "/graph", "/metrics", "/gaps", "/build", "/enrich", "/db", "/projects", "/config",
 ]
 

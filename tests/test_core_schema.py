@@ -96,3 +96,44 @@ def test_identifier_helpers():
     assert looks_like_identifier("place_order")
     assert looks_like_identifier("Foo.bar")
     assert not looks_like_identifier("where is the pricing logic")
+
+
+def test_doc_section_kind_exists_and_is_not_a_symbol():
+    from uci.core.entities import SYMBOL_KINDS, EntityType
+
+    assert EntityType.DOC_SECTION.value == "doc_section"
+    # sections must not win resolve_symbol over the code artifact they describe
+    assert EntityType.DOC_SECTION not in SYMBOL_KINDS
+
+
+def test_describes_relation_exists_and_never_drives_impact():
+    from uci.core.relationships import DEPENDENCY_LIKE, RelationType
+
+    assert RelationType.DESCRIBES.value == "describes"
+    # a README mentioning a program must not inflate its blast radius
+    assert RelationType.DESCRIBES not in DEPENDENCY_LIKE
+
+
+def test_describes_relation_spec_allows_doc_sources():
+    from uci.core.entities import EntityType
+    from uci.core.relationships import RelationType
+    from uci.core.schema import RELATION_SPECS, validate_relationship
+
+    spec = RELATION_SPECS[RelationType.DESCRIBES]
+    assert spec.directed
+    assert EntityType.DOC_SECTION in spec.sources
+    assert not spec.targets  # any target kind
+    assert validate_relationship(
+        RelationType.DESCRIBES, EntityType.DOC_SECTION, EntityType.LEGACY_PROGRAM
+    ) == []
+
+
+def test_doc_aliases_normalize():
+    from uci.core.entities import EntityType
+    from uci.core.relationships import RelationType
+    from uci.core.schema import normalize_entity, normalize_relation
+
+    assert normalize_entity("doc") is EntityType.DOC_SECTION
+    assert normalize_entity("doc_section") is EntityType.DOC_SECTION
+    assert normalize_relation("documents") is RelationType.DESCRIBES
+    assert normalize_relation("describes") is RelationType.DESCRIBES

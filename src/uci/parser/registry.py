@@ -7,6 +7,7 @@ from .bms_parser import BmsParser
 from .cobol_parser import CobolParser
 from .config_parser import ConfigParser
 from .csd_parser import CsdParser
+from .doc_parser import DocParser
 from .hlasm_parser import HlasmParser
 from .javascript_parser import JavaScriptParser
 from .jcl_parser import JclParser
@@ -36,6 +37,12 @@ register(JclParser())
 register(CsdParser())
 register(HlasmParser())
 register(BmsParser())
+
+# documentation dialects share one parser class, registered per language id
+for _lang in ("markdown", "rst", "asciidoc", "doctext", "htmldoc", "pdf", "docx"):
+    _p = DocParser()
+    _p.language = _lang
+    register(_p)
 
 
 __all__ = ["register", "get_parser", "supported_languages", "ParseResult", "LanguageParser"]

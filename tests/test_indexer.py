@@ -75,3 +75,27 @@ def test_deleted_file_removed_from_graph(engine, sample_repo: Path):
     (sample_repo / "web" / "app.js").unlink()
     engine.index(full=False)
     assert not engine.graph.find_by_name("computeTotal", exact=True)
+
+
+def test_doc_files_are_chunked_and_secret_scrubbed(tmp_path):
+    from uci import Config, Engine
+
+    (tmp_path / "README.md").write_text(
+        "# Guide\n\nSet api_key = 'sk-supersecret1234567890' to connect.\n")
+    with Engine(Config.from_env(tmp_path)) as eng:
+        stats = eng.index(full=True)
+        assert stats.chunks >= 1
+        chunks = list(eng.metadata.iter_chunks(stats.repo_id))
+        texts = [c["text"] for c in chunks if c["path"] == "README.md"]
+        assert texts and all("supersecret" not in t for t in texts)
+        assert any(c["kind"] == "doc_section" for c in chunks)
+        assert stats.doc_sections >= 1
+
+
+def test_index_docs_off_skips_docs(tmp_path):
+    from uci import Config, Engine
+
+    (tmp_path / "README.md").write_text("# Guide\n\nhello\n")
+    with Engine(Config.from_env(tmp_path, {"index_docs": False})) as eng:
+        stats = eng.index(full=True)
+        assert all(c["path"] != "README.md" for c in eng.metadata.iter_chunks(stats.repo_id))

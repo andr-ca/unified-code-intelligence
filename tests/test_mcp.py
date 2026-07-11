@@ -76,3 +76,23 @@ def test_tools_list_annotates_availability(indexed_engine):
     assert tools["find_config_dependencies"]["available"] is True
     assert tools["find_data_lineage"]["available"] is False
     assert tools["search_code"]["available"] is True
+
+
+def test_docs_tools_listed_and_dispatch(tmp_path):
+    from uci import Config, Engine
+    from uci.mcp.tools import dispatch, list_tools
+
+    (tmp_path / "cbl").mkdir()
+    (tmp_path / "cbl" / "COSGN00C.cbl").write_text(
+        "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. COSGN00C.\n"
+        "       PROCEDURE DIVISION.\n           MOVE 1 TO X.\n")
+    (tmp_path / "README.md").write_text(
+        "# App\n\n## Signon — COSGN00C\n\n`COSGN00C` handles signon.\n")
+    with Engine(Config.from_env(tmp_path)) as eng:
+        eng.index(full=True)
+        names = {t["name"] for t in list_tools(eng)}
+        assert {"search_docs", "get_documentation"} <= names
+        res = dispatch(eng, "get_documentation", {"symbol": "COSGN00C"})
+        assert res["documentation"] and res["documentation"][0]["path"] == "README.md"
+        res = dispatch(eng, "search_docs", {"query": "signon"})
+        assert res["results"] and all(h["kind"] == "doc_section" for h in res["results"])

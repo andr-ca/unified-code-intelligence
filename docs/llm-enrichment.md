@@ -59,6 +59,12 @@ per-run log to `evals/reports/llm-logs/llm-eval-<run>.jsonl`.
 `briefing` and `ask` are on-demand surfaces, not index passes. Pick a subset with repeated
 `--pass`, e.g. `uci enrich --pass summaries --pass capabilities`.
 
+> **`doc_links`** (on-demand, opt-in via `--pass doc_links`): links *unlinked* `DOC_SECTION`s to the
+> code they describe when the deterministic ladder couldn't (e.g. prose that never names the
+> program). Names are validated against the index; edges are written `resolution="llm-suggested"`,
+> `confidence=0.6` — outside `RESOLVED_LEVELS`, so they never touch impact. See
+> [`documentation-ingestion.md`](documentation-ingestion.md) §7.
+
 ### Pass 1 — `summaries` (retrieval semantics; the measured win)
 - **For**: `LEGACY_PROGRAM`, `COPYBOOK`, `JCL_JOB`, `MODULE` (code files), `TRANSACTION_CODE`.
 - **Prompt**: entity name/kind/language + structural facts (what it calls, what calls it, tables/

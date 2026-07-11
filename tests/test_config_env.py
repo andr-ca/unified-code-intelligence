@@ -87,3 +87,18 @@ def test_real_env_var_wins_over_uci_env(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("UCI_LLM_PROTOCOL", "anthropic")
     cfg = Config.from_env(repo)
     assert cfg.llm_protocol == "anthropic"
+
+
+def test_index_docs_default_on_and_disable(tmp_path: Path, monkeypatch):
+    from uci.config import Config
+
+    monkeypatch.delenv("UCI_INDEX_DOCS", raising=False)
+    assert Config.from_env(tmp_path).index_docs is True
+    monkeypatch.setenv("UCI_INDEX_DOCS", "0")
+    assert Config.from_env(tmp_path).index_docs is False
+
+
+def test_doc_weight_and_max_bytes_defaults(tmp_path: Path):
+    cfg = Config.from_env(tmp_path)
+    assert cfg.weight_doc == 0.8
+    assert cfg.doc_max_bytes == 10_000_000

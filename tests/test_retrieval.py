@@ -47,3 +47,47 @@ def test_symbol_query_finds_exact_symbol(indexed_engine):
 def test_search_kind_filter(indexed_engine):
     result = indexed_engine.search("calculate", top_k=10, kinds=[EntityType.CLASS])
     assert all(r["kind"] == "class" for r in result["results"])
+
+
+def _doc_repo_engine(tmp_path, overrides=None):
+    from uci import Config, Engine
+
+    (tmp_path / "cbl").mkdir()
+    (tmp_path / "cbl" / "COSGN00C.cbl").write_text(
+        "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. COSGN00C.\n"
+        "       PROCEDURE DIVISION.\n           MOVE 1 TO X.\n")
+    (tmp_path / "README.md").write_text(
+        "# App\n\n## Signon — COSGN00C\n\n`COSGN00C` validates users at signon time.\n")
+    eng = Engine(Config.from_env(tmp_path, overrides or {}))
+    eng.index(full=True)
+    return eng
+
+
+def test_doc_hits_labeled_and_weighted(tmp_path):
+    eng = _doc_repo_engine(tmp_path)
+    try:
+        hits = eng.search("signon validates users")["results"]
+        doc_hits = [h for h in hits if h["kind"] == "doc_section"]
+        assert doc_hits, "doc sections must be searchable"
+        assert any("Documentation" in h.get("reason", "") for h in doc_hits)
+    finally:
+        eng.close()
+
+
+def test_doc_weight_zero_suppresses_docs(tmp_path):
+    eng = _doc_repo_engine(tmp_path, overrides={"weight_doc": 0.0})
+    try:
+        hits = eng.search("signon validates users")["results"]
+        assert all(h["kind"] != "doc_section" for h in hits)
+    finally:
+        eng.close()
+
+
+def test_graph_expansion_bridges_docs_and_code(tmp_path):
+    eng = _doc_repo_engine(tmp_path)
+    try:
+        hits = eng.search("Signon — COSGN00C")["results"]
+        kinds = {h["kind"] for h in hits}
+        assert "legacy_program" in kinds        # DESCRIBES expansion / symbol match pulls the program
+    finally:
+        eng.close()

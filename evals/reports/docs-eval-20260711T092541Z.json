@@ -1,0 +1,10 @@
+{
+  "name": "carddemo-doc-links",
+  "precision": 1.0,
+  "recall": 1.0,
+  "gate": "PASS",
+  "found": 18,
+  "expected": 18,
+  "misses": [],
+  "forbidden_hits": []
+}

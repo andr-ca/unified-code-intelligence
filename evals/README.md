@@ -13,6 +13,7 @@ evals/
   tools/           mine_ground_truth.py — independent reference extractor (never imports uci.*)
   run_eval.py      runner + scorer (implements docs/scoring.md)
   llm_eval.py      LLM model benchmark for enrichment tasks (docs/llm-eval.md; opt-in, needs a provider)
+  docs_eval.py     documentation→code linkage: precision/recall gate (docs/documentation-ingestion.md)
   reports/         run reports + baseline.json (the regression gate)
 ```
 

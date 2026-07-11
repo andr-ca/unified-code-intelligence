@@ -271,6 +271,30 @@ def cmd_gaps(args) -> int:
     return 0
 
 
+def cmd_docs(args) -> int:
+    with _engine(args) as engine:
+        _ensure_indexed(engine)
+        data = engine.docs_overview()
+        if args.json:
+            print(json.dumps(data, indent=2))
+            return 0
+        docs = data["documents"]
+        cov = data["coverage"]
+        if not docs:
+            print("No documentation indexed.")
+            return 0
+        print(f"{len(docs)} document(s):")
+        for d in docs:
+            print(f"  {d['path']}  ·  {d['sections']} section(s)  ·  {d['links']} link(s)")
+        print(f"\ncoverage: {cov['described']}/{cov['total']} key artifacts documented ({cov['pct']}%)")
+        undoc = data["undocumented"]
+        if undoc:
+            print(f"\nundocumented ({len(undoc)}):")
+            for u in undoc[:20]:
+                print(f"  [{u['kind']}] {u['name']}  {u['path']}")
+    return 0
+
+
 def cmd_metrics(args) -> int:
     with _engine(args) as engine:
         _ensure_indexed(engine)
@@ -522,6 +546,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("gaps", help="list missing artifacts referenced but not indexed")
     sp.add_argument("--kind"); sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
     sp.set_defaults(func=cmd_gaps)
+
+    sp = sub.add_parser("docs", help="documentation coverage — documents, links, undocumented artifacts")
+    sp.add_argument("--json", action="store_true"); sp.add_argument("--path")
+    sp.set_defaults(func=cmd_docs)
 
     sp = sub.add_parser("serve", help="run the web dashboard + REST API")
     sp.add_argument("--host", default="127.0.0.1"); sp.add_argument("--port", type=int, default=8765)
