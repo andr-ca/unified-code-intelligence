@@ -21,9 +21,34 @@ _TAG = re.compile(r"<[^>]+>")
 _PAGE = re.compile(r"^\f\[uci-page (\d+)\]$")
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
+_CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
+_MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
+_PATHISH = re.compile(r"^[\w./-]+\.[A-Za-z0-9]{1,8}$")
+#: mainframe member shape: 3-8 chars, starts alphabetic/national, uppercase
+_MEMBER = re.compile(r"\b([A-Z@#$][A-Z0-9@#$]{2,7})\b")
+#: dotted qualified name (modern code) inside a code span
+_QNAME = re.compile(r"^[A-Za-z_][\w]*(\.[\w]+)+$")
+_FENCE = re.compile(r"^(```|~~~)")
+
+#: ALL-CAPS prose words that are never code artifacts (platform nouns, English)
+_MENTION_STOPLIST = frozenset({
+    "COBOL", "CICS", "JCL", "VSAM", "HLASM", "BMS", "RACF", "IMS", "MQ", "DB2", "SQL",
+    "AWS", "API", "HTTP", "HTTPS", "JSON", "YAML", "XML", "CSV", "PDF", "README",
+    "TODO", "NOTE", "WARNING", "IMPORTANT", "LICENSE", "CHANGELOG", "AND", "THE",
+    "FOR", "NOT", "ALL", "ANY", "NEW", "OLD", "SET", "GET", "PUT", "RUN", "USE",
+    "GDG", "PDS", "KSDS", "ESDS", "RRDS", "COMP", "FTP", "TXT",
+})
+
 
 def _slug(text: str) -> str:
     return _SLUG_STRIP.sub("-", text.lower()).strip("-")[:60] or "section"
+
+
+def _section_at(sections: list[ParsedSymbol], line: int) -> ParsedSymbol | None:
+    for sec in sections:
+        if sec.start_line <= line <= sec.end_line:
+            return sec
+    return sections[0] if sections else None
 
 
 @dataclass
@@ -115,9 +140,54 @@ class DocParser(LanguageParser):
             ))
         return out
 
-    # -- mentions (Task 5) ----------------------------------------------------
+    # -- mentions -----------------------------------------------------------
     def _extract_mentions(self, lines: list[str], sections: list[ParsedSymbol]) -> list[ParsedLink]:
-        return []
+        links: list[ParsedLink] = []
+        seen: set[tuple[str, str, str]] = set()
+        in_fence = False
+
+        def add(section: ParsedSymbol | None, target: str, match: str, line_no: int, context: str):
+            if section is None or not target:
+                return
+            key = (section.qualified_name, target, match)
+            if key in seen:
+                return
+            seen.add(key)
+            links.append(ParsedLink(
+                relation="describes", src_qname=section.qualified_name,
+                target_name=target, target_kind=EntityType.LEGACY_PROGRAM.value,
+                start_line=line_no,
+                attributes={"match": match, "context": context.strip()[:160]},
+            ))
+
+        for i, raw in enumerate(lines, start=1):
+            if _FENCE.match(raw.strip()):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            section = _section_at(sections, i)
+            heading_line = section is not None and i == section.start_line
+
+            for m in _MD_LINK.finditer(raw):
+                target = m.group(1).split("#", 1)[0].lstrip("./")
+                if target and _PATHISH.match(target):
+                    add(section, target, "path", i, raw)
+            for m in _CODE_SPAN.finditer(raw):
+                span = m.group(1).strip()
+                if "/" in span and _PATHISH.match(span):
+                    add(section, span.lstrip("./"), "path", i, raw)
+                elif _QNAME.match(span):
+                    add(section, span, "code-span", i, raw)
+                elif _MEMBER.fullmatch(span) and span not in _MENTION_STOPLIST:
+                    add(section, span, "code-span", i, raw)
+            plain = _CODE_SPAN.sub(" ", raw)  # bare tokens: outside code spans only
+            for m in _MEMBER.finditer(plain):
+                token = m.group(1)
+                if token in _MENTION_STOPLIST:
+                    continue
+                add(section, token, "heading" if heading_line else "bare", i, raw)
+        return links
 
 
 __all__ = ["DocParser"]

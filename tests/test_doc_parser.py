@@ -43,3 +43,42 @@ def test_headingless_doc_gets_one_whole_file_section():
     result = _parse("just prose\nmore prose\n", path="NOTES.txt", lang="doctext", qname="NOTES")
     secs = [s for s in result.symbols if s.kind is EntityType.DOC_SECTION]
     assert len(secs) == 1 and secs[0].name == "NOTES" and secs[0].start_line == 1
+
+
+def _mentions(result):
+    return {(link.src_qname, link.target_name, link.attributes["match"]) for link in result.links}
+
+
+def test_code_span_and_path_and_bare_mentions():
+    result = _parse(MD)
+    m = _mentions(result)
+    assert ("README.signon-cosgn00c", "COSGN00C", "code-span") in m
+    assert ("README.signon-cosgn00c", "app/cbl/COSGN00C.cbl", "path") in m
+    assert ("README.signon-cosgn00c", "CC00", "bare") in m
+    assert ("README.signon-cosgn00c", "USRSEC", "bare") in m
+
+
+def test_heading_mentions_flagged():
+    result = _parse(MD)
+    m = _mentions(result)
+    assert ("README.signon-cosgn00c", "COSGN00C", "heading") in m
+
+
+def test_stoplist_and_short_tokens_skipped():
+    text = "# T\n\nCOBOL and CICS and JCL run IT with `SORT`.\n"
+    result = _parse(text)
+    names = {link.target_name for link in result.links}
+    assert "COBOL" not in names and "CICS" not in names and "IT" not in names
+
+
+def test_qualified_names_and_fenced_blocks():
+    text = (
+        "# T\n\nUse `pricing.calculator.PricingCalculator.calculate` here.\n"
+        "```cobol\nCALL 'CBTRN01C'\nMOVE X TO Y\n```\n"
+    )
+    result = _parse(text)
+    m = _mentions(result)
+    assert ("README.t", "pricing.calculator.PricingCalculator.calculate", "code-span") in m
+    # fenced code blocks are quoted code, not prose mentions: no 'bare' links from inside
+    assert not any(link.attributes["match"] == "bare" and link.target_name in ("CBTRN01C", "MOVE", "CALL")
+                   for link in result.links)
