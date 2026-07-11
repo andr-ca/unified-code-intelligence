@@ -21,7 +21,7 @@ DEFAULT_IGNORE_GLOBS: tuple[str, ...] = (
     "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache",
     ".ruff_cache", "dist", "build", "target", ".next", ".nuxt", "out", "coverage",
     ".idea", ".vscode", "*.min.js", "*.lock", "*.png", "*.jpg", "*.jpeg", "*.gif",
-    "*.pdf", "*.zip", "*.tar", "*.gz", "*.so", "*.dylib", "*.dll", "*.class",
+    "*.zip", "*.tar", "*.gz", "*.so", "*.dylib", "*.dll", "*.class",
     "*.pyc", "*.o", "*.a", "*.bin", "*.wasm",
 )
 
@@ -97,6 +97,11 @@ class Config:
     ignore_globs: tuple[str, ...] = DEFAULT_IGNORE_GLOBS
     max_file_bytes: int = 1_500_000
     index_all_text: bool = False
+
+    # documentation pipeline (docs/documentation-ingestion.md)
+    index_docs: bool = True
+    weight_doc: float = 0.8
+    doc_max_bytes: int = 10_000_000
 
     # chunking
     max_chunk_lines: int = 200
@@ -188,6 +193,10 @@ class Config:
         )
         embedding_model, embedding_dim = _default_model_for(embedding_provider, env)
 
+        index_docs = str(env.get("UCI_INDEX_DOCS", "1")).lower() in _TRUE
+        # PDFs/DOCX are only ignored when the doc pipeline is off (else the converter reads them)
+        ignore_globs = DEFAULT_IGNORE_GLOBS if index_docs else DEFAULT_IGNORE_GLOBS + ("*.pdf", "*.docx")
+
         cfg = cls(
             repo_path=repo,
             profile=profile,
@@ -201,6 +210,10 @@ class Config:
             embedding_dim=int(pick("embedding_dim", "UCI_EMBEDDING_DIM", embedding_dim)),
             use_gitignore=str(env.get("UCI_USE_GITIGNORE", "1")).lower() in _TRUE,
             index_all_text=str(env.get("UCI_INDEX_ALL_TEXT", "0")).lower() in _TRUE,
+            index_docs=index_docs,
+            weight_doc=_num(env, "UCI_WEIGHT_DOC", 0.8),
+            doc_max_bytes=int(_num(env, "UCI_DOC_MAX_BYTES", 10_000_000)),
+            ignore_globs=ignore_globs,
             gap_external_prefixes=_gap_prefixes(env),
             weight_symbol=_num(env, "UCI_WEIGHT_SYMBOL", 1.4),
             weight_keyword=_num(env, "UCI_WEIGHT_KEYWORD", 1.0),

@@ -77,9 +77,10 @@ def test_extension_agrees_is_kept():
 
 
 def test_prose_with_incidental_marker_is_not_code():
-    # a single incidental keyword in prose must not reclassify a document as code
+    # a single incidental keyword in prose must not reclassify a document as code — a .md file
+    # with a lone COBOL phrase stays a doc (markdown), never 'cobol'
     md = "# Design notes\n\nThis program has an IDENTIFICATION DIVISION and some tables.\n"
-    assert analyze_language("notes.md", md) is None
+    assert analyze_language("notes.md", md) == "markdown"
 
 
 def test_config_stays_extension_led():
@@ -105,4 +106,38 @@ def test_scanner_rescues_extensionless_cobol(tmp_path: Path):
     scanned = {sf.rel_path: sf.language for sf in scan(Config.from_env(repo))}
     assert scanned.get("CBTRN02C") == "cobol"   # extensionless member rescued
     assert scanned.get("run.jcl") == "jcl"       # normal path unaffected
-    assert "notes.md" not in scanned             # prose neither misclassified nor indexed
+    assert scanned.get("notes.md") == "markdown"  # docs are now first-class (index_docs on)
+
+
+def test_doc_extensions_detected():
+    from uci.ingest.langdetect import detect_language
+
+    assert detect_language("README.md") == "markdown"
+    assert detect_language("docs/guide.rst") == "rst"
+    assert detect_language("notes/design.adoc") == "asciidoc"
+    assert detect_language("CHANGES.txt") == "doctext"
+    assert detect_language("site/index.html") == "htmldoc"
+    assert detect_language("specs/layout.pdf") == "pdf"
+    assert detect_language("specs/req.docx") == "docx"
+
+
+def test_doc_filenames_without_extension_detected():
+    from uci.ingest.langdetect import detect_language
+
+    assert detect_language("README") == "doctext"
+    assert detect_language("sub/CHANGELOG") == "doctext"
+    assert detect_language("LICENSE") is None  # licenses are noise, not docs
+
+
+def test_is_doc_classifier():
+    from uci.ingest.langdetect import is_doc
+
+    assert is_doc("markdown") and is_doc("pdf") and is_doc("doctext")
+    assert not is_doc("python") and not is_doc("config") and not is_doc("text")
+
+
+def test_doc_module_qname_strips_extension():
+    from uci.ingest.langdetect import module_qname
+
+    assert module_qname("README.md") == "README"
+    assert module_qname("docs/index.md") == "docs.index"

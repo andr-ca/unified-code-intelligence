@@ -22,8 +22,27 @@ _CODE_EXTS = frozenset({
 # mainframe members live in flat libraries: the member name IS the module name
 _MAINFRAME_EXTS = (".cbl", ".cob", ".cpy", ".jcl", ".prc", ".proc", ".csd", ".asm", ".hlasm")
 
-# extensions we treat as plain text when index_all_text is enabled
-_TEXT_EXTS = frozenset({".md", ".rst", ".txt", ".sql", ".sh", ".html", ".css"})
+# extensions we treat as plain text when index_all_text is enabled (docs own .md/.rst/.txt/.html)
+_TEXT_EXTS = frozenset({".sql", ".sh", ".css"})
+
+# --- documentation formats (docs/documentation-ingestion.md) ---
+_DOC_EXT_LANGUAGE: dict[str, str] = {
+    ".md": "markdown", ".markdown": "markdown",
+    ".rst": "rst",
+    ".adoc": "asciidoc", ".asciidoc": "asciidoc",
+    ".txt": "doctext",
+    ".html": "htmldoc", ".htm": "htmldoc",
+    ".pdf": "pdf", ".docx": "docx",
+}
+#: extensionless conventional doc filenames (basename match, case-sensitive by convention)
+_DOC_FILENAMES = frozenset({"README", "CHANGELOG", "CONTRIBUTING", "INSTALL", "NOTICE", "TODO"})
+#: doc languages that require a converter (binary source)
+DOC_CONVERTER_LANGS = frozenset({"pdf", "docx"})
+_DOC_LANGS = frozenset(_DOC_EXT_LANGUAGE.values())
+
+
+def is_doc(language: str | None) -> bool:
+    return language in _DOC_LANGS
 
 
 def detect_language(path: str) -> str | None:
@@ -33,6 +52,12 @@ def detect_language(path: str) -> str | None:
     for ext, lang in _EXT_LANGUAGE.items():
         if lower.endswith(ext):
             return lang
+    for ext, lang in _DOC_EXT_LANGUAGE.items():
+        if lower.endswith(ext):
+            return lang
+    basename = path.replace("\\", "/").rsplit("/", 1)[-1]
+    if basename in _DOC_FILENAMES:
+        return "doctext"
     return None
 
 
@@ -59,7 +84,9 @@ def module_qname(rel_path: str) -> str:
         if lower.endswith(ext):
             return p.rsplit("/", 1)[-1][: -len(ext)].upper()
     for ext in (".pyi", ".py", ".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs",
-                ".yaml", ".yml", ".toml", ".json", ".ini", ".cfg", ".env", ".properties"):
+                ".yaml", ".yml", ".toml", ".json", ".ini", ".cfg", ".env", ".properties",
+                ".markdown", ".md", ".rst", ".adoc", ".asciidoc", ".txt", ".html", ".htm",
+                ".pdf", ".docx"):
         if lower.endswith(ext):
             p = p[: -len(ext)]
             break
@@ -69,4 +96,4 @@ def module_qname(rel_path: str) -> str:
     return ".".join(parts) if parts else (rel_path or "root")
 
 
-__all__ = ["detect_language", "is_code", "is_text", "module_qname"]
+__all__ = ["detect_language", "is_code", "is_text", "is_doc", "module_qname", "DOC_CONVERTER_LANGS"]
