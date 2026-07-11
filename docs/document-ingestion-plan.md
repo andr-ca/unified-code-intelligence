@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Follow superpowers:test-driven-development within each task and superpowers:verification-before-completion before claiming any task done.
 
+> **Status (2026-07-11):** Plan reviewed and approved. Tasks 0–5 are implemented and committed on `feat/doc-ingestion` (`7ad7ff4`…`5b8f068`), all their tests green (43 passed, 2 optional-dep skips). **Resume at Task 6.** Known pre-existing failures unrelated to this feature: `tests/test_eval.py::test_eval_meets_thresholds` and `::test_eval_per_resolution_level_is_precise` (`KeyError: 'callgraph'`) fail identically at pre-doc commit `9e246a2` — do not attempt to fix them inside this feature branch.
+
 **Goal:** Ingest repository documentation (Markdown/RST/AsciiDoc/plain text/HTML, plus PDF/DOCX via an optional extra) into the canonical graph as first-class `DOC_SECTION` entities, deterministically link doc sections to the code entities they describe via a new `DESCRIBES` relationship, and surface documentation in hybrid retrieval, impact/symbol packs, the dashboard, and MCP tools — with an optional LLM linking pass and a scored eval.
 
 **Architecture:** Documentation becomes another language family in the existing pipeline (scan → parse → normalize → graph → chunk → embed). A registered `DocParser` emits sections as `ParsedSymbol(kind=DOC_SECTION)` and mentions as `ParsedLink(relation="describes")`; the `GraphBuilder` resolves mentions through a confidence-labeled ladder mirroring call resolution, feeding the existing gap registry for documented-but-missing artifacts. `DESCRIBES` is deliberately **excluded** from `DEPENDENCY_LIKE` (docs must never inflate impact analysis) but **included** in retrieval graph-expansion (a doc hit pulls its programs; a program hit pulls its docs).
@@ -79,13 +81,13 @@ Guardrails (all rungs): unique match required (fan-out cap = existing `_FANOUT_C
 
 ## Task 0: Branch + baseline snapshot
 
-- [ ] **Step 0.1:** Create a feature branch (work never lands directly on `main`):
+- [x] **Step 0.1:** Create a feature branch (work never lands directly on `main`):
 
 ```bash
 git checkout -b feat/doc-ingestion
 ```
 
-- [ ] **Step 0.2:** Capture the pre-change eval baseline (house rule: *no extraction change ships without an eval delta*):
+- [x] **Step 0.2:** Capture the pre-change eval baseline (house rule: *no extraction change ships without an eval delta*):
 
 ```bash
 PYTHONPATH=src python3 evals/run_eval.py --baseline evals/reports/baseline.json || true
@@ -104,7 +106,7 @@ Record the summary numbers in your working notes; Task 16 compares against them.
 - Modify: `src/uci/core/schema.py`
 - Test: `tests/test_core_schema.py`
 
-- [ ] **Step 1.1: Write failing tests** (append to `tests/test_core_schema.py`):
+- [x] **Step 1.1: Write failing tests** (append to `tests/test_core_schema.py`):
 
 ```python
 from uci.core.entities import SYMBOL_KINDS, EntityType
@@ -141,9 +143,9 @@ def test_doc_aliases_normalize():
     assert normalize_relation("describes") is RelationType.DESCRIBES
 ```
 
-- [ ] **Step 1.2:** Run: `PYTHONPATH=src python3 -m pytest tests/test_core_schema.py -q` — expect FAIL (`AttributeError: DOC_SECTION`).
+- [x] **Step 1.2:** Run: `PYTHONPATH=src python3 -m pytest tests/test_core_schema.py -q` — expect FAIL (`AttributeError: DOC_SECTION`).
 
-- [ ] **Step 1.3: Implement.** In `entities.py`, add to `EntityType` after the legacy tier (keep the grouping comment style):
+- [x] **Step 1.3: Implement.** In `entities.py`, add to `EntityType` after the legacy tier (keep the grouping comment style):
 
 ```python
     # --- Documentation ---
@@ -173,8 +175,8 @@ In `schema.py`, add to `RELATION_SPECS`:
 
 and the aliases: `"doc": EntityType.DOC_SECTION`, `"section": EntityType.DOC_SECTION` in `_ENTITY_ALIASES`; `"documents": RelationType.DESCRIBES`, `"describe": RelationType.DESCRIBES` in `_RELATION_ALIASES`.
 
-- [ ] **Step 1.4:** Run: `PYTHONPATH=src python3 -m pytest tests/test_core_schema.py -q` — expect PASS.
-- [ ] **Step 1.5:** Commit:
+- [x] **Step 1.4:** Run: `PYTHONPATH=src python3 -m pytest tests/test_core_schema.py -q` — expect PASS.
+- [x] **Step 1.5:** Commit:
 
 ```bash
 git add src/uci/core/entities.py src/uci/core/relationships.py src/uci/core/schema.py tests/test_core_schema.py
@@ -192,7 +194,7 @@ git commit -m "feat(schema): DOC_SECTION entity kind + DESCRIBES relation (impac
 - Modify: `.env.sample`
 - Test: `tests/test_langanalyze.py` (append), `tests/test_config_env.py` (append)
 
-- [ ] **Step 2.1: Write failing tests.** Append to `tests/test_langanalyze.py`:
+- [x] **Step 2.1: Write failing tests.** Append to `tests/test_langanalyze.py`:
 
 ```python
 from uci.ingest.langdetect import detect_language, is_doc, module_qname
@@ -241,8 +243,8 @@ def test_doc_weight_and_max_bytes_defaults(tmp_path):
     assert cfg.doc_max_bytes == 10_000_000
 ```
 
-- [ ] **Step 2.2:** Run both test files — expect FAIL.
-- [ ] **Step 2.3: Implement `langdetect.py`.** Add doc mappings (distinct language ids so the registry can route one parser under many names, and the scanner can gate converter formats):
+- [x] **Step 2.2:** Run both test files — expect FAIL.
+- [x] **Step 2.3: Implement `langdetect.py`.** Add doc mappings (distinct language ids so the registry can route one parser under many names, and the scanner can gate converter formats):
 
 ```python
 _DOC_EXT_LANGUAGE: dict[str, str] = {
@@ -266,7 +268,7 @@ def is_doc(language: str | None) -> bool:
 
 In `detect_language()`, check `_DOC_EXT_LANGUAGE` after the existing `_EXT_LANGUAGE` loop, then the basename against `_DOC_FILENAMES` (return `"doctext"`). Keep `.html`/`.css` etc. behavior: **remove `.md`, `.rst`, `.txt`, `.html` from `_TEXT_EXTS`** (the doc pipeline owns them now; `.sql`, `.sh`, `.css` stay under `index_all_text`). In `module_qname()`, extend the strip-extension tuple with `(".markdown", ".md", ".rst", ".adoc", ".asciidoc", ".txt", ".html", ".htm", ".pdf", ".docx")`.
 
-- [ ] **Step 2.4: Implement `config.py`.** Add fields with defaults + env wiring in `from_env` (mirror `index_all_text`):
+- [x] **Step 2.4: Implement `config.py`.** Add fields with defaults + env wiring in `from_env` (mirror `index_all_text`):
 
 ```python
     # documentation pipeline (docs/documentation-ingestion.md)
@@ -283,9 +285,9 @@ In `detect_language()`, check `_DOC_EXT_LANGUAGE` after the existing `_EXT_LANGU
 
 `DEFAULT_IGNORE_GLOBS` contains `*.pdf`: remove it from the constant and instead have `Config.from_env` append `*.pdf` and `*.docx` to `ignore_globs` **only when `index_docs` is false** (compute before constructing `cfg`; keep `ignore_globs` overrideable). This keeps `--no-docs` behavior identical to today.
 
-- [ ] **Step 2.5: Implement `scanner.py`.** In `_classify`, docs route through language detection already; add the gates: if `is_doc(language)` and not `config.index_docs` → return `None`; if `language in DOC_CONVERTER_LANGS` use `config.doc_max_bytes` (not `max_file_bytes`) for the size check and **skip the file (return None) when the converter is unavailable** (`from .docconvert import available; available(language)` — Task 3 provides it; until then guard with a try/except ImportError returning None). Note: `analyze_language(rp, read_head(abs_path))` returns `None` head for binary files — call `detect_language(rp)` first for converter formats so PDFs are classified by extension, not content.
+- [x] **Step 2.5: Implement `scanner.py`.** In `_classify`, docs route through language detection already; add the gates: if `is_doc(language)` and not `config.index_docs` → return `None`; if `language in DOC_CONVERTER_LANGS` use `config.doc_max_bytes` (not `max_file_bytes`) for the size check and **skip the file (return None) when the converter is unavailable** (`from .docconvert import available; available(language)` — Task 3 provides it; until then guard with a try/except ImportError returning None). Note: `analyze_language(rp, read_head(abs_path))` returns `None` head for binary files — call `detect_language(rp)` first for converter formats so PDFs are classified by extension, not content.
 
-- [ ] **Step 2.6: Update `.env.sample`** (sanitized — placeholders only, per repo convention):
+- [x] **Step 2.6: Verify `.env.sample`** already contains the documentation-ingestion block below (it was added when this plan was written — do not duplicate it; extend only if a key is missing):
 
 ```ini
 # --- Documentation ingestion (docs/documentation-ingestion.md) -----------------------
@@ -296,8 +298,8 @@ UCI_WEIGHT_DOC=0.8          # ranking multiplier for doc hits (docs must not swa
 UCI_DOC_MAX_BYTES=10000000  # size cap for converter formats (PDF/DOCX) only
 ```
 
-- [ ] **Step 2.7:** Run: `PYTHONPATH=src python3 -m pytest tests/test_langanalyze.py tests/test_config_env.py -q` — expect PASS. Then the full suite (`PYTHONPATH=src python3 -m pytest -q`) — the `_TEXT_EXTS` change may surface `index_all_text` tests to adjust; fix expectations only where the test asserted `.md`→text behavior.
-- [ ] **Step 2.8:** Commit: `git commit -am "feat(ingest): doc language detection + UCI_INDEX_DOCS/UCI_WEIGHT_DOC/UCI_DOC_MAX_BYTES config"`
+- [x] **Step 2.7:** Run: `PYTHONPATH=src python3 -m pytest tests/test_langanalyze.py tests/test_config_env.py -q` — expect PASS. Then the full suite (`PYTHONPATH=src python3 -m pytest -q`) — the `_TEXT_EXTS` change may surface `index_all_text` tests to adjust; fix expectations only where the test asserted `.md`→text behavior.
+- [x] **Step 2.8:** Commit: `git commit -am "feat(ingest): doc language detection + UCI_INDEX_DOCS/UCI_WEIGHT_DOC/UCI_DOC_MAX_BYTES config"`
 
 ---
 
@@ -309,7 +311,7 @@ UCI_DOC_MAX_BYTES=10000000  # size cap for converter formats (PDF/DOCX) only
 - Modify: `pyproject.toml`
 - Test: `tests/test_docconvert.py`
 
-- [ ] **Step 3.1: Write failing tests** (`tests/test_docconvert.py`). Converter tests must pass **without** the extra installed (the registry reports unavailability; conversion tests are skipped):
+- [x] **Step 3.1: Write failing tests** (`tests/test_docconvert.py`). Converter tests must pass **without** the extra installed (the registry reports unavailability; conversion tests are skipped):
 
 ```python
 import pytest
@@ -342,8 +344,8 @@ def test_extract_docx_roundtrip(tmp_path):
     assert "# Payments Spec" in text and "COSGN00C" in text
 ```
 
-- [ ] **Step 3.2:** Run: `PYTHONPATH=src python3 -m pytest tests/test_docconvert.py -q` — expect FAIL (module missing).
-- [ ] **Step 3.3: Implement `docconvert.py`** — lazy imports, never raises, honest markers:
+- [x] **Step 3.2:** Run: `PYTHONPATH=src python3 -m pytest tests/test_docconvert.py -q` — expect FAIL (module missing).
+- [x] **Step 3.3: Implement `docconvert.py`** — lazy imports, never raises, honest markers:
 
 ```python
 """Optional binary-document converters (PDF/DOCX -> text).
@@ -428,7 +430,7 @@ def _docx_text(p: Path) -> str:
 __all__ = ["available", "extract_text", "PAGE_MARKER"]
 ```
 
-- [ ] **Step 3.4: Wire the indexer read path.** In `indexer.py` inside the scan loop, replace the plain `read_text` call for converter formats:
+- [x] **Step 3.4: Wire the indexer read path.** In `indexer.py` inside the scan loop, replace the plain `read_text` call for converter formats:
 
 ```python
         for sf in scanned:
@@ -442,7 +444,7 @@ __all__ = ["available", "extract_text", "PAGE_MARKER"]
 
 (imports: `from .docconvert import extract_text` and `from .langdetect import DOC_CONVERTER_LANGS, is_doc` — `is_doc` used in Task 7). Content-hash change detection then hashes the *extracted text* — deterministic, so incremental embedding still works; no separate conversion cache is needed (YAGNI: extraction re-runs per index pass, matching how parsing re-runs per pass).
 
-- [ ] **Step 3.5: `pyproject.toml`.** Add the extra and grow `all`:
+- [x] **Step 3.5: `pyproject.toml`.** Add the extra and grow `all`:
 
 ```toml
 # Documentation converters for the doc-ingestion pipeline (PDF/DOCX; docs/documentation-ingestion.md).
@@ -451,8 +453,8 @@ docs = ["pypdf>=4.0", "python-docx>=1.1"]
 
 and append `"pypdf>=4.0", "python-docx>=1.1"` to the `all` list.
 
-- [ ] **Step 3.6:** Run: `PYTHONPATH=src python3 -m pytest tests/test_docconvert.py -q` — expect PASS (docx test skipped unless installed).
-- [ ] **Step 3.7:** Commit: `git commit -am "feat(ingest): optional PDF/DOCX converter registry behind [docs] extra"`
+- [x] **Step 3.6:** Run: `PYTHONPATH=src python3 -m pytest tests/test_docconvert.py -q` — expect PASS (docx test skipped unless installed).
+- [x] **Step 3.7:** Commit: `git commit -am "feat(ingest): optional PDF/DOCX converter registry behind [docs] extra"`
 
 ---
 
@@ -465,7 +467,7 @@ and append `"pypdf>=4.0", "python-docx>=1.1"` to the `all` list.
 
 The parser is a *dumb structural extractor* (house style): sections + mention links, line-accurate, never raises.
 
-- [ ] **Step 4.1: Write failing structure tests** (`tests/test_doc_parser.py`):
+- [x] **Step 4.1: Write failing structure tests** (`tests/test_doc_parser.py`):
 
 ```python
 from uci.core.entities import EntityType
@@ -515,8 +517,8 @@ def test_headingless_doc_gets_one_whole_file_section():
     assert len(secs) == 1 and secs[0].name == "NOTES" and secs[0].start_line == 1
 ```
 
-- [ ] **Step 4.2:** Run: `PYTHONPATH=src python3 -m pytest tests/test_doc_parser.py -q` — FAIL (no module).
-- [ ] **Step 4.3: Implement structure extraction.** Core shape of `doc_parser.py` (mention extraction arrives in Task 5 — leave `_extract_mentions` returning `[]` for now):
+- [x] **Step 4.2:** Run: `PYTHONPATH=src python3 -m pytest tests/test_doc_parser.py -q` — FAIL (no module).
+- [x] **Step 4.3: Implement structure extraction.** Core shape of `doc_parser.py` (mention extraction arrives in Task 5 — leave `_extract_mentions` returning `[]` for now):
 
 ```python
 """Documentation parser: headings -> DOC_SECTION symbols; mentions -> ParsedLink("describes").
@@ -641,7 +643,7 @@ class DocParser(LanguageParser):
         return []
 ```
 
-- [ ] **Step 4.4: Register dialects** in `registry.py`:
+- [x] **Step 4.4: Register dialects** in `registry.py`:
 
 ```python
 from .doc_parser import DocParser
@@ -652,8 +654,8 @@ for _lang in ("markdown", "rst", "asciidoc", "doctext", "htmldoc", "pdf", "docx"
     register(_p)
 ```
 
-- [ ] **Step 4.5:** Run: `PYTHONPATH=src python3 -m pytest tests/test_doc_parser.py -q` — PASS. Full suite still green.
-- [ ] **Step 4.6:** Commit: `git commit -am "feat(parser): DocParser — heading-bounded DOC_SECTION extraction for md/rst/adoc/txt/html/pdf/docx"`
+- [x] **Step 4.5:** Run: `PYTHONPATH=src python3 -m pytest tests/test_doc_parser.py -q` — PASS. Full suite still green.
+- [x] **Step 4.6:** Commit: `git commit -am "feat(parser): DocParser — heading-bounded DOC_SECTION extraction for md/rst/adoc/txt/html/pdf/docx"`
 
 ---
 
@@ -665,7 +667,7 @@ for _lang in ("markdown", "rst", "asciidoc", "doctext", "htmldoc", "pdf", "docx"
 
 The parser only *extracts and classifies* mention candidates; it does **not** resolve them (graph builder's job). Every mention becomes `ParsedLink(relation="describes", src_qname=<section>, target_name=..., attributes={"match": ..., "context": ...})`.
 
-- [ ] **Step 5.1: Write failing mention tests** (append to `tests/test_doc_parser.py`):
+- [x] **Step 5.1: Write failing mention tests** (append to `tests/test_doc_parser.py`):
 
 ```python
 def _mentions(result):
@@ -709,8 +711,8 @@ def test_qualified_names_and_fenced_blocks():
 
 (Adjust the first section qname in the last test to the actual slug of `# T` → `T.t`.)
 
-- [ ] **Step 5.2:** Run — expect FAIL.
-- [ ] **Step 5.3: Implement mention extraction** in `doc_parser.py` (replace the stub):
+- [x] **Step 5.2:** Run — expect FAIL.
+- [x] **Step 5.3: Implement mention extraction** in `doc_parser.py` (replace the stub):
 
 ```python
 _CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
@@ -790,8 +792,8 @@ class DocParser(LanguageParser):
         return links
 ```
 
-- [ ] **Step 5.4:** Run: `PYTHONPATH=src python3 -m pytest tests/test_doc_parser.py -q` — PASS.
-- [ ] **Step 5.5:** Commit: `git commit -am "feat(parser): doc mention extraction — paths, code-spans, headings, bare member tokens"`
+- [x] **Step 5.4:** Run: `PYTHONPATH=src python3 -m pytest tests/test_doc_parser.py -q` — PASS.
+- [x] **Step 5.5:** Commit: `git commit -am "feat(parser): doc mention extraction — paths, code-spans, headings, bare member tokens"`
 
 ---
 
@@ -808,7 +810,7 @@ Resolution policy (deterministic, mirrors calls):
 - Gap policy: only `match == "code-span"` member-shaped misses (and not external-prefixed / system utilities) → `report_gap("documented-artifact", name, EntityType.LEGACY_PROGRAM, prov, "documented-artifact-missing", f"{name} (referenced in documentation)")` **without** emitting an edge to the stub? **No — follow house style: emit the DESCRIBES edge to the stub with `resolution="missing"`** so the gaps panel and doc page can show it, exactly like unresolved COPY members.
 - `bare`/`heading`/`path` misses: drop silently (noise).
 
-- [ ] **Step 6.1: Write failing tests** (`tests/test_doc_linker.py`) — build a tiny in-memory repo through the public pipeline:
+- [ ] **Step 6.1: Write failing tests** (`tests/test_doc_linker.py`) — build a tiny in-memory repo through the public pipeline. Put the `_repo`/`_doc_repo_engine` helpers in `tests/conftest.py` (Tasks 8–10 and 12 reuse them; keep tests DRY):
 
 ```python
 from pathlib import Path
