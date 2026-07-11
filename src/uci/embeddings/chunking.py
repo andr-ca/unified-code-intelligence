@@ -26,6 +26,7 @@ _CHUNKABLE = frozenset(
         EntityType.LEGACY_PROGRAM,
         EntityType.COPYBOOK,
         EntityType.JCL_JOB,
+        EntityType.DOC_SECTION,
     }
 )
 

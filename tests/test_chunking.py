@@ -73,3 +73,10 @@ def test_secret_scrubbing_masks_credentials():
     assert "REDACTED" in scrub_secrets("api_key = 'sk-supersecretvalue123'")
     assert "-----BEGIN" not in scrub_secrets("-----BEGIN RSA PRIVATE KEY-----")
     assert scrub_secrets("x = 1") == "x = 1"
+
+
+def test_doc_sections_are_chunkable():
+    from uci.core.entities import EntityType
+    from uci.embeddings.chunking import _CHUNKABLE
+
+    assert EntityType.DOC_SECTION in _CHUNKABLE

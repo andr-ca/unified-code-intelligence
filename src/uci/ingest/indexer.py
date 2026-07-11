@@ -45,6 +45,8 @@ class IndexStats:
     embedded: int = 0
     commits: int = 0
     gaps: int = 0
+    doc_sections: int = 0
+    doc_links: int = 0
     elapsed_ms: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -134,6 +136,8 @@ class Indexer:
         self.graph.add_relationships(relationships)
         stats.entities = len(entities)
         stats.relationships = len(relationships)
+        stats.doc_sections = sum(1 for e in entities if e.kind is EntityType.DOC_SECTION)
+        stats.doc_links = sum(1 for r in relationships if r.type is RelationType.DESCRIBES)
 
         # -- deleted files: purge chunks/vectors/records -------------------
         deleted = set(stored) - scanned_paths
@@ -154,13 +158,13 @@ class Indexer:
         prev_embed_meta = self.metadata.get_state(rid, "embedding_meta")
         if prev_embed_meta and prev_embed_meta != embed_meta:
             self.vectors.clear(rid)
-            changed |= {fp.path for fp in file_parses if is_code(fp.path)}
+            changed |= {fp.path for fp in file_parses if is_code(fp.path) or is_doc(fp.language)}
             existing_chunks.clear()
         self.metadata.set_state(rid, "embedding_meta", embed_meta)
 
         # -- chunks + embeddings (incremental) -----------------------------
         for fp in file_parses:
-            if not is_code(fp.path):
+            if not (is_code(fp.path) or is_doc(fp.language)):
                 continue
             path = fp.path
             if path not in changed and existing_chunks.get(path):
