@@ -1,32 +1,8 @@
-from pathlib import Path
+from conftest import _repo
 
 from uci import Config, Engine
 from uci.core.entities import EntityType
 from uci.core.relationships import RelationType
-
-COBOL = """\
-       IDENTIFICATION DIVISION.
-       PROGRAM-ID. COSGN00C.
-       PROCEDURE DIVISION.
-       MAIN-PARA.
-           MOVE 1 TO X.
-"""
-
-README = """\
-# App
-
-## Signon — COSGN00C
-
-`COSGN00C` handles signon. See [source](cbl/COSGN00C.cbl).
-Missing member `CBTRN99C` is documented but absent. COBOL rules IGNOREME.
-"""
-
-
-def _repo(tmp_path: Path) -> Path:
-    (tmp_path / "cbl").mkdir()
-    (tmp_path / "cbl" / "COSGN00C.cbl").write_text(COBOL)
-    (tmp_path / "README.md").write_text(README)
-    return tmp_path
 
 
 def _describes(engine):
