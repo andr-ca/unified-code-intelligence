@@ -25,9 +25,10 @@ from ..embeddings.chunking import build_chunks, embed_chunks
 from ..parser.base import ParseResult
 from ..parser.registry import get_parser
 from . import git_meta
+from .docconvert import extract_text
 from .graph_builder import FileParse, GraphBuilder
 from .hashing import hash_text, read_text
-from .langdetect import is_code, module_qname
+from .langdetect import DOC_CONVERTER_LANGS, is_code, is_doc, module_qname
 from .metrics import MetricsCollector
 from .scanner import scan
 
@@ -97,7 +98,10 @@ class Indexer:
         metrics = MetricsCollector()
 
         for sf in scanned:
-            source = read_text(sf.abs_path, self.config.max_file_bytes)
+            if sf.language in DOC_CONVERTER_LANGS:
+                source = extract_text(sf.abs_path, sf.language, self.config.doc_max_bytes)
+            else:
+                source = read_text(sf.abs_path, self.config.max_file_bytes)
             if source is None:
                 continue
             metrics.add_file(sf.rel_path, sf.language, source)
