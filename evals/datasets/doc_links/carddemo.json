@@ -1,0 +1,34 @@
+{
+  "name": "carddemo-doc-links",
+  "version": 1,
+  "repo": "evals/demo-repos/aws-mainframe-modernization-carddemo",
+  "expected_links": [
+    {"doc_path": "README.md", "section_contains": "Accessing the Application", "target": "CC00", "target_kind": "transaction_code"},
+    {"doc_path": "README.md", "section_contains": "Running Batch Jobs", "target": "POSTTRAN", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Running Batch Jobs", "target": "INTCALC", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Running Batch Jobs", "target": "COMBTRAN", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Running Batch Jobs", "target": "CREASTMT", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Running Batch Jobs", "target": "TRANBKP", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Running Batch Jobs", "target": "TRANIDX", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Running Batch Jobs", "target": "WAITSTEP", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "DISCGRP", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "TRANCATG", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "TRANTYPE", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "ACCTFILE", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "CARDFILE", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "CUSTFILE", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "XREFFILE", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "TRANFILE", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "OPENFIL", "target_kind": "jcl_job"},
+    {"doc_path": "README.md", "section_contains": "Installation Steps", "target": "CLOSEFIL", "target_kind": "jcl_job"}
+  ],
+  "forbidden_links": [
+    {"doc_path": "README.md", "target": "COBOL"},
+    {"doc_path": "README.md", "target": "AWS"},
+    {"doc_path": "README.md", "target": "CICS"},
+    {"doc_path": "README.md", "target": "JCL"},
+    {"doc_path": "README.md", "target": "VSAM"},
+    {"doc_path": "README.md", "target": "README"}
+  ],
+  "expected_gaps": []
+}
