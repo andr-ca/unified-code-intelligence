@@ -629,12 +629,14 @@ class Engine:
             for r in self.graph.out_relationships(entity_id, [RelationType.CALLS])
             if self.graph.get_entity(r.dst_id)
         ]
+        imp = self._impact()
         return {
             "ok": True,
             "entity": _entity_hit(entity),
             "callers": callers,
             "callees": callees,
-            "source": self._impact()._source_slice(entity),
+            "documentation": imp._documentation(entity),
+            "source": imp._source_slice(entity),
         }
 
     def default_graph_root(self) -> tuple[str, str]:
