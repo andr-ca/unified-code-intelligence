@@ -67,6 +67,11 @@ RELATION_SPECS: dict[RelationType, RelationSpec] = {
     RelationType.USES: RelationSpec(True, frozenset({EntityType.USER_FLOW}), _ANY),
     RelationType.INVOKES: RelationSpec(True, frozenset({EntityType.TRANSACTION_CODE}), _ANY),
     RelationType.CANDIDATE_FOR_MIGRATION: RelationSpec(True, _ANY, frozenset({EntityType.SERVICE, EntityType.COMPONENT})),
+    RelationType.DESCRIBES: RelationSpec(
+        True,
+        frozenset({EntityType.DOC_SECTION, EntityType.FILE, EntityType.MODULE}),
+        frozenset(),  # any target: programs, jobs, tables, screens, files, functions…
+    ),
 }
 
 
@@ -91,6 +96,8 @@ _ENTITY_ALIASES: dict[str, EntityType] = {
     "endpoint": EntityType.API_ENDPOINT,
     "flag": EntityType.FEATURE_FLAG,
     "cron": EntityType.JOB,
+    "doc": EntityType.DOC_SECTION,
+    "section": EntityType.DOC_SECTION,
 }
 
 _RELATION_ALIASES: dict[str, RelationType] = {
@@ -114,6 +121,8 @@ _RELATION_ALIASES: dict[str, RelationType] = {
     "ref": RelationType.REFERENCES,
     "contain": RelationType.CONTAINS,
     "define": RelationType.DEFINES,
+    "documents": RelationType.DESCRIBES,
+    "describe": RelationType.DESCRIBES,
 }
 
 

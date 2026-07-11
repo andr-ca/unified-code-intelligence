@@ -56,6 +56,9 @@ class RelationType(str, Enum):
     INVOKES = "invokes"
     CANDIDATE_FOR_MIGRATION = "candidate_for_migration"
 
+    # documentation
+    DESCRIBES = "describes"
+
     def __str__(self) -> str:  # pragma: no cover - trivial
         return self.value
 
